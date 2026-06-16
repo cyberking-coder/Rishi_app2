@@ -4,6 +4,8 @@ import 'package:go_router/go_router.dart';
 
 import '../../../../app/theme/app_theme.dart';
 import '../../../../core/utils/responsive.dart';
+import '../../../audio/application/audio_providers.dart';
+import '../../../audio/domain/entities/audio_track.dart';
 import '../../application/home_providers.dart';
 import '../../domain/entities/audio_summary.dart';
 import '../../domain/entities/category_summary.dart';
@@ -108,7 +110,17 @@ class _ContinueWatchingSection extends ConsumerWidget {
                       item: item,
                       onTap: item.type == ContinueWatchingType.video
                           ? () => context.push('/player/${item.contentId}')
-                          : () {},
+                          : () {
+                              ref.read(audioHandlerProvider).playSingleTrack(
+                                    AudioTrack(
+                                      id: item.contentId,
+                                      title: item.title,
+                                      coverArtUrl: item.thumbnailUrl,
+                                      durationSeconds: item.durationSeconds,
+                                    ),
+                                  );
+                              context.push('/now-playing');
+                            },
                     );
                   },
                 ),
@@ -179,7 +191,21 @@ class _FeaturedAudiosSection extends ConsumerWidget {
                 itemCount: audios.length,
                 itemBuilder: (context, index) {
                   final AudioSummary audio = audios[index];
-                  return AudioCard(audio: audio, onTap: () {});
+                  return AudioCard(
+                    audio: audio,
+                    onTap: () {
+                      ref.read(audioHandlerProvider).playSingleTrack(
+                            AudioTrack(
+                              id: audio.id,
+                              title: audio.title,
+                              artist: audio.artist,
+                              coverArtUrl: audio.coverArtUrl,
+                              durationSeconds: audio.durationSeconds,
+                            ),
+                          );
+                      context.push('/now-playing');
+                    },
+                  );
                 },
               ),
             ),
