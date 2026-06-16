@@ -1,0 +1,93 @@
+import 'package:supabase_flutter/supabase_flutter.dart';
+
+import '../../../../core/device/device_info_service.dart';
+import '../../../../core/errors/auth_failure.dart';
+
+/// Raised internally when the `register_device` RPC rejects the login
+/// because another device already holds the active session.
+class DeviceLockedException implements Exception {}
+
+class AuthRemoteDataSource {
+  final SupabaseClient _client;
+  final DeviceInfoService _deviceInfoService;
+
+  AuthRemoteDataSource(this._client, this._deviceInfoService);
+
+  User? get currentUser => _client.auth.currentUser;
+
+  Stream<AuthState> get onAuthStateChange => _client.auth.onAuthStateChange;
+
+  /// Signs in with email/password, then registers this device. If the
+  /// account is already active on a different device, the RPC throws and
+  /// we immediately sign the session back out so no partially-authed
+  /// state leaks into the app.
+  Future<User> signInAndRegisterDevice({
+    required String email,
+    required String password,
+  }) async {
+    final AuthResponse response;
+    try {
+      response = await _client.auth.signInWithPassword(
+        email: email,
+        password: password,
+      );
+    } on AuthException catch (e) {
+      throw _mapAuthException(e);
+    }
+
+    final user = response.user;
+    if (user == null) {
+      throw AuthFailure.unknown('Login failed. Please try again.');
+    }
+
+    try {
+      await _registerDevice();
+    } on DeviceLockedException {
+      await _client.auth.signOut();
+      throw AuthFailure.deviceLocked();
+    }
+
+    return user;
+  }
+
+  Future<void> _registerDevice() async {
+    final profile = await _deviceInfoService.getDeviceProfile();
+    try {
+      await _client.rpc('register_device', params: {
+        'p_device_fingerprint': profile.fingerprint,
+        'p_device_name': profile.name,
+        'p_platform': profile.platform,
+      });
+    } on PostgrestException catch (e) {
+      if (e.hint == 'DEVICE_LOCKED' ||
+          e.message.contains('already active on another device')) {
+        throw DeviceLockedException();
+      }
+      rethrow;
+    }
+  }
+
+  Future<void> signOut() => _client.auth.signOut();
+
+  Future<void> sendPasswordResetEmail(String email) async {
+    try {
+      await _client.auth.resetPasswordForEmail(email);
+    } on AuthException catch (e) {
+      throw _mapAuthException(e);
+    }
+  }
+
+  AuthFailure _mapAuthException(AuthException e) {
+    final message = e.message.toLowerCase();
+    if (message.contains('invalid login credentials')) {
+      return AuthFailure.invalidCredentials();
+    }
+    if (message.contains('email not confirmed')) {
+      return const AuthFailure(
+        AuthFailureType.emailNotConfirmed,
+        'Please verify your email before logging in.',
+      );
+    }
+    return AuthFailure.unknown(e.message);
+  }
+}
