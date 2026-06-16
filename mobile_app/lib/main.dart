@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'app/router/app_router.dart';
+import 'app/theme/app_theme.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -25,7 +26,9 @@ class OttApp extends ConsumerWidget {
 
     return MaterialApp.router(
       title: 'OTT App',
-      theme: ThemeData(useMaterial3: true, colorSchemeSeed: Colors.deepPurple),
+      themeMode: ThemeMode.dark,
+      darkTheme: AppTheme.dark(),
+      theme: AppTheme.dark(),
       routerConfig: router,
     );
   }
