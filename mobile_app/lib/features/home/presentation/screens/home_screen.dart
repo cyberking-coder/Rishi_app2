@@ -47,7 +47,8 @@ class HomeScreen extends ConsumerWidget {
                 icon: const Icon(Icons.download_outlined),
               ),
               IconButton(
-                onPressed: () {},
+                tooltip: 'Profile',
+                onPressed: () => context.push('/profile'),
                 icon: const Icon(Icons.person_outline),
               ),
               const SizedBox(width: 8),

@@ -10,6 +10,7 @@ import '../../features/downloads/presentation/screens/downloads_screen.dart';
 import '../../features/downloads/presentation/screens/offline_player_screen.dart';
 import '../../features/home/presentation/screens/home_screen.dart';
 import '../../features/player/presentation/screens/video_player_screen.dart';
+import '../../features/profile/presentation/screens/profile_screen.dart';
 import '../widgets/app_shell.dart';
 
 final goRouterProvider = Provider<GoRouter>((ref) {
@@ -57,6 +58,10 @@ final goRouterProvider = Provider<GoRouter>((ref) {
           contentId: state.pathParameters['contentId']!,
           title: state.extra as String? ?? 'Offline',
         ),
+      ),
+      GoRoute(
+        path: '/profile',
+        builder: (_, __) => const AppShell(child: ProfileScreen()),
       ),
     ],
   );
