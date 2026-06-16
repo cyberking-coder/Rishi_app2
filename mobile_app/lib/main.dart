@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:audio_service/audio_service.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -10,6 +12,12 @@ import 'features/audio/application/audio_player_handler.dart';
 import 'features/audio/application/audio_providers.dart';
 import 'features/audio/data/datasources/audio_remote_datasource.dart';
 import 'features/audio/data/repositories/audio_repository_impl.dart';
+import 'features/downloads/application/download_providers.dart';
+import 'features/downloads/data/net/local_decrypting_proxy.dart';
+import 'features/downloads/data/repositories/download_repository_impl.dart';
+import 'features/downloads/data/sources/download_source_resolver.dart';
+import 'features/downloads/data/storage/download_metadata_store.dart';
+import 'features/downloads/data/storage/secure_download_storage.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -31,9 +39,24 @@ Future<void> main() async {
     ),
   );
 
+  // Offline downloads: build the engine, start the loopback decrypting
+  // proxy, restore the manifest, and purge any revoked/expired files
+  // before the UI can reference them.
+  final downloadRepository = DownloadRepositoryImpl(
+    storage: SecureDownloadStorage(),
+    metadataStore: DownloadMetadataStore(),
+    resolver: DownloadSourceResolver(Supabase.instance.client),
+    proxy: LocalDecryptingProxy(),
+  );
+  await downloadRepository.restore();
+  unawaited(downloadRepository.purgeRevokedAndExpired());
+
   runApp(
     ProviderScope(
-      overrides: [audioHandlerProvider.overrideWithValue(audioHandler)],
+      overrides: [
+        audioHandlerProvider.overrideWithValue(audioHandler),
+        downloadRepositoryProvider.overrideWithValue(downloadRepository),
+      ],
       child: const OttApp(),
     ),
   );
