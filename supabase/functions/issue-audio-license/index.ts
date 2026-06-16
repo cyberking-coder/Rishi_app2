@@ -5,9 +5,10 @@
 // returns one signed URL rather than a list.
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { AwsClient } from "https://esm.sh/aws4fetch@1.0.17";
+import { handlePreflight, jsonResponse } from "../_shared/cors.ts";
+import { DEFAULT_DOWNLOAD_TTL_SECONDS, presignGet } from "../_shared/r2.ts";
 
-const SIGNED_URL_TTL_SECONDS = 600;
+const SIGNED_URL_TTL_SECONDS = DEFAULT_DOWNLOAD_TTL_SECONDS;
 
 interface AudioRow {
   id: string;
@@ -20,6 +21,9 @@ interface AssetRow {
 }
 
 Deno.serve(async (req) => {
+  const preflight = handlePreflight(req);
+  if (preflight) return preflight;
+
   if (req.method !== "POST") {
     return jsonResponse({ error: "Method not allowed" }, 405);
   }
@@ -108,23 +112,7 @@ Deno.serve(async (req) => {
     return jsonResponse({ error: "No playable rendition for this audio" }, 404);
   }
 
-  const r2 = new AwsClient({
-    accessKeyId: Deno.env.get("R2_ACCESS_KEY_ID")!,
-    secretAccessKey: Deno.env.get("R2_SECRET_ACCESS_KEY")!,
-    service: "s3",
-    region: "auto",
-  });
-
-  const bucket = Deno.env.get("R2_BUCKET")!;
-  const accountId = Deno.env.get("R2_ACCOUNT_ID")!;
-  const endpoint = `https://${accountId}.r2.cloudflarestorage.com`;
-  const objectUrl = `${endpoint}/${bucket}/${asset.r2_path}`;
-
-  const signed = await r2.sign(objectUrl, {
-    method: "GET",
-    aws: { signQuery: true },
-    headers: { "X-Amz-Expires": String(SIGNED_URL_TTL_SECONDS) },
-  });
+  const signedUrl = await presignGet(asset.r2_path, SIGNED_URL_TTL_SECONDS);
 
   const { data: history } = await supabase
     .from("watch_history")
@@ -135,15 +123,8 @@ Deno.serve(async (req) => {
 
   return jsonResponse({
     audio_id: audioId,
-    url: signed.url,
+    url: signedUrl,
     resume_position_seconds: history?.progress_seconds ?? 0,
     expires_in_seconds: SIGNED_URL_TTL_SECONDS,
   });
 });
-
-function jsonResponse(body: unknown, status = 200): Response {
-  return new Response(JSON.stringify(body), {
-    status,
-    headers: { "Content-Type": "application/json" },
-  });
-}

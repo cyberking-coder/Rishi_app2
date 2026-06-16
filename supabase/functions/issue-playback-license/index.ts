@@ -9,9 +9,10 @@
 // Deployed with: supabase functions deploy issue-playback-license
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { AwsClient } from "https://esm.sh/aws4fetch@1.0.17";
+import { handlePreflight, jsonResponse } from "../_shared/cors.ts";
+import { DEFAULT_DOWNLOAD_TTL_SECONDS, presignGet } from "../_shared/r2.ts";
 
-const SIGNED_URL_TTL_SECONDS = 600; // 10 minutes
+const SIGNED_URL_TTL_SECONDS = DEFAULT_DOWNLOAD_TTL_SECONDS; // 10 minutes
 
 interface VideoRow {
   id: string;
@@ -27,6 +28,9 @@ interface AssetRow {
 }
 
 Deno.serve(async (req) => {
+  const preflight = handlePreflight(req);
+  if (preflight) return preflight;
+
   if (req.method !== "POST") {
     return jsonResponse({ error: "Method not allowed" }, 405);
   }
@@ -117,32 +121,12 @@ Deno.serve(async (req) => {
     return jsonResponse({ error: "No playable renditions for this video" }, 404);
   }
 
-  const r2 = new AwsClient({
-    accessKeyId: Deno.env.get("R2_ACCESS_KEY_ID")!,
-    secretAccessKey: Deno.env.get("R2_SECRET_ACCESS_KEY")!,
-    service: "s3",
-    region: "auto",
-  });
-
-  const bucket = Deno.env.get("R2_BUCKET")!;
-  const accountId = Deno.env.get("R2_ACCOUNT_ID")!;
-  const endpoint = `https://${accountId}.r2.cloudflarestorage.com`;
-
   const qualities = await Promise.all(
-    assets.map(async (asset) => {
-      const objectUrl = `${endpoint}/${bucket}/${asset.r2_path}`;
-      const signed = await r2.sign(objectUrl, {
-        method: "GET",
-        aws: { signQuery: true },
-        headers: { "X-Amz-Expires": String(SIGNED_URL_TTL_SECONDS) },
-      });
-
-      return {
-        label: asset.resolution ?? "auto",
-        bitrate: asset.bitrate,
-        url: signed.url,
-      };
-    }),
+    assets.map(async (asset) => ({
+      label: asset.resolution ?? "auto",
+      bitrate: asset.bitrate,
+      url: await presignGet(asset.r2_path, SIGNED_URL_TTL_SECONDS),
+    })),
   );
 
   const { data: history } = await supabase
@@ -159,10 +143,3 @@ Deno.serve(async (req) => {
     expires_in_seconds: SIGNED_URL_TTL_SECONDS,
   });
 });
-
-function jsonResponse(body: unknown, status = 200): Response {
-  return new Response(JSON.stringify(body), {
-    status,
-    headers: { "Content-Type": "application/json" },
-  });
-}

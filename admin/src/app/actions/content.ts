@@ -96,6 +96,21 @@ export async function attachUpload(args: {
     .eq("id", args.contentId);
 
   if (error) return { ok: false, error: error.message };
+
+  // Register a ready content_assets row so the playback license functions
+  // (which read content_assets, not videos.r2_path) can serve this file.
+  // For the MVP the uploaded file IS the playable asset (progressive
+  // mp4/mp3); a transcode pipeline would instead add HLS rendition rows.
+  const assetType = args.kind === "video" ? "video_mp4" : "audio_mp3";
+  const { error: assetError } = await db.from("content_assets").insert({
+    content_type: args.kind,
+    content_id: args.contentId,
+    asset_type: assetType,
+    r2_path: args.objectKey,
+    status: "ready",
+  });
+  if (assetError) return { ok: false, error: assetError.message };
+
   revalidatePath(args.kind === "video" ? "/videos" : "/audios");
   return { ok: true };
 }
