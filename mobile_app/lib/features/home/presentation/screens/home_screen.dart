@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../../../app/theme/app_theme.dart';
 import '../../../../core/utils/responsive.dart';
@@ -101,10 +102,15 @@ class _ContinueWatchingSection extends ConsumerWidget {
                   scrollDirection: Axis.horizontal,
                   padding: Responsive.pageHorizontalPadding(context),
                   itemCount: items.length,
-                  itemBuilder: (context, index) => ContinueWatchingCard(
-                    item: items[index],
-                    onTap: () => _openContinueWatching(context, items[index]),
-                  ),
+                  itemBuilder: (context, index) {
+                    final item = items[index];
+                    return ContinueWatchingCard(
+                      item: item,
+                      onTap: item.type == ContinueWatchingType.video
+                          ? () => context.push('/player/${item.contentId}')
+                          : () {},
+                    );
+                  },
                 ),
               ),
             ],
@@ -112,11 +118,6 @@ class _ContinueWatchingSection extends ConsumerWidget {
         );
       },
     );
-  }
-
-  void _openContinueWatching(BuildContext context, ContinueWatchingItem item) {
-    // Hand off to the player route once it exists; contentId + type is
-    // all the player needs to resume playback.
   }
 }
 
@@ -277,7 +278,7 @@ class _VideoRow extends StatelessWidget {
         itemCount: videos.length,
         itemBuilder: (context, index) => PosterCard(
           video: videos[index],
-          onTap: () {},
+          onTap: () => context.push('/player/${videos[index].id}'),
         ),
       ),
     );

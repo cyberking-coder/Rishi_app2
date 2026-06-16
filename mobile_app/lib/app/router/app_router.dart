@@ -6,6 +6,7 @@ import '../../features/auth/application/auth_providers.dart';
 import '../../features/auth/presentation/screens/forgot_password_screen.dart';
 import '../../features/auth/presentation/screens/login_screen.dart';
 import '../../features/home/presentation/screens/home_screen.dart';
+import '../../features/player/presentation/screens/video_player_screen.dart';
 
 final goRouterProvider = Provider<GoRouter>((ref) {
   final authState = ref.watch(authStateChangesProvider);
@@ -31,6 +32,12 @@ final goRouterProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/home',
         builder: (_, __) => const HomeScreen(),
+      ),
+      GoRoute(
+        path: '/player/:videoId',
+        builder: (_, state) => VideoPlayerScreen(
+          videoId: state.pathParameters['videoId']!,
+        ),
       ),
     ],
   );
