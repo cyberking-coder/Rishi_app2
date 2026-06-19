@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:audio_service/audio_service.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -22,6 +23,12 @@ import 'features/downloads/data/storage/secure_download_storage.dart';
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
+  // Surface any uncaught Flutter error instead of a blank black screen.
+  FlutterError.onError = (details) {
+    FlutterError.presentError(details);
+    debugPrint('FlutterError: ${details.exceptionAsString()}');
+  };
+
   await Supabase.initialize(
     url: AppConfig.supabaseUrl,
     anonKey: AppConfig.supabaseAnonKey,
@@ -30,14 +37,22 @@ Future<void> main() async {
   final audioRepository =
       AudioRepositoryImpl(AudioRemoteDataSource(Supabase.instance.client));
 
-  final audioHandler = await AudioService.init(
-    builder: () => AudioPlayerHandler(audioRepository),
-    config: const AudioServiceConfig(
-      androidNotificationChannelId: AppConfig.audioChannelId,
-      androidNotificationChannelName: AppConfig.audioChannelName,
-      androidStopForegroundOnPause: true,
-    ),
-  );
+  // Audio + downloads are optional at boot. If either fails to initialise
+  // (e.g. missing native channel, storage permission), the app must still
+  // reach the login screen rather than dying to a black screen.
+  AudioPlayerHandler? audioHandler;
+  try {
+    audioHandler = await AudioService.init(
+      builder: () => AudioPlayerHandler(audioRepository),
+      config: const AudioServiceConfig(
+        androidNotificationChannelId: AppConfig.audioChannelId,
+        androidNotificationChannelName: AppConfig.audioChannelName,
+        androidStopForegroundOnPause: true,
+      ),
+    );
+  } catch (e, st) {
+    debugPrint('AudioService.init failed: $e\n$st');
+  }
 
   final downloadRepository = DownloadRepositoryImpl(
     storage: SecureDownloadStorage(),
@@ -45,13 +60,18 @@ Future<void> main() async {
     resolver: DownloadSourceResolver(Supabase.instance.client),
     proxy: LocalDecryptingProxy(),
   );
-  await downloadRepository.restore();
-  unawaited(downloadRepository.purgeRevokedAndExpired());
+  try {
+    await downloadRepository.restore();
+    unawaited(downloadRepository.purgeRevokedAndExpired());
+  } catch (e, st) {
+    debugPrint('Download restore failed: $e\n$st');
+  }
 
   runApp(
     ProviderScope(
       overrides: [
-        audioHandlerProvider.overrideWithValue(audioHandler),
+        if (audioHandler != null)
+          audioHandlerProvider.overrideWithValue(audioHandler),
         downloadRepositoryProvider.overrideWithValue(downloadRepository),
       ],
       child: const MeditationApp(),
