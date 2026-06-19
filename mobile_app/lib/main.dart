@@ -52,6 +52,9 @@ Future<void> main() async {
     );
   } catch (e, st) {
     debugPrint('AudioService.init failed: $e\n$st');
+    // Provide a plain handler so the app can still reach the login screen.
+    // Background audio notification won't work but the UI will load.
+    audioHandler = AudioPlayerHandler(audioRepository);
   }
 
   final downloadRepository = DownloadRepositoryImpl(
@@ -70,8 +73,7 @@ Future<void> main() async {
   runApp(
     ProviderScope(
       overrides: [
-        if (audioHandler != null)
-          audioHandlerProvider.overrideWithValue(audioHandler),
+        audioHandlerProvider.overrideWithValue(audioHandler!),
         downloadRepositoryProvider.overrideWithValue(downloadRepository),
       ],
       child: const MeditationApp(),
