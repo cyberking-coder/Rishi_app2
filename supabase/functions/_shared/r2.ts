@@ -31,11 +31,15 @@ export async function presignGet(
   r2Path: string,
   ttlSeconds = DEFAULT_DOWNLOAD_TTL_SECONDS,
 ): Promise<string> {
-  const signed = await client().sign(objectUrl(r2Path), {
-    method: "GET",
-    aws: { signQuery: true },
-    headers: { "X-Amz-Expires": String(ttlSeconds) },
-  });
+  // X-Amz-Expires must live in the query string for a presigned URL — this
+  // mirrors the admin dashboard's proven-working upload signer. Passing it
+  // as a header produces URLs that R2 rejects with SignatureDoesNotMatch.
+  const url = new URL(objectUrl(r2Path));
+  url.searchParams.set("X-Amz-Expires", String(ttlSeconds));
+  const signed = await client().sign(
+    new Request(url, { method: "GET" }),
+    { aws: { signQuery: true } },
+  );
   return signed.url;
 }
 
@@ -49,14 +53,12 @@ export async function presignPut(
   contentType: string,
   ttlSeconds = DEFAULT_UPLOAD_TTL_SECONDS,
 ): Promise<string> {
-  const signed = await client().sign(objectUrl(r2Path), {
-    method: "PUT",
-    aws: { signQuery: true },
-    headers: {
-      "X-Amz-Expires": String(ttlSeconds),
-      "Content-Type": contentType,
-    },
-  });
+  const url = new URL(objectUrl(r2Path));
+  url.searchParams.set("X-Amz-Expires", String(ttlSeconds));
+  const signed = await client().sign(
+    new Request(url, { method: "PUT", headers: { "Content-Type": contentType } }),
+    { aws: { signQuery: true } },
+  );
   return signed.url;
 }
 
