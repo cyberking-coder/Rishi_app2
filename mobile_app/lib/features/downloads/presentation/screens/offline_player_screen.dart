@@ -1,8 +1,11 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:just_audio/just_audio.dart';
 
 import '../../../../app/theme/app_theme.dart';
+import '../../../audio/application/audio_providers.dart';
 import '../../application/download_providers.dart';
 
 /// Plays a fully-downloaded, encrypted audio file entirely offline.
@@ -36,11 +39,14 @@ class _OfflinePlayerScreenState extends ConsumerState<OfflinePlayerScreen> {
 
   Future<void> _init() async {
     try {
+      // Stop the global streaming handler so online + offline audio don't
+      // play over each other.
+      await ref.read(audioHandlerProvider).stop();
+
       final repo = ref.read(downloadRepositoryProvider);
       final url = await repo.localPlaybackUrl(widget.contentId);
       final player = AudioPlayer();
       await player.setUrl(url.toString());
-      await player.play();
       if (!mounted) {
         await player.dispose();
         return;
@@ -49,6 +55,9 @@ class _OfflinePlayerScreenState extends ConsumerState<OfflinePlayerScreen> {
         _player = player;
         _loading = false;
       });
+      // Do NOT await: just_audio's play() Future only completes when the
+      // track *ends*, which would otherwise leave the screen "loading".
+      unawaited(player.play());
     } catch (e) {
       if (mounted) setState(() { _error = e.toString(); _loading = false; });
     }

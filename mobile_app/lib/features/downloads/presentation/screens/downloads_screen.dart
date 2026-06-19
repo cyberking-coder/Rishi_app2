@@ -9,11 +9,19 @@ import '../widgets/download_tile.dart';
 
 /// Lists every offline download with its live status, and routes completed
 /// items to the encrypted offline player.
-class DownloadsScreen extends ConsumerWidget {
+class DownloadsScreen extends ConsumerStatefulWidget {
   const DownloadsScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<DownloadsScreen> createState() => _DownloadsScreenState();
+}
+
+class _DownloadsScreenState extends ConsumerState<DownloadsScreen> {
+  // Guards against rapid double-taps spawning multiple player screens.
+  bool _navigating = false;
+
+  @override
+  Widget build(BuildContext context) {
     final tasksAsync = ref.watch(downloadTasksProvider);
     final repo = ref.read(downloadRepositoryProvider);
 
@@ -65,10 +73,15 @@ class DownloadsScreen extends ConsumerWidget {
                       break;
                   }
                 },
-                onPlay: () => context.push(
-                  '/offline-player/${task.contentId}',
-                  extra: task.title,
-                ),
+                onPlay: () async {
+                  if (_navigating) return;
+                  setState(() => _navigating = true);
+                  await context.push(
+                    '/offline-player/${task.contentId}',
+                    extra: task.title,
+                  );
+                  if (mounted) setState(() => _navigating = false);
+                },
               );
             },
           );
