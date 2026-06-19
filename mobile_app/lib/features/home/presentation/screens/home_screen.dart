@@ -36,7 +36,7 @@ class HomeScreen extends ConsumerWidget {
                 const LotusLogo(size: 26),
                 const SizedBox(width: 10),
                 Text(
-                  'Meditation',
+                  'Anurag _Rishi',
                   style: TextStyle(
                     fontWeight: FontWeight.w700,
                     fontSize: 20,
