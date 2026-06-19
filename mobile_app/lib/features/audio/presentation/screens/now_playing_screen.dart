@@ -13,9 +13,12 @@ class NowPlayingScreen extends ConsumerWidget {
   const NowPlayingScreen({super.key});
 
   String _formatDuration(Duration d) {
+    final h = d.inHours;
     final m = d.inMinutes.remainder(60).toString().padLeft(2, '0');
     final s = d.inSeconds.remainder(60).toString().padLeft(2, '0');
-    return '$m:$s';
+    // Show hours only for tracks an hour or longer (e.g. 1:23:45),
+    // otherwise stay compact (e.g. 23:45).
+    return h > 0 ? '$h:$m:$s' : '$m:$s';
   }
 
   @override
