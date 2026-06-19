@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<network-security-config>
+    <!-- The offline decrypting proxy serves on http://127.0.0.1. Android
+         blocks cleartext by default; permit it ONLY for loopback so
+         encrypted offline playback works, without opening up any other
+         plain-HTTP traffic. -->
+    <domain-config cleartextTrafficPermitted="true">
+        <domain includeSubdomains="false">127.0.0.1</domain>
+        <domain includeSubdomains="false">localhost</domain>
+    </domain-config>
+</network-security-config>
