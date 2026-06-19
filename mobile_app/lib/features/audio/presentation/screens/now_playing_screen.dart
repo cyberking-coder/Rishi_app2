@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../app/theme/app_theme.dart';
+import '../../../downloads/domain/entities/download_content_type.dart';
+import '../../../downloads/presentation/widgets/download_button.dart';
 import '../../application/audio_providers.dart';
 import '../widgets/sleep_timer_sheet.dart';
 import '../widgets/speed_selector_sheet.dart';
@@ -45,7 +47,21 @@ class NowPlayingScreen extends ConsumerWidget {
             );
           }
 
-          return Padding(
+          return Stack(
+            children: [
+            Align(
+              alignment: Alignment.topRight,
+              child: Padding(
+                padding: const EdgeInsets.only(right: 8),
+                child: DownloadButton(
+                  contentId: mediaItem.id,
+                  contentType: DownloadContentType.audio,
+                  title: mediaItem.title,
+                  thumbnailUrl: mediaItem.artUri?.toString(),
+                ),
+              ),
+            ),
+            Padding(
             padding: const EdgeInsets.symmetric(horizontal: 32),
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
@@ -185,6 +201,8 @@ class NowPlayingScreen extends ConsumerWidget {
                 ),
               ],
             ),
+          ),
+            ],
           );
         },
       ),

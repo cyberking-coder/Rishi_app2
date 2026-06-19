@@ -13,6 +13,20 @@ class DownloadSourceResolver {
   DownloadSourceResolver(this._client);
 
   Future<Uri> resolve(String contentId, DownloadContentType type) async {
+    // Test-mode fast path: audio with a direct public URL downloads
+    // straight from that URL, bypassing the R2 signing pipeline.
+    if (type == DownloadContentType.audio) {
+      final row = await _client
+          .from('audios')
+          .select('direct_url')
+          .eq('id', contentId)
+          .maybeSingle();
+      final directUrl = row?['direct_url'] as String?;
+      if (directUrl != null && directUrl.isNotEmpty) {
+        return Uri.parse(directUrl);
+      }
+    }
+
     final deviceId = await _getActiveDeviceId();
 
     final (fnName, bodyKey) = switch (type) {
