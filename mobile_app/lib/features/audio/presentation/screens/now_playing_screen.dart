@@ -81,39 +81,65 @@ class NowPlayingScreen extends ConsumerWidget {
                   stream: handler.playbackState,
                   builder: (context, stateSnapshot) {
                     final state = stateSnapshot.data;
-                    final position = state?.position ?? Duration.zero;
-                    final duration = mediaItem.duration ?? Duration.zero;
                     final playing = state?.playing ?? false;
 
                     return Column(
                       children: [
-                        SliderTheme(
-                          data: SliderTheme.of(context).copyWith(
-                            activeTrackColor: AppTheme.accent,
-                            thumbColor: AppTheme.accent,
-                            inactiveTrackColor: Colors.white24,
-                          ),
-                          child: Slider(
-                            min: 0,
-                            max: duration.inMilliseconds.toDouble().clamp(1, double.infinity),
-                            value: position.inMilliseconds
-                                .toDouble()
-                                .clamp(0, duration.inMilliseconds.toDouble().clamp(1, double.infinity)),
-                            onChanged: (value) =>
-                                handler.seek(Duration(milliseconds: value.toInt())),
-                          ),
-                        ),
-                        Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 8),
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              Text(_formatDuration(position),
-                                  style: const TextStyle(color: AppTheme.textSecondary)),
-                              Text(_formatDuration(duration),
-                                  style: const TextStyle(color: AppTheme.textSecondary)),
-                            ],
-                          ),
+                        StreamBuilder<Duration?>(
+                          stream: handler.durationStream,
+                          builder: (context, durSnap) {
+                            final duration = durSnap.data ??
+                                handler.currentDuration ??
+                                mediaItem.duration ??
+                                Duration.zero;
+                            return StreamBuilder<Duration>(
+                              stream: handler.positionStream,
+                              builder: (context, posSnap) {
+                                var position = posSnap.data ?? Duration.zero;
+                                if (position > duration) position = duration;
+                                final maxMs = duration.inMilliseconds
+                                    .toDouble()
+                                    .clamp(1, double.infinity);
+                                return Column(
+                                  children: [
+                                    SliderTheme(
+                                      data: SliderTheme.of(context).copyWith(
+                                        activeTrackColor: AppTheme.accent,
+                                        thumbColor: AppTheme.accent,
+                                        inactiveTrackColor: Colors.white24,
+                                      ),
+                                      child: Slider(
+                                        min: 0,
+                                        max: maxMs,
+                                        value: position.inMilliseconds
+                                            .toDouble()
+                                            .clamp(0, maxMs),
+                                        onChanged: (value) => handler.seek(
+                                          Duration(milliseconds: value.toInt()),
+                                        ),
+                                      ),
+                                    ),
+                                    Padding(
+                                      padding:
+                                          const EdgeInsets.symmetric(horizontal: 8),
+                                      child: Row(
+                                        mainAxisAlignment:
+                                            MainAxisAlignment.spaceBetween,
+                                        children: [
+                                          Text(_formatDuration(position),
+                                              style: const TextStyle(
+                                                  color: AppTheme.textSecondary)),
+                                          Text(_formatDuration(duration),
+                                              style: const TextStyle(
+                                                  color: AppTheme.textSecondary)),
+                                        ],
+                                      ),
+                                    ),
+                                  ],
+                                );
+                              },
+                            );
+                          },
                         ),
                         const SizedBox(height: 16),
                         Row(

@@ -138,6 +138,16 @@ class AudioPlayerHandler extends BaseAudioHandler
 
   double get speed => _player.speed;
 
+  /// Continuously-ticking position stream (~every 200ms while playing) so
+  /// the UI progress bar advances smoothly, rather than only on discrete
+  /// playback events. The OS-facing playbackState stays event-driven.
+  Stream<Duration> get positionStream => _player.positionStream;
+
+  /// The player's actual loaded duration (authoritative over the
+  /// metadata duration, which may be wrong/estimated).
+  Stream<Duration?> get durationStream => _player.durationStream;
+  Duration? get currentDuration => _player.duration;
+
   /// Pauses playback once [duration] elapses. Pass null to cancel an
   /// active timer. Ticks [sleepTimerRemaining] every second so the UI can
   /// show a live countdown.
