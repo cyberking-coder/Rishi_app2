@@ -17,6 +17,8 @@ class DownloadMetadataStore {
     if (_file != null) return _file!;
     final support = await getApplicationSupportDirectory();
     _file = File('${support.path}/offline/manifest.json');
+    // Ensure the directory exists before any read or write attempt.
+    await _file!.parent.create(recursive: true);
     return _file!;
   }
 
