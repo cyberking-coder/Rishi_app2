@@ -36,14 +36,15 @@ class HomeRemoteDataSource {
     int limit = 12,
   }) {
     return _client
-        .from('listen_history')
+        .from('watch_history')
         .select(
-          'id, progress_seconds, duration_seconds, last_listened_at, '
+          'id, progress_seconds, duration_seconds, last_watched_at, '
           'audio_id, audios(id, title, cover_art_url, artist)',
         )
         .eq('user_id', userId)
         .eq('completed', false)
-        .order('last_listened_at', ascending: false)
+        .not('audio_id', 'is', null)
+        .order('last_watched_at', ascending: false)
         .limit(limit);
   }
 }
