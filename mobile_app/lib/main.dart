@@ -3,11 +3,11 @@ import 'dart:async';
 import 'package:audio_service/audio_service.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'app/router/app_router.dart';
 import 'app/theme/app_theme.dart';
+import 'core/config/app_config.dart';
 import 'features/audio/application/audio_player_handler.dart';
 import 'features/audio/application/audio_providers.dart';
 import 'features/audio/data/datasources/audio_remote_datasource.dart';
@@ -23,8 +23,8 @@ Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
   await Supabase.initialize(
-    url: const String.fromEnvironment('SUPABASE_URL'),
-    anonKey: const String.fromEnvironment('SUPABASE_ANON_KEY'),
+    url: AppConfig.supabaseUrl,
+    anonKey: AppConfig.supabaseAnonKey,
   );
 
   final audioRepository =
@@ -33,15 +33,12 @@ Future<void> main() async {
   final audioHandler = await AudioService.init(
     builder: () => AudioPlayerHandler(audioRepository),
     config: const AudioServiceConfig(
-      androidNotificationChannelId: 'com.ottapp.audio.channel',
-      androidNotificationChannelName: 'OTT Audio Playback',
+      androidNotificationChannelId: AppConfig.audioChannelId,
+      androidNotificationChannelName: AppConfig.audioChannelName,
       androidStopForegroundOnPause: true,
     ),
   );
 
-  // Offline downloads: build the engine, start the loopback decrypting
-  // proxy, restore the manifest, and purge any revoked/expired files
-  // before the UI can reference them.
   final downloadRepository = DownloadRepositoryImpl(
     storage: SecureDownloadStorage(),
     metadataStore: DownloadMetadataStore(),
@@ -57,20 +54,21 @@ Future<void> main() async {
         audioHandlerProvider.overrideWithValue(audioHandler),
         downloadRepositoryProvider.overrideWithValue(downloadRepository),
       ],
-      child: const OttApp(),
+      child: const MeditationApp(),
     ),
   );
 }
 
-class OttApp extends ConsumerWidget {
-  const OttApp({super.key});
+class MeditationApp extends ConsumerWidget {
+  const MeditationApp({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final router = ref.watch(goRouterProvider);
 
     return MaterialApp.router(
-      title: 'OTT App',
+      title: AppConfig.appName,
+      debugShowCheckedModeBanner: false,
       themeMode: ThemeMode.dark,
       darkTheme: AppTheme.dark(),
       theme: AppTheme.dark(),

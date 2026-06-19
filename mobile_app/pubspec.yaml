@@ -1,7 +1,7 @@
-name: ott_app
-description: OTT mobile application (video/audio streaming)
+name: meditation_app
+description: Meditation and spiritual audio streaming application
 publish_to: "none"
-version: 0.1.0
+version: 1.0.0+1
 
 environment:
   sdk: ">=3.3.0 <4.0.0"
@@ -15,8 +15,6 @@ dependencies:
   device_info_plus: ^10.1.0
   flutter_secure_storage: ^9.2.2
   crypto: ^3.0.3
-  video_player: ^2.9.1
-  wakelock_plus: ^1.2.5
   just_audio: ^0.9.40
   audio_service: ^0.18.15
   rxdart: ^0.27.7

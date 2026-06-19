@@ -9,13 +9,10 @@ import '../../../audio/domain/entities/audio_track.dart';
 import '../../application/home_providers.dart';
 import '../../domain/entities/audio_summary.dart';
 import '../../domain/entities/category_summary.dart';
-import '../../domain/entities/continue_watching_item.dart';
-import '../../domain/entities/video_summary.dart';
+import '../../domain/entities/continue_listening_item.dart';
 import '../widgets/audio_card.dart';
 import '../widgets/category_chip.dart';
-import '../widgets/continue_watching_card.dart';
 import '../widgets/fade_slide_in.dart';
-import '../widgets/poster_card.dart';
 import '../widgets/section_error.dart';
 import '../widgets/section_header.dart';
 import '../widgets/section_placeholder.dart';
@@ -33,14 +30,10 @@ class HomeScreen extends ConsumerWidget {
             backgroundColor: AppTheme.background,
             pinned: true,
             title: const Text(
-              'OTT',
+              'Meditation',
               style: TextStyle(fontWeight: FontWeight.w800, letterSpacing: 1),
             ),
             actions: [
-              IconButton(
-                onPressed: () {},
-                icon: const Icon(Icons.search),
-              ),
               IconButton(
                 tooltip: 'Downloads',
                 onPressed: () => context.push('/downloads'),
@@ -61,9 +54,7 @@ class HomeScreen extends ConsumerWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   const SizedBox(height: 8),
-                  _ContinueWatchingSection(),
-                  const SizedBox(height: 24),
-                  _FeaturedVideosSection(),
+                  _ContinueListeningSection(),
                   const SizedBox(height: 24),
                   _FeaturedAudiosSection(),
                   const SizedBox(height: 24),
@@ -81,52 +72,43 @@ class HomeScreen extends ConsumerWidget {
   }
 }
 
-class _ContinueWatchingSection extends ConsumerWidget {
+class _ContinueListeningSection extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final async = ref.watch(continueWatchingProvider);
+    final async = ref.watch(continueListeningProvider);
 
     return async.when(
-      loading: () => Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const SectionHeader(title: 'Continue Watching'),
-          const SectionPlaceholder(),
-        ],
-      ),
-      error: (_, __) => SectionError(
-        onRetry: () => ref.invalidate(continueWatchingProvider),
-      ),
+      loading: () => const SizedBox.shrink(),
+      error: (_, __) => const SizedBox.shrink(),
       data: (items) {
         if (items.isEmpty) return const SizedBox.shrink();
         return FadeSlideIn(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const SectionHeader(title: 'Continue Watching'),
+              const SectionHeader(title: 'Continue Listening'),
               SizedBox(
-                height: Responsive.posterCardHeight(context) * 0.8,
+                height: Responsive.squareCardWidth(context) + 50,
                 child: ListView.builder(
                   scrollDirection: Axis.horizontal,
                   padding: Responsive.pageHorizontalPadding(context),
                   itemCount: items.length,
                   itemBuilder: (context, index) {
-                    final item = items[index];
-                    return ContinueWatchingCard(
+                    final ContinueListeningItem item = items[index];
+                    return _ContinueListeningCard(
                       item: item,
-                      onTap: item.type == ContinueWatchingType.video
-                          ? () => context.push('/player/${item.contentId}')
-                          : () {
-                              ref.read(audioHandlerProvider).playSingleTrack(
-                                    AudioTrack(
-                                      id: item.contentId,
-                                      title: item.title,
-                                      coverArtUrl: item.thumbnailUrl,
-                                      durationSeconds: item.durationSeconds,
-                                    ),
-                                  );
-                              context.push('/now-playing');
-                            },
+                      onTap: () {
+                        ref.read(audioHandlerProvider).playSingleTrack(
+                              AudioTrack(
+                                id: item.audioId,
+                                title: item.title,
+                                artist: item.teacher,
+                                coverArtUrl: item.coverArtUrl,
+                                durationSeconds: item.durationSeconds,
+                              ),
+                            );
+                        context.push('/now-playing');
+                      },
                     );
                   },
                 ),
@@ -139,33 +121,70 @@ class _ContinueWatchingSection extends ConsumerWidget {
   }
 }
 
-class _FeaturedVideosSection extends ConsumerWidget {
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final async = ref.watch(featuredVideosProvider);
+class _ContinueListeningCard extends StatelessWidget {
+  final ContinueListeningItem item;
+  final VoidCallback onTap;
 
-    return async.when(
-      loading: () => Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: const [
-          SectionHeader(title: 'Featured Videos'),
-          SectionPlaceholder(),
-        ],
-      ),
-      error: (_, __) =>
-          SectionError(onRetry: () => ref.invalidate(featuredVideosProvider)),
-      data: (videos) => FadeSlideIn(
-        delay: const Duration(milliseconds: 60),
+  const _ContinueListeningCard({required this.item, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    final size = Responsive.squareCardWidth(context);
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        width: size,
+        margin: const EdgeInsets.only(right: 12),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const SectionHeader(title: 'Featured Videos'),
-            _VideoRow(videos: videos),
+            Stack(
+              children: [
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(8),
+                  child: item.coverArtUrl != null
+                      ? Image.network(
+                          item.coverArtUrl!,
+                          width: size,
+                          height: size,
+                          fit: BoxFit.cover,
+                          errorBuilder: (_, __, ___) =>
+                              _placeholder(size),
+                        )
+                      : _placeholder(size),
+                ),
+                Positioned(
+                  bottom: 0,
+                  left: 0,
+                  right: 0,
+                  child: LinearProgressIndicator(
+                    value: item.progressFraction,
+                    backgroundColor: Colors.white24,
+                    valueColor: const AlwaysStoppedAnimation(AppTheme.accent),
+                    minHeight: 3,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 6),
+            Text(
+              item.title,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500),
+            ),
           ],
         ),
       ),
     );
   }
+
+  Widget _placeholder(double size) => Container(
+        width: size,
+        height: size,
+        color: AppTheme.surfaceElevated,
+        child: const Icon(Icons.headphones, color: AppTheme.textSecondary),
+      );
 }
 
 class _FeaturedAudiosSection extends ConsumerWidget {
@@ -174,47 +193,22 @@ class _FeaturedAudiosSection extends ConsumerWidget {
     final async = ref.watch(featuredAudiosProvider);
 
     return async.when(
-      loading: () => Column(
+      loading: () => const Column(
         crossAxisAlignment: CrossAxisAlignment.start,
-        children: const [
-          SectionHeader(title: 'Featured Audios'),
+        children: [
+          SectionHeader(title: 'Featured'),
           SectionPlaceholder(square: true),
         ],
       ),
       error: (_, __) =>
           SectionError(onRetry: () => ref.invalidate(featuredAudiosProvider)),
       data: (audios) => FadeSlideIn(
-        delay: const Duration(milliseconds: 120),
+        delay: const Duration(milliseconds: 60),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const SectionHeader(title: 'Featured Audios'),
-            SizedBox(
-              height: Responsive.squareCardWidth(context) + 50,
-              child: ListView.builder(
-                scrollDirection: Axis.horizontal,
-                padding: Responsive.pageHorizontalPadding(context),
-                itemCount: audios.length,
-                itemBuilder: (context, index) {
-                  final AudioSummary audio = audios[index];
-                  return AudioCard(
-                    audio: audio,
-                    onTap: () {
-                      ref.read(audioHandlerProvider).playSingleTrack(
-                            AudioTrack(
-                              id: audio.id,
-                              title: audio.title,
-                              artist: audio.artist,
-                              coverArtUrl: audio.coverArtUrl,
-                              durationSeconds: audio.durationSeconds,
-                            ),
-                          );
-                      context.push('/now-playing');
-                    },
-                  );
-                },
-              ),
-            ),
+            const SectionHeader(title: 'Featured'),
+            _AudioRow(audios: audios, ref: ref),
           ],
         ),
       ),
@@ -228,24 +222,69 @@ class _RecentlyAddedSection extends ConsumerWidget {
     final async = ref.watch(recentlyAddedProvider);
 
     return async.when(
-      loading: () => Column(
+      loading: () => const Column(
         crossAxisAlignment: CrossAxisAlignment.start,
-        children: const [
+        children: [
           SectionHeader(title: 'Recently Added'),
-          SectionPlaceholder(),
+          SectionPlaceholder(square: true),
         ],
       ),
       error: (_, __) =>
           SectionError(onRetry: () => ref.invalidate(recentlyAddedProvider)),
-      data: (videos) => FadeSlideIn(
-        delay: const Duration(milliseconds: 180),
+      data: (audios) => FadeSlideIn(
+        delay: const Duration(milliseconds: 120),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             const SectionHeader(title: 'Recently Added'),
-            _VideoRow(videos: videos),
+            _AudioRow(audios: audios, ref: ref),
           ],
         ),
+      ),
+    );
+  }
+}
+
+class _AudioRow extends StatelessWidget {
+  final List<AudioSummary> audios;
+  final WidgetRef ref;
+
+  const _AudioRow({required this.audios, required this.ref});
+
+  @override
+  Widget build(BuildContext context) {
+    if (audios.isEmpty) {
+      return const Padding(
+        padding: EdgeInsets.symmetric(horizontal: 16),
+        child: Text('Nothing here yet.',
+            style: TextStyle(color: AppTheme.textSecondary)),
+      );
+    }
+
+    return SizedBox(
+      height: Responsive.squareCardWidth(context) + 50,
+      child: ListView.builder(
+        scrollDirection: Axis.horizontal,
+        padding: Responsive.pageHorizontalPadding(context),
+        itemCount: audios.length,
+        itemBuilder: (context, index) {
+          final AudioSummary audio = audios[index];
+          return AudioCard(
+            audio: audio,
+            onTap: () {
+              ref.read(audioHandlerProvider).playSingleTrack(
+                    AudioTrack(
+                      id: audio.id,
+                      title: audio.title,
+                      artist: audio.artist,
+                      coverArtUrl: audio.coverArtUrl,
+                      durationSeconds: audio.durationSeconds,
+                    ),
+                  );
+              context.push('/now-playing');
+            },
+          );
+        },
       ),
     );
   }
@@ -257,14 +296,11 @@ class _CategoriesSection extends ConsumerWidget {
     final async = ref.watch(categoriesProvider);
 
     return async.when(
-      loading: () => const Padding(
-        padding: EdgeInsets.symmetric(horizontal: 16),
-        child: SizedBox(height: 40),
-      ),
+      loading: () => const SizedBox(height: 40),
       error: (_, __) =>
           SectionError(onRetry: () => ref.invalidate(categoriesProvider)),
       data: (categories) => FadeSlideIn(
-        delay: const Duration(milliseconds: 240),
+        delay: const Duration(milliseconds: 180),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -275,42 +311,12 @@ class _CategoriesSection extends ConsumerWidget {
                 spacing: 0,
                 runSpacing: 10,
                 children: categories
-                    .map((CategorySummary category) =>
-                        CategoryChip(category: category, onTap: () {}))
+                    .map((CategorySummary c) =>
+                        CategoryChip(category: c, onTap: () {}))
                     .toList(),
               ),
             ),
           ],
-        ),
-      ),
-    );
-  }
-}
-
-class _VideoRow extends StatelessWidget {
-  final List<VideoSummary> videos;
-
-  const _VideoRow({required this.videos});
-
-  @override
-  Widget build(BuildContext context) {
-    if (videos.isEmpty) {
-      return const Padding(
-        padding: EdgeInsets.symmetric(horizontal: 16),
-        child: Text('Nothing here yet.',
-            style: TextStyle(color: AppTheme.textSecondary)),
-      );
-    }
-
-    return SizedBox(
-      height: Responsive.posterCardHeight(context) + 28,
-      child: ListView.builder(
-        scrollDirection: Axis.horizontal,
-        padding: Responsive.pageHorizontalPadding(context),
-        itemCount: videos.length,
-        itemBuilder: (context, index) => PosterCard(
-          video: videos[index],
-          onTap: () => context.push('/player/${videos[index].id}'),
         ),
       ),
     );
