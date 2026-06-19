@@ -54,7 +54,14 @@ class DownloadRepositoryImpl implements DownloadRepository {
   static const _persistEveryBytes = 2 * 1024 * 1024;
 
   @override
-  Stream<List<DownloadTask>> watchTasks() => _controller.stream;
+  Stream<List<DownloadTask>> watchTasks() async* {
+    // Seed new subscribers with the current snapshot — the broadcast
+    // controller does NOT replay its last value, and restore() emits once
+    // at startup before this screen ever subscribes. Without this initial
+    // yield the StreamProvider stays in `loading` forever (blank spinner).
+    yield _sortedTasks();
+    yield* _controller.stream;
+  }
 
   @override
   List<DownloadTask> get tasks => _sortedTasks();
