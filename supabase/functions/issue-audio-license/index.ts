@@ -100,17 +100,21 @@ Deno.serve(async (req) => {
     }
   }
 
-  const { data: asset, error: assetError } = await supabase
+  // Prefer an HLS rendition, but fall back to a single-file MP3 (the
+  // MVP upload path produces audio_mp3).
+  const { data: assets, error: assetError } = await supabase
     .from("content_assets")
-    .select("r2_path")
+    .select("r2_path, asset_type")
     .eq("content_id", audioId)
-    .eq("asset_type", "audio_hls")
+    .in("asset_type", ["audio_hls", "audio_mp3"])
     .eq("status", "ready")
-    .maybeSingle<AssetRow>();
+    .returns<Array<AssetRow & { asset_type: string }>>();
 
-  if (assetError || !asset) {
+  if (assetError || !assets || assets.length === 0) {
     return jsonResponse({ error: "No playable rendition for this audio" }, 404);
   }
+
+  const asset = assets.find((a) => a.asset_type === "audio_hls") ?? assets[0];
 
   const signedUrl = await presignGet(asset.r2_path, SIGNED_URL_TTL_SECONDS);
 
