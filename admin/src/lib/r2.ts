@@ -10,7 +10,7 @@ import { env } from "@/lib/env";
 export async function presignUpload(
   objectKey: string,
   contentType: string,
-  expiresSeconds = 600,
+  expiresSeconds = 3600,
 ): Promise<{ uploadUrl: string; objectKey: string }> {
   const r2 = env.r2();
   const client = new AwsClient({

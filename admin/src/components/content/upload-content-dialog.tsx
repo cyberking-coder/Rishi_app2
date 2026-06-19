@@ -48,13 +48,22 @@ export function UploadContentDialog({ kind }: { kind: ContentKind }) {
   }
 
   async function uploadToR2(uploadUrl: string, f: File) {
-    // Direct browser → R2 PUT; bytes never pass through our server.
-    const res = await fetch(uploadUrl, {
-      method: "PUT",
-      body: f,
-      headers: { "content-type": f.type || "application/octet-stream" },
+    await new Promise<void>((resolve, reject) => {
+      const xhr = new XMLHttpRequest();
+      xhr.open("PUT", uploadUrl);
+      xhr.setRequestHeader("content-type", f.type || "application/octet-stream");
+      xhr.upload.onprogress = (e) => {
+        if (e.lengthComputable) {
+          const pct = Math.round((e.loaded / e.total) * 100);
+          const mb = (e.loaded / 1024 / 1024).toFixed(1);
+          const total = (e.total / 1024 / 1024).toFixed(1);
+          setProgress(`Uploading… ${pct}% (${mb} / ${total} MB)`);
+        }
+      };
+      xhr.onload = () => xhr.status >= 200 && xhr.status < 300 ? resolve() : reject(new Error(`Upload failed (${xhr.status})`));
+      xhr.onerror = () => reject(new Error("Upload failed (network error)"));
+      xhr.send(f);
     });
-    if (!res.ok) throw new Error(`Upload failed (${res.status})`);
   }
 
   async function onSubmit(e: React.FormEvent) {
