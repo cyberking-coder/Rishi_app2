@@ -32,12 +32,24 @@ class DownloadButton extends ConsumerWidget {
       return IconButton(
         tooltip: 'Download',
         icon: const Icon(Icons.download_outlined),
-        onPressed: () => repo.enqueue(
-          contentId: contentId,
-          contentType: contentType,
-          title: title,
-          thumbnailUrl: thumbnailUrl,
-        ),
+        onPressed: () async {
+          final messenger = ScaffoldMessenger.of(context);
+          try {
+            await repo.enqueue(
+              contentId: contentId,
+              contentType: contentType,
+              title: title,
+              thumbnailUrl: thumbnailUrl,
+            );
+            messenger.showSnackBar(
+              const SnackBar(content: Text('Download started')),
+            );
+          } catch (e) {
+            messenger.showSnackBar(
+              SnackBar(content: Text('Could not start download: $e')),
+            );
+          }
+        },
       );
     }
 
@@ -131,7 +143,7 @@ class _ProgressRing extends StatelessWidget {
               child: CircularProgressIndicator(
                 value: progress == 0 ? null : progress,
                 strokeWidth: 2.5,
-                backgroundColor: Colors.white12,
+                backgroundColor: Colors.black12,
                 valueColor: const AlwaysStoppedAnimation(AppTheme.accent),
               ),
             ),

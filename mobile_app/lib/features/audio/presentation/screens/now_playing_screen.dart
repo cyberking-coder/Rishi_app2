@@ -49,18 +49,6 @@ class NowPlayingScreen extends ConsumerWidget {
 
           return Stack(
             children: [
-            Align(
-              alignment: Alignment.topRight,
-              child: Padding(
-                padding: const EdgeInsets.only(right: 8),
-                child: DownloadButton(
-                  contentId: mediaItem.id,
-                  contentType: DownloadContentType.audio,
-                  title: mediaItem.title,
-                  thumbnailUrl: mediaItem.artUri?.toString(),
-                ),
-              ),
-            ),
             Padding(
             padding: const EdgeInsets.symmetric(horizontal: 32),
             child: Column(
@@ -204,6 +192,20 @@ class NowPlayingScreen extends ConsumerWidget {
               ],
             ),
           ),
+            // Topmost so the tap always lands on the button, never the
+            // centred content column behind it.
+            Align(
+              alignment: Alignment.topRight,
+              child: Padding(
+                padding: const EdgeInsets.only(right: 8, top: 4),
+                child: DownloadButton(
+                  contentId: mediaItem.id,
+                  contentType: DownloadContentType.audio,
+                  title: mediaItem.title,
+                  thumbnailUrl: mediaItem.artUri?.toString(),
+                ),
+              ),
+            ),
             ],
           );
         },
