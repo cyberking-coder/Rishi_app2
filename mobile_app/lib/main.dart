@@ -91,9 +91,9 @@ class MeditationApp extends ConsumerWidget {
     return MaterialApp.router(
       title: AppConfig.appName,
       debugShowCheckedModeBanner: false,
-      themeMode: ThemeMode.dark,
-      darkTheme: AppTheme.dark(),
-      theme: AppTheme.dark(),
+      themeMode: ThemeMode.light,
+      theme: AppTheme.light(),
+      darkTheme: AppTheme.light(),
       routerConfig: router,
     );
   }

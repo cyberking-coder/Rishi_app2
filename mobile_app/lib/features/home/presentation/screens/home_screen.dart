@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../../app/theme/app_theme.dart';
+import '../../../../app/widgets/lotus_logo.dart';
 import '../../../../core/utils/responsive.dart';
 import '../../../audio/application/audio_providers.dart';
 import '../../../audio/domain/entities/audio_track.dart';
@@ -29,9 +30,21 @@ class HomeScreen extends ConsumerWidget {
           SliverAppBar(
             backgroundColor: AppTheme.background,
             pinned: true,
-            title: const Text(
-              'Meditation',
-              style: TextStyle(fontWeight: FontWeight.w800, letterSpacing: 1),
+            titleSpacing: 16,
+            title: Row(
+              children: [
+                const LotusLogo(size: 26),
+                const SizedBox(width: 10),
+                Text(
+                  'Meditation',
+                  style: TextStyle(
+                    fontWeight: FontWeight.w700,
+                    fontSize: 20,
+                    letterSpacing: 0.2,
+                    color: AppTheme.textPrimary,
+                  ),
+                ),
+              ],
             ),
             actions: [
               IconButton(

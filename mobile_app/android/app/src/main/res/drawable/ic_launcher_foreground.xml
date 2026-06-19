@@ -4,7 +4,31 @@
     android:height="108dp"
     android:viewportWidth="108"
     android:viewportHeight="108">
+    <!-- Lotus: five petals fanning up from a point near the lower centre,
+         sitting inside the 66dp adaptive-icon safe zone. -->
+
+    <!-- Outer petals -->
     <path
         android:fillColor="#FFFFFF"
-        android:pathData="M54,30 C42,30 32,40 32,52 C32,58 34,63 38,67 L38,76 C38,77 39,78 40,78 L44,78 C45,78 46,77 46,76 L46,72 L62,72 L62,76 C62,77 63,78 64,78 L68,78 C69,78 70,77 70,76 L70,67 C74,63 76,58 76,52 C76,40 66,30 54,30 Z M46,62 C43,62 41,60 41,57 C41,54 43,52 46,52 C49,52 51,54 51,57 C51,60 49,62 46,62 Z M62,62 C59,62 57,60 57,57 C57,54 59,52 62,52 C65,52 67,54 67,57 C67,60 65,62 62,62 Z M36,48 C36,36 44,26 54,26 C64,26 72,36 72,48 L68,48 C68,38 62,30 54,30 C46,30 40,38 40,48 Z" />
+        android:fillAlpha="0.65"
+        android:pathData="M54,74 C42,68 30,60 30,53 C36,51 52,63 54,74 Z" />
+    <path
+        android:fillColor="#FFFFFF"
+        android:fillAlpha="0.65"
+        android:pathData="M54,74 C66,68 78,60 78,53 C72,51 56,63 54,74 Z" />
+
+    <!-- Inner side petals -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:fillAlpha="0.85"
+        android:pathData="M54,74 C44,64 36,48 40,39 C47,42 56,60 54,74 Z" />
+    <path
+        android:fillColor="#FFFFFF"
+        android:fillAlpha="0.85"
+        android:pathData="M54,74 C64,64 72,48 68,39 C61,42 52,60 54,74 Z" />
+
+    <!-- Centre petal -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M54,74 C44,58 48,38 54,30 C60,38 64,58 54,74 Z" />
 </vector>

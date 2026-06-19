@@ -22,21 +22,33 @@ class AudioCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            ClipRRect(
-              borderRadius: BorderRadius.circular(8),
-              child: SizedBox(
-                width: size,
-                height: size,
-                child: audio.coverArtUrl != null
-                    ? Image.network(
-                        audio.coverArtUrl!,
-                        fit: BoxFit.cover,
-                        errorBuilder: (_, __, ___) => const _CoverFallback(),
-                      )
-                    : const _CoverFallback(),
+            Container(
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(16),
+                boxShadow: [
+                  BoxShadow(
+                    color: AppTheme.textPrimary.withValues(alpha: 0.08),
+                    blurRadius: 12,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
+              ),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(16),
+                child: SizedBox(
+                  width: size,
+                  height: size,
+                  child: audio.coverArtUrl != null
+                      ? Image.network(
+                          audio.coverArtUrl!,
+                          fit: BoxFit.cover,
+                          errorBuilder: (_, __, ___) => const _CoverFallback(),
+                        )
+                      : const _CoverFallback(),
+                ),
               ),
             ),
-            const SizedBox(height: 6),
+            const SizedBox(height: 8),
             Text(
               audio.title,
               maxLines: 1,
