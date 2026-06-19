@@ -115,21 +115,23 @@ class NowPlayingScreen extends ConsumerWidget {
                                 if (position > duration) position = duration;
                                 final maxMs = duration.inMilliseconds
                                     .toDouble()
-                                    .clamp(1, double.infinity);
+                                    .clamp(1.0, double.infinity)
+                                    .toDouble();
                                 return Column(
                                   children: [
                                     SliderTheme(
                                       data: SliderTheme.of(context).copyWith(
                                         activeTrackColor: AppTheme.accent,
                                         thumbColor: AppTheme.accent,
-                                        inactiveTrackColor: Colors.white24,
+                                        inactiveTrackColor: Colors.black12,
                                       ),
                                       child: Slider(
                                         min: 0,
                                         max: maxMs,
                                         value: position.inMilliseconds
                                             .toDouble()
-                                            .clamp(0, maxMs),
+                                            .clamp(0.0, maxMs)
+                                            .toDouble(),
                                         onChanged: (value) => handler.seek(
                                           Duration(milliseconds: value.toInt()),
                                         ),
