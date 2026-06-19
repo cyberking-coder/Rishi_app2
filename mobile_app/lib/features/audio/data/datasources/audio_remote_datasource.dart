@@ -7,6 +7,18 @@ class AudioRemoteDataSource {
 
   AudioRemoteDataSource(this._client);
 
+  /// Test-mode: returns a direct public URL if the audio row has one set,
+  /// otherwise null (caller then falls back to the signed R2 license flow).
+  Future<String?> getDirectUrl(String audioId) async {
+    final row = await _client
+        .from('audios')
+        .select('direct_url')
+        .eq('id', audioId)
+        .maybeSingle();
+    final url = row?['direct_url'] as String?;
+    return (url != null && url.isNotEmpty) ? url : null;
+  }
+
   Future<Map<String, dynamic>> issueAudioLicense(String audioId) async {
     final deviceId = await _getActiveDeviceId();
 
