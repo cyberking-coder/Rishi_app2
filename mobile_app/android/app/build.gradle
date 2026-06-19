@@ -22,6 +22,17 @@ if (flutterVersionName == null) {
     flutterVersionName = "1.0"
 }
 
+// Release signing — credentials live in android/key.properties, which is
+// gitignored and never committed. If absent (e.g. CI without secrets), the
+// release build falls back to debug signing so it still compiles.
+def keystoreProperties = new Properties()
+def keystorePropertiesFile = rootProject.file("key.properties")
+if (keystorePropertiesFile.exists()) {
+    keystorePropertiesFile.withReader("UTF-8") { reader ->
+        keystoreProperties.load(reader)
+    }
+}
+
 android {
     namespace "com.meditation.app"
     compileSdk = 36
@@ -49,9 +60,22 @@ android {
         multiDexEnabled true
     }
 
+    signingConfigs {
+        release {
+            if (keystorePropertiesFile.exists()) {
+                keyAlias keystoreProperties["keyAlias"]
+                keyPassword keystoreProperties["keyPassword"]
+                storeFile file(keystoreProperties["storeFile"])
+                storePassword keystoreProperties["storePassword"]
+            }
+        }
+    }
+
     buildTypes {
         release {
-            signingConfig = signingConfigs.debug
+            // Use the real release keystore when key.properties is present,
+            // otherwise fall back to debug signing so the build still works.
+            signingConfig = keystorePropertiesFile.exists() ? signingConfigs.release : signingConfigs.debug
             // R8: obfuscate + shrink Kotlin/Java bytecode and strip unused
             // resources, so a pulled-apart APK is much harder to read.
             minifyEnabled true
