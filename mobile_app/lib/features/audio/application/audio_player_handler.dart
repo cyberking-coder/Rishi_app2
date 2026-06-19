@@ -181,12 +181,18 @@ class AudioPlayerHandler extends BaseAudioHandler
     final track = currentTrack;
     if (track == null || !_player.duration.isPresent) return;
 
-    await _repository.updateListenProgress(
-      audioId: track.id,
-      progressSeconds: _player.position.inSeconds,
-      durationSeconds: _player.duration?.inSeconds ?? 0,
-      completed: completed,
-    );
+    try {
+      await _repository.updateListenProgress(
+        audioId: track.id,
+        progressSeconds: _player.position.inSeconds,
+        durationSeconds: _player.duration?.inSeconds ?? 0,
+        completed: completed,
+      );
+    } catch (e) {
+      // Network may be unavailable (offline playback). Progress save is
+      // best-effort — never block or crash playback over it.
+      debugPrint('_flushProgress: $e');
+    }
   }
 
   void _broadcastState(PlaybackEvent event) {
