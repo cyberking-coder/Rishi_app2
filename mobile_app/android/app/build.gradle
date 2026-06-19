@@ -52,8 +52,14 @@ android {
     buildTypes {
         release {
             signingConfig = signingConfigs.debug
-            minifyEnabled false
-            shrinkResources false
+            // R8: obfuscate + shrink Kotlin/Java bytecode and strip unused
+            // resources, so a pulled-apart APK is much harder to read.
+            minifyEnabled true
+            shrinkResources true
+            proguardFiles(
+                getDefaultProguardFile("proguard-android-optimize.txt"),
+                "proguard-rules.pro"
+            )
         }
         debug {
             applicationIdSuffix ".debug"
