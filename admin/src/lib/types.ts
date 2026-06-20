@@ -13,6 +13,8 @@ export interface Profile {
   subscription_tier: string;
   country: string | null;
   status: UserStatus;
+  access_started_at: string | null;
+  access_expires_at: string | null;
   created_at: string;
   updated_at: string;
 }

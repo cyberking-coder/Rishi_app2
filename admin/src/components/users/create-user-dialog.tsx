@@ -35,6 +35,7 @@ export function CreateUserDialog() {
   const [displayName, setDisplayName] = useState("");
   const [role, setRole] = useState<UserRole>("user");
   const [tier, setTier] = useState("free");
+  const [accessDays, setAccessDays] = useState("30");
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -45,6 +46,7 @@ export function CreateUserDialog() {
       displayName: displayName || undefined,
       role,
       subscriptionTier: tier,
+      accessDays: Number(accessDays) || 0,
     });
     setLoading(false);
 
@@ -59,6 +61,7 @@ export function CreateUserDialog() {
     setDisplayName("");
     setRole("user");
     setTier("free");
+    setAccessDays("30");
     router.refresh();
   }
 
@@ -135,6 +138,19 @@ export function CreateUserDialog() {
                 </SelectContent>
               </Select>
             </div>
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="cu-access">Access window (days)</Label>
+            <Input
+              id="cu-access"
+              type="number"
+              min={0}
+              value={accessDays}
+              onChange={(e) => setAccessDays(e.target.value)}
+            />
+            <p className="text-xs text-muted-foreground">
+              Days the attendee can use the app. Use 0 for unlimited (staff).
+            </p>
           </div>
           <DialogFooter>
             <Button type="submit" disabled={loading}>

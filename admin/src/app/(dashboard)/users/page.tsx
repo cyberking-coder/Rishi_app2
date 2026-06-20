@@ -46,6 +46,7 @@ export default async function UsersPage() {
                 <TableHead>Role</TableHead>
                 <TableHead>Tier</TableHead>
                 <TableHead>Status</TableHead>
+                <TableHead>Access</TableHead>
                 <TableHead>Joined</TableHead>
                 <TableHead className="w-12" />
               </TableRow>
@@ -53,7 +54,7 @@ export default async function UsersPage() {
             <TableBody>
               {(users ?? []).length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={6} className="py-8 text-center text-muted-foreground">
+                  <TableCell colSpan={7} className="py-8 text-center text-muted-foreground">
                     No users yet.
                   </TableCell>
                 </TableRow>
@@ -70,6 +71,9 @@ export default async function UsersPage() {
                     <TableCell>
                       <UserStatusBadge status={u.status} />
                     </TableCell>
+                    <TableCell>
+                      <AccessCell expiresAt={u.access_expires_at} />
+                    </TableCell>
                     <TableCell className="text-muted-foreground">
                       {formatDate(u.created_at)}
                     </TableCell>
@@ -84,5 +88,22 @@ export default async function UsersPage() {
         </CardContent>
       </Card>
     </div>
+  );
+}
+
+/** Shows the user's remaining access window as a coloured badge. */
+function AccessCell({ expiresAt }: { expiresAt: string | null }) {
+  if (!expiresAt) {
+    return <Badge variant="outline">Unlimited</Badge>;
+  }
+  const ms = new Date(expiresAt).getTime() - Date.now();
+  if (ms <= 0) {
+    return <Badge variant="destructive">Expired</Badge>;
+  }
+  const days = Math.ceil(ms / (24 * 60 * 60 * 1000));
+  return (
+    <Badge variant={days <= 7 ? "secondary" : "outline"}>
+      {days}d left
+    </Badge>
   );
 }

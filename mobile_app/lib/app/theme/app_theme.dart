@@ -19,6 +19,22 @@ class AppTheme {
   static const Color textPrimary = Color(0xFF221C32);
   static const Color textSecondary = Color(0xFF7A7486);
 
+  // Soft ambient backdrop — gentle, low-saturation wash used behind the
+  // home and player screens. Three barely-there tints that blend into the
+  // warm neutral so nothing competes with the content.
+  static const Color washTop = Color(0xFFF3EEFB); // faint lavender
+  static const Color washMid = Color(0xFFF7F5F2); // warm neutral
+  static const Color washBottom = Color(0xFFFDF1EC); // faint peach
+  static const Color blobViolet = Color(0x267C6BB0); // 15% lotus-violet
+  static const Color blobPeach = Color(0x22F0A98E); // ~13% peach
+
+  static const LinearGradient ambientWash = LinearGradient(
+    begin: Alignment.topCenter,
+    end: Alignment.bottomCenter,
+    colors: [washTop, washMid, washBottom],
+    stops: [0.0, 0.55, 1.0],
+  );
+
   static ThemeData light() {
     final base = ThemeData.light(useMaterial3: true);
 

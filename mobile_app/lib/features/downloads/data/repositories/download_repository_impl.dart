@@ -212,6 +212,14 @@ class DownloadRepositoryImpl implements DownloadRepository {
     }
   }
 
+  @override
+  Future<void> purgeAll() async {
+    final ids = _tasks.values.map((t) => t.id).toList();
+    for (final id in ids) {
+      await delete(id);
+    }
+  }
+
   // --- core engine ---------------------------------------------------------
 
   Future<void> _run(String id, DownloadCipherKey cipherKey) async {

@@ -62,6 +62,16 @@ Deno.serve(async (req) => {
   }
   const userId = userData.user.id;
 
+  // Retreat access window: refuse playback once the user's 30-day access
+  // has lapsed, enforced server-side so a device clock change can't bypass
+  // it. Null expiry == no limit (staff/admin).
+  const { data: hasAccess } = await supabase.rpc("has_active_access", {
+    p_user_id: userId,
+  });
+  if (hasAccess === false) {
+    return jsonResponse({ error: "Your access period has ended." }, 403);
+  }
+
   const { data: device, error: deviceError } = await supabase
     .from("devices")
     .select("id, is_active")

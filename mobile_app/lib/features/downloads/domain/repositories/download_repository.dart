@@ -42,5 +42,9 @@ abstract class DownloadRepository {
   /// offline license has expired. Safe to call periodically / on launch.
   Future<void> purgeRevokedAndExpired();
 
+  /// Deletes every downloaded file and manifest entry. Called when the
+  /// user's retreat access window lapses.
+  Future<void> purgeAll();
+
   Future<void> dispose();
 }

@@ -12,7 +12,11 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
-import { updateUserStatus } from "@/app/actions/users";
+import {
+  updateUserStatus,
+  setUserAccessDays,
+  revokeUserAccess,
+} from "@/app/actions/users";
 import { resetUserDevices } from "@/app/actions/devices";
 import type { UserStatus } from "@/lib/types";
 
@@ -39,6 +43,20 @@ export function UserActions({
     router.refresh();
   }
 
+  async function extendAccess(days: number) {
+    const result = await setUserAccessDays(userId, days);
+    if (!result.ok) return toast.error(result.error);
+    toast.success(`Access set to ${days} more days`);
+    router.refresh();
+  }
+
+  async function endAccess() {
+    const result = await revokeUserAccess(userId);
+    if (!result.ok) return toast.error(result.error);
+    toast.success("Access ended — content hidden & downloads purged on next open");
+    router.refresh();
+  }
+
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
@@ -50,6 +68,17 @@ export function UserActions({
         <DropdownMenuLabel>Actions</DropdownMenuLabel>
         <DropdownMenuItem onClick={resetDevices}>
           Reset device
+        </DropdownMenuItem>
+        <DropdownMenuSeparator />
+        <DropdownMenuLabel>Access</DropdownMenuLabel>
+        <DropdownMenuItem onClick={() => extendAccess(30)}>
+          Grant 30 more days
+        </DropdownMenuItem>
+        <DropdownMenuItem onClick={() => extendAccess(7)}>
+          Grant 7 more days
+        </DropdownMenuItem>
+        <DropdownMenuItem className="text-destructive" onClick={endAccess}>
+          End access now
         </DropdownMenuItem>
         <DropdownMenuSeparator />
         {status !== "active" && (

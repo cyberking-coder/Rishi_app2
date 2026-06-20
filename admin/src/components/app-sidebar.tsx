@@ -10,6 +10,7 @@ import {
   Music,
   Tags,
   BarChart3,
+  Settings,
   LogOut,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -25,6 +26,7 @@ const NAV = [
   { href: "/audios", label: "Audios", icon: Music },
   { href: "/categories", label: "Categories", icon: Tags },
   { href: "/analytics", label: "Analytics", icon: BarChart3 },
+  { href: "/settings", label: "Settings", icon: Settings },
 ];
 
 export function AppSidebar({

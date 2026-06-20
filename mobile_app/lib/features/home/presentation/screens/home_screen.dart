@@ -4,9 +4,15 @@ import 'package:go_router/go_router.dart';
 
 import '../../../../app/theme/app_theme.dart';
 import '../../../../app/widgets/lotus_logo.dart';
+import '../../../../app/widgets/soft_background.dart';
 import '../../../../core/utils/responsive.dart';
+import '../../../access/application/access_providers.dart';
+import '../../../access/domain/access_state.dart';
+import '../../../access/presentation/access_expired_view.dart';
+import '../../../access/presentation/next_event_popup.dart';
 import '../../../audio/application/audio_providers.dart';
 import '../../../audio/domain/entities/audio_track.dart';
+import '../../../downloads/application/download_providers.dart';
 import '../../application/home_providers.dart';
 import '../../domain/entities/audio_summary.dart';
 import '../../domain/entities/category_summary.dart';
@@ -18,65 +24,150 @@ import '../widgets/section_error.dart';
 import '../widgets/section_header.dart';
 import '../widgets/section_placeholder.dart';
 
-class HomeScreen extends ConsumerWidget {
+class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<HomeScreen> createState() => _HomeScreenState();
+}
+
+class _HomeScreenState extends ConsumerState<HomeScreen> {
+  // Ensures the next-event pop-up is shown at most once per app session.
+  bool _popupShown = false;
+  // Ensures downloads are purged at most once after detecting expiry.
+  bool _purged = false;
+
+  void _onAccess(AccessState access) {
+    // Access lapsed: wipe any offline downloads (best-effort).
+    if (access.isExpired && !_purged) {
+      _purged = true;
+      ref.read(downloadRepositoryProvider).purgeAll();
+      return;
+    }
+    // Still has access and a pop-up is due: show it once, after this frame.
+    if (access.hasAccess && access.shouldShowPopup && !_popupShown) {
+      _popupShown = true;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) NextEventPopup.show(context, access);
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final accessAsync = ref.watch(accessStateProvider);
+    final access = accessAsync.valueOrNull;
+    if (access != null) _onAccess(access);
+
+    // Fail open while access is unknown (loading/error): playback is still
+    // enforced server-side, so the worst case is briefly showing titles.
+    final expired = access?.isExpired ?? false;
+
     return Scaffold(
       backgroundColor: AppTheme.background,
-      body: CustomScrollView(
-        slivers: [
-          SliverAppBar(
-            backgroundColor: AppTheme.background,
-            pinned: true,
-            titleSpacing: 16,
-            title: Row(
-              children: [
-                const LotusLogo(size: 26),
-                const SizedBox(width: 10),
-                Text(
-                  'Anurag _Rishi',
-                  style: TextStyle(
-                    fontWeight: FontWeight.w700,
-                    fontSize: 20,
-                    letterSpacing: 0.2,
-                    color: AppTheme.textPrimary,
-                  ),
+      body: Stack(
+        children: [
+          const SoftBackground(),
+          CustomScrollView(
+            slivers: [
+              SliverAppBar(
+                backgroundColor: Colors.transparent,
+                pinned: true,
+                titleSpacing: 16,
+                title: Row(
+                  children: [
+                    const LotusLogo(size: 26),
+                    const SizedBox(width: 10),
+                    Text(
+                      'Anurag _Rishi',
+                      style: TextStyle(
+                        fontWeight: FontWeight.w700,
+                        fontSize: 20,
+                        letterSpacing: 0.2,
+                        color: AppTheme.textPrimary,
+                      ),
+                    ),
+                  ],
                 ),
-              ],
-            ),
-            actions: [
-              IconButton(
-                tooltip: 'Downloads',
-                onPressed: () => context.push('/downloads'),
-                icon: const Icon(Icons.download_outlined),
-              ),
-              IconButton(
-                tooltip: 'Profile',
-                onPressed: () => context.push('/profile'),
-                icon: const Icon(Icons.person_outline),
-              ),
-              const SizedBox(width: 8),
-            ],
-          ),
-          SliverToBoxAdapter(
-            child: SafeArea(
-              top: false,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const SizedBox(height: 8),
-                  _ContinueListeningSection(),
-                  const SizedBox(height: 24),
-                  _FeaturedAudiosSection(),
-                  const SizedBox(height: 24),
-                  _RecentlyAddedSection(),
-                  const SizedBox(height: 24),
-                  _CategoriesSection(),
-                  const SizedBox(height: 32),
+                actions: [
+                  if (!expired)
+                    IconButton(
+                      tooltip: 'Downloads',
+                      onPressed: () => context.push('/downloads'),
+                      icon: const Icon(Icons.download_outlined),
+                    ),
+                  IconButton(
+                    tooltip: 'Profile',
+                    onPressed: () => context.push('/profile'),
+                    icon: const Icon(Icons.person_outline),
+                  ),
+                  const SizedBox(width: 8),
                 ],
               ),
+              if (expired)
+                SliverFillRemaining(
+                  hasScrollBody: false,
+                  child: AccessExpiredView(access: access!),
+                )
+              else
+                SliverToBoxAdapter(
+                  child: SafeArea(
+                    top: false,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        if (access?.daysLeft != null && access!.daysLeft! <= 7)
+                          _AccessBanner(daysLeft: access.daysLeft!),
+                        const SizedBox(height: 8),
+                        _ContinueListeningSection(),
+                        const SizedBox(height: 24),
+                        _FeaturedAudiosSection(),
+                        const SizedBox(height: 24),
+                        _RecentlyAddedSection(),
+                        const SizedBox(height: 24),
+                        _CategoriesSection(),
+                        const SizedBox(height: 32),
+                      ],
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// A gentle reminder shown in the final week of the access window.
+class _AccessBanner extends StatelessWidget {
+  final int daysLeft;
+  const _AccessBanner({required this.daysLeft});
+
+  @override
+  Widget build(BuildContext context) {
+    final label = daysLeft <= 0
+        ? 'Access ends today'
+        : daysLeft == 1
+            ? '1 day of access left'
+            : '$daysLeft days of access left';
+    return Container(
+      margin: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      decoration: BoxDecoration(
+        color: AppTheme.accentSoft,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.access_time, size: 18, color: AppTheme.accent),
+          const SizedBox(width: 10),
+          Text(
+            label,
+            style: const TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
+              color: AppTheme.accent,
             ),
           ),
         ],
