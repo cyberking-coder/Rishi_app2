@@ -1,8 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
+import { CalendarDays, Clock } from "lucide-react";
 import { savePopupConfig, type PopupConfig } from "@/app/actions/config";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -46,6 +47,17 @@ export function PopupConfigForm({ initial }: { initial: PopupConfig }) {
   const [enabled, setEnabled] = useState(initial.popup_enabled);
   const [startDate, setStartDate] = useState(isoToDate(initial.popup_start_at));
   const [startTime, setStartTime] = useState(isoToTime(initial.popup_start_at));
+  const dateRef = useRef<HTMLInputElement>(null);
+  const timeRef = useRef<HTMLInputElement>(null);
+
+  function openPicker(ref: React.RefObject<HTMLInputElement | null>) {
+    // showPicker() reliably opens the native calendar/clock on click.
+    try {
+      ref.current?.showPicker();
+    } catch {
+      ref.current?.focus();
+    }
+  }
   const [title, setTitle] = useState(initial.popup_title ?? "");
   const [body, setBody] = useState(initial.popup_body ?? "");
   const [imageUrl, setImageUrl] = useState(initial.popup_image_url ?? "");
@@ -95,23 +107,47 @@ export function PopupConfigForm({ initial }: { initial: PopupConfig }) {
                 <Label htmlFor="startDate" className="text-xs text-muted-foreground">
                   Date
                 </Label>
-                <Input
-                  id="startDate"
-                  type="date"
-                  value={startDate}
-                  onChange={(e) => setStartDate(e.target.value)}
-                />
+                <div className="relative">
+                  <Input
+                    ref={dateRef}
+                    id="startDate"
+                    type="date"
+                    value={startDate}
+                    onChange={(e) => setStartDate(e.target.value)}
+                    className="pr-10 [&::-webkit-calendar-picker-indicator]:opacity-0"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => openPicker(dateRef)}
+                    className="absolute inset-y-0 right-0 flex w-10 items-center justify-center text-muted-foreground hover:text-foreground"
+                    aria-label="Open calendar"
+                  >
+                    <CalendarDays className="h-4 w-4" />
+                  </button>
+                </div>
               </div>
               <div className="space-y-1">
                 <Label htmlFor="startTime" className="text-xs text-muted-foreground">
                   Time
                 </Label>
-                <Input
-                  id="startTime"
-                  type="time"
-                  value={startTime}
-                  onChange={(e) => setStartTime(e.target.value)}
-                />
+                <div className="relative">
+                  <Input
+                    ref={timeRef}
+                    id="startTime"
+                    type="time"
+                    value={startTime}
+                    onChange={(e) => setStartTime(e.target.value)}
+                    className="pr-10 [&::-webkit-calendar-picker-indicator]:opacity-0"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => openPicker(timeRef)}
+                    className="absolute inset-y-0 right-0 flex w-10 items-center justify-center text-muted-foreground hover:text-foreground"
+                    aria-label="Open time picker"
+                  >
+                    <Clock className="h-4 w-4" />
+                  </button>
+                </div>
               </div>
             </div>
             <p className="text-xs text-muted-foreground">
