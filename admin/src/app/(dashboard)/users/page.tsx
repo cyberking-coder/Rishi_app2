@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { PageHeader } from "@/components/page-header";
 import { CreateUserDialog } from "@/components/users/create-user-dialog";
 import { UserActions } from "@/components/users/user-actions";
@@ -28,6 +29,23 @@ export default async function UsersPage() {
     .select("*")
     .order("created_at", { ascending: false })
     .returns<Profile[]>();
+
+  // Email lives in auth.users, not profiles. Fetch it with the service-role
+  // client so each row can be identified by email (display names are often
+  // blank). Keyed by user id.
+  const emailById = new Map<string, string>();
+  try {
+    const admin = createAdminClient();
+    const { data: authList } = await admin.auth.admin.listUsers({
+      page: 1,
+      perPage: 1000,
+    });
+    for (const u of authList?.users ?? []) {
+      if (u.email) emailById.set(u.id, u.email);
+    }
+  } catch {
+    // If listing fails, fall back to showing display names only.
+  }
 
   return (
     <div>
@@ -62,7 +80,10 @@ export default async function UsersPage() {
                 (users ?? []).map((u) => (
                   <TableRow key={u.id}>
                     <TableCell className="font-medium">
-                      {u.display_name ?? "—"}
+                      <div>{u.display_name ?? "—"}</div>
+                      <div className="text-xs font-normal text-muted-foreground">
+                        {emailById.get(u.id) ?? "—"}
+                      </div>
                     </TableCell>
                     <TableCell>
                       <Badge variant="outline">{u.role}</Badge>
