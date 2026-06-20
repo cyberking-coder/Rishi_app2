@@ -15,6 +15,7 @@ import '../../application/home_providers.dart';
 import '../../domain/entities/audio_summary.dart';
 import '../../domain/entities/category_summary.dart';
 import '../../domain/entities/continue_listening_item.dart';
+import '../../../profile/application/profile_providers.dart';
 import '../widgets/section_error.dart';
 
 class HomeScreen extends ConsumerStatefulWidget {
@@ -84,7 +85,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                 // ── Header ──
                 SliverToBoxAdapter(child: _buildHeader()),
                 // ── Search bar ──
-                const SliverToBoxAdapter(child: _SearchBar()),
+                SliverToBoxAdapter(
+                  child: _SearchBar(onTap: () => context.push('/search')),
+                ),
                 // ── Daily featured card ──
                 SliverToBoxAdapter(child: featuredAsync.when(
                   loading: () => const SizedBox(height: 80),
@@ -117,7 +120,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                 SliverToBoxAdapter(child: categoriesAsync.when(
                   loading: () => const SizedBox.shrink(),
                   error: (_, __) => const SizedBox.shrink(),
-                  data: (cats) => _CategoriesRow(categories: cats),
+                  data: (cats) => _CategoriesRow(
+                    categories: cats,
+                    onTap: (c) => context.push('/category/${c.id}', extra: c.name),
+                  ),
                 )),
                 const SliverToBoxAdapter(child: SizedBox(height: 16)),
               ]),
@@ -153,14 +159,19 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   Widget _buildHeader() {
     final h = DateTime.now().hour;
     final greeting = h < 12 ? 'Good Morning' : h < 17 ? 'Good Afternoon' : 'Good Evening';
+    final profile = ref.watch(userProfileProvider).valueOrNull;
+    final raw = profile?.displayName?.trim().isNotEmpty == true
+        ? profile!.displayName!.trim()
+        : (profile?.email.split('@').first ?? 'there');
+    final name = raw.isEmpty ? 'there' : raw;
     return Padding(
       padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
       child: Row(children: [
         Expanded(
           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            RichText(text: const TextSpan(children: [
-              TextSpan(text: 'Hi, Arjun ', style: TextStyle(fontSize: 22, fontWeight: FontWeight.w700, color: Colors.white)),
-              TextSpan(text: '👋', style: TextStyle(fontSize: 22)),
+            RichText(text: TextSpan(children: [
+              TextSpan(text: 'Hi, $name ', style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w700, color: Colors.white)),
+              const TextSpan(text: '👋', style: TextStyle(fontSize: 22)),
             ])),
             const SizedBox(height: 2),
             Text(greeting, style: const TextStyle(fontSize: 13, color: AppTheme.textSecondary)),
@@ -190,24 +201,28 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 // ─────────────────────────────────────────────────────────────
 
 class _SearchBar extends StatelessWidget {
-  const _SearchBar();
+  final VoidCallback onTap;
+  const _SearchBar({required this.onTap});
   @override
   Widget build(BuildContext context) {
     return Padding(
       padding: const EdgeInsets.fromLTRB(20, 14, 20, 0),
-      child: Container(
-        height: 46,
-        decoration: BoxDecoration(
-          color: const Color(0xFF1C1640),
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: AppTheme.line),
+      child: GestureDetector(
+        onTap: onTap,
+        child: Container(
+          height: 46,
+          decoration: BoxDecoration(
+            color: const Color(0xFF1C1640),
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: AppTheme.line),
+          ),
+          child: const Row(children: [
+            SizedBox(width: 14),
+            Icon(Icons.search, color: AppTheme.textDim, size: 18),
+            SizedBox(width: 10),
+            Text('Search meditation, music, etc...', style: TextStyle(color: AppTheme.textDim, fontSize: 13)),
+          ]),
         ),
-        child: const Row(children: [
-          SizedBox(width: 14),
-          Icon(Icons.search, color: AppTheme.textDim, size: 18),
-          SizedBox(width: 10),
-          Text('Search meditation, music, etc...', style: TextStyle(color: AppTheme.textDim, fontSize: 13)),
-        ]),
       ),
     );
   }
@@ -320,15 +335,14 @@ class _MiniCardRow extends StatelessWidget {
 
 class _CategoriesRow extends StatelessWidget {
   final List<CategorySummary> categories;
-  static const _emojis = ['🌙', '🧘', '🎯', '🛡️'];
-  static const _fallback = ['Sleep', 'Relaxation', 'Focus', 'Anxiety'];
-  const _CategoriesRow({required this.categories});
+  final void Function(CategorySummary) onTap;
+  static const _emojis = ['🌙', '🧘', '🎯', '🛡️', '🌿', '💤', '🔥', '🪷'];
+  const _CategoriesRow({required this.categories, required this.onTap});
 
   @override
   Widget build(BuildContext context) {
-    final labels = categories.isEmpty
-        ? _fallback
-        : categories.take(4).map((c) => c.name).toList();
+    if (categories.isEmpty) return const SizedBox.shrink();
+    final items = categories.take(4).toList();
     return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
       const Padding(
         padding: EdgeInsets.fromLTRB(20, 20, 20, 12),
@@ -337,18 +351,28 @@ class _CategoriesRow extends StatelessWidget {
       Padding(
         padding: const EdgeInsets.symmetric(horizontal: 20),
         child: Row(mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: List.generate(labels.length > 4 ? 4 : labels.length, (i) {
-            return Column(children: [
-              Container(width: 56, height: 56,
-                decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.07),
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: AppTheme.line),
+          children: List.generate(items.length, (i) {
+            return GestureDetector(
+              onTap: () => onTap(items[i]),
+              child: Column(children: [
+                Container(width: 56, height: 56,
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.07),
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: AppTheme.line),
+                  ),
+                  child: Center(child: Text(_emojis[i % _emojis.length], style: const TextStyle(fontSize: 22)))),
+                const SizedBox(height: 6),
+                SizedBox(
+                  width: 64,
+                  child: Text(items[i].name,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(fontSize: 10, color: AppTheme.textSecondary)),
                 ),
-                child: Center(child: Text(_emojis[i % _emojis.length], style: const TextStyle(fontSize: 22)))),
-              const SizedBox(height: 6),
-              Text(labels[i], style: const TextStyle(fontSize: 10, color: AppTheme.textSecondary)),
-            ]);
+              ]),
+            );
           }),
         ),
       ),
