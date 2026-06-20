@@ -40,6 +40,43 @@ export async function resetUserDevices(userId: string): Promise<ActionResult> {
   return { ok: true };
 }
 
+/**
+ * Resets the device lock for EVERY account: revokes downloads on all active
+ * devices and deactivates them, so everyone can register fresh on next login.
+ * Use after shipping a new build whose device fingerprint changed.
+ * Returns the number of devices that were reset.
+ */
+export async function resetAllDevices(): Promise<
+  { ok: true; count: number } | { ok: false; error: string }
+> {
+  await requireAdmin();
+  const admin = createAdminClient();
+
+  const { data: devices, error: listError } = await admin
+    .from("devices")
+    .select("id")
+    .eq("is_active", true);
+
+  if (listError) return { ok: false, error: listError.message };
+
+  for (const device of devices ?? []) {
+    await admin.rpc("revoke_downloads_for_device", {
+      p_device_id: (device as { id: string }).id,
+    });
+  }
+
+  const { error } = await admin
+    .from("devices")
+    .update({ is_active: false })
+    .eq("is_active", true);
+
+  if (error) return { ok: false, error: error.message };
+
+  revalidatePath("/devices");
+  revalidatePath("/users");
+  return { ok: true, count: devices?.length ?? 0 };
+}
+
 /** Deactivates a single device by id (finer-grained than a full reset). */
 export async function deactivateDevice(deviceId: string): Promise<ActionResult> {
   await requireAdmin();

@@ -2,6 +2,7 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { PageHeader } from "@/components/page-header";
 import { CreateUserDialog } from "@/components/users/create-user-dialog";
+import { ResetAllDevicesButton } from "@/components/users/reset-all-devices-button";
 import { UserActions } from "@/components/users/user-actions";
 import { UserStatusBadge } from "@/components/status-badge";
 import { Badge } from "@/components/ui/badge";
@@ -52,7 +53,12 @@ export default async function UsersPage() {
       <PageHeader
         title="Users"
         description="Manage accounts, roles, status, and device locks."
-        action={<CreateUserDialog />}
+        action={
+          <div className="flex items-center gap-2">
+            <ResetAllDevicesButton />
+            <CreateUserDialog />
+          </div>
+        }
       />
 
       <Card>
