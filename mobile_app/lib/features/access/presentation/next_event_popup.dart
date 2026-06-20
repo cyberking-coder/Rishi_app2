@@ -65,12 +65,14 @@ class _PopupCard extends StatelessWidget {
                 if (hasImage)
                   ClipRRect(
                     borderRadius: BorderRadius.circular(16),
-                    child: Image.network(
-                      access.popupImageUrl!,
-                      height: 150,
-                      width: double.infinity,
-                      fit: BoxFit.cover,
-                      errorBuilder: (_, __, ___) => const SizedBox.shrink(),
+                    child: ConstrainedBox(
+                      constraints: const BoxConstraints(maxHeight: 320),
+                      child: Image.network(
+                        access.popupImageUrl!,
+                        width: double.infinity,
+                        fit: BoxFit.contain,
+                        errorBuilder: (_, __, ___) => const SizedBox.shrink(),
+                      ),
                     ),
                   )
                 else
