@@ -18,15 +18,21 @@ class SoftBackground extends StatelessWidget {
             children: [
               // Top-right lotus-violet glow.
               Positioned(
-                top: -120,
-                right: -90,
-                child: _Blob(color: AppTheme.blobViolet, size: 280),
+                top: -130,
+                right: -100,
+                child: _Blob(color: AppTheme.blobViolet, size: 320),
               ),
-              // Lower-left warm peach glow.
+              // Mid-left faint mint, adds depth between the two main glows.
               Positioned(
-                bottom: -140,
-                left: -110,
-                child: _Blob(color: AppTheme.blobPeach, size: 320),
+                top: 220,
+                left: -140,
+                child: _Blob(color: AppTheme.blobMint, size: 260),
+              ),
+              // Lower-right warm peach glow.
+              Positioned(
+                bottom: -160,
+                right: -120,
+                child: _Blob(color: AppTheme.blobPeach, size: 360),
               ),
             ],
           ),

@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../app/theme/app_theme.dart';
+import '../../../../app/widgets/soft_background.dart';
 import '../../../downloads/domain/entities/download_content_type.dart';
 import '../../../downloads/presentation/widgets/download_button.dart';
 import '../../application/audio_providers.dart';
@@ -45,13 +46,20 @@ class NowPlayingScreen extends ConsumerWidget {
         builder: (context, mediaItemSnapshot) {
           final mediaItem = mediaItemSnapshot.data;
           if (mediaItem == null) {
-            return const Center(
-              child: Text('Nothing playing', style: TextStyle(color: AppTheme.textSecondary)),
+            return const Stack(
+              children: [
+                SoftBackground(),
+                Center(
+                  child: Text('Nothing playing',
+                      style: TextStyle(color: AppTheme.textSecondary)),
+                ),
+              ],
             );
           }
 
           return Stack(
             children: [
+            const SoftBackground(),
             Padding(
             padding: const EdgeInsets.symmetric(horizontal: 32),
             child: Column(

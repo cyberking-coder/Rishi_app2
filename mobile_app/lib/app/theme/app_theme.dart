@@ -19,20 +19,29 @@ class AppTheme {
   static const Color textPrimary = Color(0xFF221C32);
   static const Color textSecondary = Color(0xFF7A7486);
 
-  // Soft ambient backdrop — gentle, low-saturation wash used behind the
-  // home and player screens. Three barely-there tints that blend into the
-  // warm neutral so nothing competes with the content.
-  static const Color washTop = Color(0xFFF3EEFB); // faint lavender
-  static const Color washMid = Color(0xFFF7F5F2); // warm neutral
-  static const Color washBottom = Color(0xFFFDF1EC); // faint peach
-  static const Color blobViolet = Color(0x267C6BB0); // 15% lotus-violet
-  static const Color blobPeach = Color(0x22F0A98E); // ~13% peach
+  // Soft ambient backdrop — a calm wash used behind the home and player
+  // screens. Present enough to feel crafted, low-saturation enough to stay
+  // serene.
+  static const Color washTop = Color(0xFFEDE6FA); // soft lavender
+  static const Color washMid = Color(0xFFF7F4FB); // pale violet-white
+  static const Color washBottom = Color(0xFFFDEFE7); // warm peach
+  static const Color blobViolet = Color(0x4A9C8BD6); // lotus-violet glow
+  static const Color blobPeach = Color(0x3DF3B79C); // warm peach glow
+  static const Color blobMint = Color(0x2E9AD6C4); // faint mint, for depth
 
   static const LinearGradient ambientWash = LinearGradient(
-    begin: Alignment.topCenter,
-    end: Alignment.bottomCenter,
+    begin: Alignment.topLeft,
+    end: Alignment.bottomRight,
     colors: [washTop, washMid, washBottom],
-    stops: [0.0, 0.55, 1.0],
+    stops: [0.0, 0.5, 1.0],
+  );
+
+  // Warm welcome-card gradient (lotus-violet → soft rose).
+  static const LinearGradient heroGradient = LinearGradient(
+    begin: Alignment.topLeft,
+    end: Alignment.bottomRight,
+    colors: [Color(0xFF8B79C4), Color(0xFFC79BC4), Color(0xFFE9B59E)],
+    stops: [0.0, 0.6, 1.0],
   );
 
   static ThemeData light() {

@@ -15,15 +15,22 @@ class CategoryChip extends StatelessWidget {
       onTap: onTap,
       child: Container(
         margin: const EdgeInsets.only(right: 8),
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 11),
         decoration: BoxDecoration(
-          color: AppTheme.surfaceElevated,
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: Colors.white12),
+          gradient: const LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [Color(0xFFF3EDFB), AppTheme.accentSoft],
+          ),
+          borderRadius: BorderRadius.circular(22),
+          border: Border.all(color: AppTheme.accent.withValues(alpha: 0.22)),
         ),
         child: Text(
           category.name,
-          style: const TextStyle(fontWeight: FontWeight.w500),
+          style: const TextStyle(
+            fontWeight: FontWeight.w600,
+            color: AppTheme.accent,
+          ),
         ),
       ),
     );
