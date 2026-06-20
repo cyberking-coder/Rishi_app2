@@ -90,6 +90,27 @@ export async function setUserAccessDays(
   return { ok: true };
 }
 
+/** Sets a user's access to expire [minutes] from now. Handy for testing the
+ *  expiry flow without waiting days (e.g. 5–10 minutes). */
+export async function setUserAccessMinutes(
+  userId: string,
+  minutes: number,
+): Promise<ActionResult> {
+  await requireAdmin();
+  const admin = createAdminClient();
+
+  const expiresAt = new Date(Date.now() + minutes * 60 * 1000).toISOString();
+
+  const { error } = await admin
+    .from("profiles")
+    .update({ access_expires_at: expiresAt })
+    .eq("id", userId);
+
+  if (error) return { ok: false, error: error.message };
+  revalidatePath("/users");
+  return { ok: true };
+}
+
 /** Immediately ends a user's access (sets expiry to now). Their audio
  *  disappears and downloads are purged on next app open. */
 export async function revokeUserAccess(userId: string): Promise<ActionResult> {

@@ -15,6 +15,7 @@ import { Button } from "@/components/ui/button";
 import {
   updateUserStatus,
   setUserAccessDays,
+  setUserAccessMinutes,
   revokeUserAccess,
 } from "@/app/actions/users";
 import { resetUserDevices } from "@/app/actions/devices";
@@ -57,6 +58,27 @@ export function UserActions({
     router.refresh();
   }
 
+  async function testMinutes(minutes: number) {
+    const result = await setUserAccessMinutes(userId, minutes);
+    if (!result.ok) return toast.error(result.error);
+    toast.success(`Access set to expire in ${minutes} minutes`);
+    router.refresh();
+  }
+
+  async function customDays() {
+    const input = window.prompt(
+      "Grant access for how many days? (use 0 for unlimited)",
+      "30",
+    );
+    if (input === null) return;
+    const days = Number(input);
+    if (Number.isNaN(days) || days < 0) return toast.error("Enter a valid number");
+    const result = await setUserAccessDays(userId, days);
+    if (!result.ok) return toast.error(result.error);
+    toast.success(days === 0 ? "Access set to unlimited" : `Access set to ${days} days`);
+    router.refresh();
+  }
+
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
@@ -76,6 +98,15 @@ export function UserActions({
         </DropdownMenuItem>
         <DropdownMenuItem onClick={() => extendAccess(7)}>
           Grant 7 more days
+        </DropdownMenuItem>
+        <DropdownMenuItem onClick={customDays}>
+          Custom days…
+        </DropdownMenuItem>
+        <DropdownMenuItem onClick={() => testMinutes(5)}>
+          Test: expire in 5 min
+        </DropdownMenuItem>
+        <DropdownMenuItem onClick={() => testMinutes(10)}>
+          Test: expire in 10 min
         </DropdownMenuItem>
         <DropdownMenuItem className="text-destructive" onClick={endAccess}>
           End access now
