@@ -16,18 +16,27 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 
-/** Converts a stored ISO timestamp to the value a datetime-local input wants
- *  (YYYY-MM-DDTHH:mm in local time), and back. */
-function isoToLocalInput(iso: string | null): string {
+/** Splits a stored ISO timestamp into local date (YYYY-MM-DD) and time
+ *  (HH:mm) strings for the two inputs, and recombines them. */
+function isoToDate(iso: string | null): string {
   if (!iso) return "";
   const d = new Date(iso);
-  const tzOffset = d.getTimezoneOffset() * 60000;
-  return new Date(d.getTime() - tzOffset).toISOString().slice(0, 16);
+  const off = d.getTimezoneOffset() * 60000;
+  return new Date(d.getTime() - off).toISOString().slice(0, 10);
 }
 
-function localInputToIso(value: string): string | null {
-  if (!value) return null;
-  return new Date(value).toISOString();
+function isoToTime(iso: string | null): string {
+  if (!iso) return "";
+  const d = new Date(iso);
+  const off = d.getTimezoneOffset() * 60000;
+  return new Date(d.getTime() - off).toISOString().slice(11, 16);
+}
+
+function dateTimeToIso(date: string, time: string): string | null {
+  if (!date) return null;
+  // Default to midnight if only a date was chosen.
+  const t = time || "00:00";
+  return new Date(`${date}T${t}`).toISOString();
 }
 
 export function PopupConfigForm({ initial }: { initial: PopupConfig }) {
@@ -35,7 +44,8 @@ export function PopupConfigForm({ initial }: { initial: PopupConfig }) {
   const [busy, setBusy] = useState(false);
 
   const [enabled, setEnabled] = useState(initial.popup_enabled);
-  const [startAt, setStartAt] = useState(isoToLocalInput(initial.popup_start_at));
+  const [startDate, setStartDate] = useState(isoToDate(initial.popup_start_at));
+  const [startTime, setStartTime] = useState(isoToTime(initial.popup_start_at));
   const [title, setTitle] = useState(initial.popup_title ?? "");
   const [body, setBody] = useState(initial.popup_body ?? "");
   const [imageUrl, setImageUrl] = useState(initial.popup_image_url ?? "");
@@ -45,7 +55,7 @@ export function PopupConfigForm({ initial }: { initial: PopupConfig }) {
     setBusy(true);
     const result = await savePopupConfig({
       popup_enabled: enabled,
-      popup_start_at: localInputToIso(startAt),
+      popup_start_at: dateTimeToIso(startDate, startTime),
       popup_title: title || null,
       popup_body: body || null,
       popup_image_url: imageUrl || null,
@@ -79,15 +89,34 @@ export function PopupConfigForm({ initial }: { initial: PopupConfig }) {
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="startAt">Show from</Label>
-            <Input
-              id="startAt"
-              type="datetime-local"
-              value={startAt}
-              onChange={(e) => setStartAt(e.target.value)}
-            />
+            <Label>Show from</Label>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <Label htmlFor="startDate" className="text-xs text-muted-foreground">
+                  Date
+                </Label>
+                <Input
+                  id="startDate"
+                  type="date"
+                  value={startDate}
+                  onChange={(e) => setStartDate(e.target.value)}
+                />
+              </div>
+              <div className="space-y-1">
+                <Label htmlFor="startTime" className="text-xs text-muted-foreground">
+                  Time
+                </Label>
+                <Input
+                  id="startTime"
+                  type="time"
+                  value={startTime}
+                  onChange={(e) => setStartTime(e.target.value)}
+                />
+              </div>
+            </div>
             <p className="text-xs text-muted-foreground">
-              Leave blank to show immediately. Set this to day 6 of the retreat.
+              Leave the date blank to show immediately. Set this to day 6 of
+              the retreat.
             </p>
           </div>
 
