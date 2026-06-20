@@ -65,16 +65,44 @@ class NowPlayingScreen extends ConsumerWidget {
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(12),
-                  child: SizedBox(
-                    width: 260,
-                    height: 260,
+                Container(
+                  width: 252,
+                  height: 252,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    // Spectrum ring behind the art.
+                    gradient: const SweepGradient(
+                      colors: [
+                        Color(0xFF8B5CF6),
+                        Color(0xFFEC4899),
+                        Color(0xFF6366F1),
+                        Color(0xFF8B5CF6),
+                      ],
+                      stops: [0.0, 0.35, 0.7, 1.0],
+                    ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: AppTheme.accent.withValues(alpha: 0.55),
+                        blurRadius: 48,
+                        spreadRadius: 4,
+                      ),
+                    ],
+                  ),
+                  padding: const EdgeInsets.all(6),
+                  child: ClipOval(
                     child: mediaItem.artUri != null
-                        ? Image.network(mediaItem.artUri.toString(), fit: BoxFit.cover)
+                        ? Image.network(mediaItem.artUri.toString(),
+                            fit: BoxFit.cover)
                         : Container(
-                            color: AppTheme.surfaceElevated,
-                            child: const Icon(Icons.music_note, size: 64, color: AppTheme.textSecondary),
+                            decoration: const BoxDecoration(
+                              gradient: LinearGradient(
+                                begin: Alignment.topLeft,
+                                end: Alignment.bottomRight,
+                                colors: [Color(0xFF312E81), Color(0xFF0C4A6E)],
+                              ),
+                            ),
+                            child: const Icon(Icons.self_improvement,
+                                size: 72, color: Colors.white70),
                           ),
                   ),
                 ),
@@ -122,7 +150,7 @@ class NowPlayingScreen extends ConsumerWidget {
                                       data: SliderTheme.of(context).copyWith(
                                         activeTrackColor: AppTheme.accent,
                                         thumbColor: AppTheme.accent,
-                                        inactiveTrackColor: Colors.black12,
+                                        inactiveTrackColor: Colors.white24,
                                       ),
                                       child: Slider(
                                         min: 0,

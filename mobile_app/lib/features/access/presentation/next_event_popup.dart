@@ -44,8 +44,9 @@ class _PopupCard extends StatelessWidget {
         gradient: const LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
-          colors: [Color(0xFFFFFFFF), AppTheme.accentSoft],
+          colors: [AppTheme.surfaceElevated, AppTheme.surface],
         ),
+        border: Border.all(color: AppTheme.line),
         borderRadius: BorderRadius.circular(24),
         boxShadow: [
           BoxShadow(

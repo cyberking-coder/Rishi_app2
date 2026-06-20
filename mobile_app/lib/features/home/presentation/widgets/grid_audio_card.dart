@@ -19,12 +19,12 @@ class GridAudioCard extends StatelessWidget {
     required this.index,
   });
 
-  // Alternating rose & teal pairs — the two signature colours of the design.
+  // Deep indigo/violet gradient tiles — the Featured look from the design.
   static const List<List<Color>> _palette = [
-    [Color(0xFFFAC6D5), Color(0xFFF2A0BA)], // rose
-    [Color(0xFFAEE2E0), Color(0xFF74C9CA)], // teal
-    [Color(0xFFFBD4DE), Color(0xFFF4AEC4)], // soft pink
-    [Color(0xFFBFE8E5), Color(0xFF6FC4C6)], // aqua
+    [Color(0xFF3730A3), Color(0xFF1E1B4B)], // indigo
+    [Color(0xFF7C3AED), Color(0xFF4C1D95)], // violet
+    [Color(0xFF9333EA), Color(0xFF6D28D9)], // purple
+    [Color(0xFF0EA5E9), Color(0xFF0C4A6E)], // sky
   ];
 
   @override
@@ -89,7 +89,7 @@ class GridAudioCard extends StatelessWidget {
                     shape: BoxShape.circle,
                   ),
                   child: const Icon(Icons.play_arrow_rounded,
-                      color: Color(0xFF3F8E91), size: 22),
+                      color: Color(0xFF6D44E0), size: 22),
                 ),
               ),
               // Title (and artist) bottom-left.
@@ -109,7 +109,7 @@ class GridAudioCard extends StatelessWidget {
                         fontSize: 15,
                         fontWeight: FontWeight.w700,
                         height: 1.2,
-                        color: hasCover ? Colors.white : const Color(0xFF2C3F44),
+                        color: Colors.white,
                       ),
                     ),
                     if (audio.artist != null && audio.artist!.isNotEmpty)
@@ -121,9 +121,7 @@ class GridAudioCard extends StatelessWidget {
                           overflow: TextOverflow.ellipsis,
                           style: TextStyle(
                             fontSize: 12,
-                            color: hasCover
-                                ? Colors.white.withValues(alpha: 0.85)
-                                : const Color(0xFF5E7A7E),
+                            color: Colors.white.withValues(alpha: 0.75),
                           ),
                         ),
                       ),

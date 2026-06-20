@@ -1,69 +1,71 @@
 import 'package:flutter/material.dart';
 
-/// Light, minimal wellness theme: warm off-white surfaces, soft lotus-violet
-/// accent, generous spacing and rounded cards so content feels calm and
-/// uncluttered.
+/// Deep, calming night-sky theme: indigo/violet surfaces, a luminous violet
+/// accent and soft glows — matching the Anurag Rishi meditation design.
 class AppTheme {
   AppTheme._();
 
-  // Soft, airy aqua neutrals — the pale spa background from the design.
-  static const Color background = Color(0xFFE6F2F0);
-  static const Color surface = Color(0xFFFFFFFF);
-  static const Color surfaceElevated = Color(0xFFDDEEEB);
+  // Night-sky surfaces.
+  static const Color canvas = Color(0xFF0B0A1E); // deepest backdrop
+  static const Color background = Color(0xFF14102E); // deep indigo screen
+  static const Color surface = Color(0xFF221B46); // card
+  static const Color surfaceElevated = Color(0xFF2A2150); // raised card
 
-  // Calming teal accent (primary) + a soft rose secondary — the two signature
-  // colours of the meditation palette.
-  static const Color accent = Color(0xFF5FBFC2); // teal
-  static const Color accentSoft = Color(0xFFDDF0EF); // pale teal
-  static const Color accentPink = Color(0xFFF2A7BF); // rose
-  static const Color accentPinkSoft = Color(0xFFFBDDE6); // pale rose
+  // Luminous violet accent + soft secondary, plus a pink chakra accent.
+  static const Color accent = Color(0xFF8B5CF6); // violet
+  static const Color accentBright = Color(0xFFA78BFA); // lighter violet
+  static const Color accentSoft = Color(0xFF2B2358); // muted violet fill
+  static const Color accentPink = Color(0xFFEC4899); // pink
+  static const Color accentPinkSoft = Color(0xFF3A2150); // muted pink fill
+  static const Color indigo = Color(0xFF6366F1);
 
-  // Text.
-  static const Color textPrimary = Color(0xFF2C3F44);
-  static const Color textSecondary = Color(0xFF7E9498);
+  // Text on the dark canvas.
+  static const Color textPrimary = Color(0xFFFFFFFF);
+  static const Color textSecondary = Color(0xFFB9B3D9);
+  static const Color textDim = Color(0xFF7F79A3);
 
-  // Soft ambient backdrop — a calm wash used behind the home and player
-  // screens. Pink at the top fading through white to aqua at the bottom,
-  // echoing the reference welcome cards.
-  static const Color washTop = Color(0xFFFCE6EC); // pale rose
-  static const Color washMid = Color(0xFFF4FAF9); // near-white aqua
-  static const Color washBottom = Color(0xFFE0F1EE); // pale aqua
-  static const Color blobViolet = Color(0x4FF2A7BF); // rose glow
-  static const Color blobPeach = Color(0x40F6B6C8); // soft pink glow
-  static const Color blobMint = Color(0x4A8FD8D6); // teal glow
+  // Hairline divider/border on dark surfaces.
+  static const Color line = Color(0x14FFFFFF);
+
+  // Ambient backdrop — a deep indigo wash that the glow blobs sit on.
+  static const Color washTop = Color(0xFF1C1640);
+  static const Color washMid = Color(0xFF14102E);
+  static const Color washBottom = Color(0xFF120E26);
+  static const Color blobViolet = Color(0x4F8B5CF6); // violet glow
+  static const Color blobPeach = Color(0x33EC4899); // pink glow
+  static const Color blobMint = Color(0x3D6366F1); // indigo glow
 
   static const LinearGradient ambientWash = LinearGradient(
-    begin: Alignment.topLeft,
-    end: Alignment.bottomRight,
+    begin: Alignment.topCenter,
+    end: Alignment.bottomCenter,
     colors: [washTop, washMid, washBottom],
-    stops: [0.0, 0.5, 1.0],
+    stops: [0.0, 0.55, 1.0],
   );
 
-  // Welcome-card gradient (rose → teal), the hero look of the design.
+  // Hero / CTA gradient (violet → deep violet) — the signature button look.
   static const LinearGradient heroGradient = LinearGradient(
     begin: Alignment.topLeft,
     end: Alignment.bottomRight,
-    colors: [Color(0xFFF7B7CB), Color(0xFFF2A7BF), Color(0xFF6FC8C9)],
-    stops: [0.0, 0.45, 1.0],
+    colors: [Color(0xFF8B5CF6), Color(0xFF6D44E0)],
   );
 
-  // Teal pill gradient used on primary call-to-action buttons.
+  // Conic spectrum used behind the now-playing disc.
   static const LinearGradient tealGradient = LinearGradient(
     begin: Alignment.topLeft,
     end: Alignment.bottomRight,
-    colors: [Color(0xFF74CDCE), Color(0xFF52B6BA)],
+    colors: [Color(0xFF8B5CF6), Color(0xFF6D44E0)],
   );
 
   static ThemeData light() {
-    final base = ThemeData.light(useMaterial3: true);
+    final base = ThemeData.dark(useMaterial3: true);
 
     return base.copyWith(
       scaffoldBackgroundColor: background,
       colorScheme: base.colorScheme.copyWith(
-        brightness: Brightness.light,
+        brightness: Brightness.dark,
         surface: surface,
         primary: accent,
-        secondary: accent,
+        secondary: accentBright,
         onPrimary: Colors.white,
         onSurface: textPrimary,
       ),
@@ -90,20 +92,38 @@ class AppTheme {
           foregroundColor: Colors.white,
           padding: const EdgeInsets.symmetric(vertical: 14),
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(14),
+            borderRadius: BorderRadius.circular(16),
           ),
+        ),
+      ),
+      inputDecorationTheme: InputDecorationTheme(
+        filled: true,
+        fillColor: Colors.white.withValues(alpha: 0.06),
+        hintStyle: const TextStyle(color: textDim),
+        labelStyle: const TextStyle(color: textSecondary),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(14),
+          borderSide: const BorderSide(color: line),
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(14),
+          borderSide: const BorderSide(color: line),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(14),
+          borderSide: const BorderSide(color: accent),
         ),
       ),
       progressIndicatorTheme: const ProgressIndicatorThemeData(
         color: accent,
-        linearTrackColor: Color(0xFFE3DEEC),
+        linearTrackColor: Color(0x1FFFFFFF),
       ),
-      dividerTheme: const DividerThemeData(color: Color(0x14221C32)),
+      dividerTheme: const DividerThemeData(color: line),
       splashFactory: InkRipple.splashFactory,
     );
   }
 
-  /// Kept for any callers still referencing the old name; returns the light
-  /// theme so the whole app shares one look.
+  /// Kept for any callers still referencing the old name; returns the single
+  /// shared (dark) theme.
   static ThemeData dark() => light();
 }
