@@ -19,14 +19,12 @@ class GridAudioCard extends StatelessWidget {
     required this.index,
   });
 
-  // Calm pastel pairs, cycled by index.
+  // Alternating rose & teal pairs — the two signature colours of the design.
   static const List<List<Color>> _palette = [
-    [Color(0xFFE6DEF9), Color(0xFFC4B3E8)], // lavender
-    [Color(0xFFD9EFE7), Color(0xFFACD7C8)], // mint
-    [Color(0xFFFBE6D9), Color(0xFFF1C0A4)], // peach
-    [Color(0xFFDEE7F9), Color(0xFFB4C5EA)], // periwinkle
-    [Color(0xFFF6DEEC), Color(0xFFE1B2CC)], // rose
-    [Color(0xFFEDE7D6), Color(0xFFD8C9A6)], // sand
+    [Color(0xFFFAC6D5), Color(0xFFF2A0BA)], // rose
+    [Color(0xFFAEE2E0), Color(0xFF74C9CA)], // teal
+    [Color(0xFFFBD4DE), Color(0xFFF4AEC4)], // soft pink
+    [Color(0xFFBFE8E5), Color(0xFF6FC4C6)], // aqua
   ];
 
   @override
@@ -91,7 +89,7 @@ class GridAudioCard extends StatelessWidget {
                     shape: BoxShape.circle,
                   ),
                   child: const Icon(Icons.play_arrow_rounded,
-                      color: Color(0xFF5B4B8A), size: 22),
+                      color: Color(0xFF3F8E91), size: 22),
                 ),
               ),
               // Title (and artist) bottom-left.
@@ -111,7 +109,7 @@ class GridAudioCard extends StatelessWidget {
                         fontSize: 15,
                         fontWeight: FontWeight.w700,
                         height: 1.2,
-                        color: hasCover ? Colors.white : const Color(0xFF3A2F5C),
+                        color: hasCover ? Colors.white : const Color(0xFF2C3F44),
                       ),
                     ),
                     if (audio.artist != null && audio.artist!.isNotEmpty)
@@ -125,7 +123,7 @@ class GridAudioCard extends StatelessWidget {
                             fontSize: 12,
                             color: hasCover
                                 ? Colors.white.withValues(alpha: 0.85)
-                                : const Color(0xFF6B5E90),
+                                : const Color(0xFF5E7A7E),
                           ),
                         ),
                       ),

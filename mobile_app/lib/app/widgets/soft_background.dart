@@ -16,23 +16,29 @@ class SoftBackground extends StatelessWidget {
           decoration: const BoxDecoration(gradient: AppTheme.ambientWash),
           child: Stack(
             children: [
-              // Top-right lotus-violet glow.
+              // Top-right rose glow.
               Positioned(
-                top: -130,
-                right: -100,
-                child: _Blob(color: AppTheme.blobViolet, size: 320),
+                top: -140,
+                right: -110,
+                child: _Blob(color: AppTheme.blobViolet, size: 340),
               ),
-              // Mid-left faint mint, adds depth between the two main glows.
+              // Top-left soft pink, balances the rose glow.
               Positioned(
-                top: 220,
-                left: -140,
-                child: _Blob(color: AppTheme.blobMint, size: 260),
+                top: -90,
+                left: -130,
+                child: _Blob(color: AppTheme.blobPeach, size: 260),
               ),
-              // Lower-right warm peach glow.
+              // Lower-right teal glow.
               Positioned(
-                bottom: -160,
-                right: -120,
-                child: _Blob(color: AppTheme.blobPeach, size: 360),
+                bottom: -170,
+                right: -130,
+                child: _Blob(color: AppTheme.blobMint, size: 380),
+              ),
+              // Lower-left teal, mirrors the bottom glow.
+              Positioned(
+                bottom: -140,
+                left: -120,
+                child: _Blob(color: AppTheme.blobMint, size: 280),
               ),
             ],
           ),

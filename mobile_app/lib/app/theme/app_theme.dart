@@ -6,28 +6,31 @@ import 'package:flutter/material.dart';
 class AppTheme {
   AppTheme._();
 
-  // Warm, airy neutrals.
-  static const Color background = Color(0xFFF7F5F2);
+  // Soft, airy aqua neutrals — the pale spa background from the design.
+  static const Color background = Color(0xFFE6F2F0);
   static const Color surface = Color(0xFFFFFFFF);
-  static const Color surfaceElevated = Color(0xFFEFEAE3);
+  static const Color surfaceElevated = Color(0xFFDDEEEB);
 
-  // Calming lotus-violet accent + a soft secondary.
-  static const Color accent = Color(0xFF7C6BB0);
-  static const Color accentSoft = Color(0xFFEDE7F6);
+  // Calming teal accent (primary) + a soft rose secondary — the two signature
+  // colours of the meditation palette.
+  static const Color accent = Color(0xFF5FBFC2); // teal
+  static const Color accentSoft = Color(0xFFDDF0EF); // pale teal
+  static const Color accentPink = Color(0xFFF2A7BF); // rose
+  static const Color accentPinkSoft = Color(0xFFFBDDE6); // pale rose
 
   // Text.
-  static const Color textPrimary = Color(0xFF221C32);
-  static const Color textSecondary = Color(0xFF7A7486);
+  static const Color textPrimary = Color(0xFF2C3F44);
+  static const Color textSecondary = Color(0xFF7E9498);
 
   // Soft ambient backdrop — a calm wash used behind the home and player
-  // screens. Present enough to feel crafted, low-saturation enough to stay
-  // serene.
-  static const Color washTop = Color(0xFFEDE6FA); // soft lavender
-  static const Color washMid = Color(0xFFF7F4FB); // pale violet-white
-  static const Color washBottom = Color(0xFFFDEFE7); // warm peach
-  static const Color blobViolet = Color(0x4A9C8BD6); // lotus-violet glow
-  static const Color blobPeach = Color(0x3DF3B79C); // warm peach glow
-  static const Color blobMint = Color(0x2E9AD6C4); // faint mint, for depth
+  // screens. Pink at the top fading through white to aqua at the bottom,
+  // echoing the reference welcome cards.
+  static const Color washTop = Color(0xFFFCE6EC); // pale rose
+  static const Color washMid = Color(0xFFF4FAF9); // near-white aqua
+  static const Color washBottom = Color(0xFFE0F1EE); // pale aqua
+  static const Color blobViolet = Color(0x4FF2A7BF); // rose glow
+  static const Color blobPeach = Color(0x40F6B6C8); // soft pink glow
+  static const Color blobMint = Color(0x4A8FD8D6); // teal glow
 
   static const LinearGradient ambientWash = LinearGradient(
     begin: Alignment.topLeft,
@@ -36,12 +39,19 @@ class AppTheme {
     stops: [0.0, 0.5, 1.0],
   );
 
-  // Warm welcome-card gradient (lotus-violet → soft rose).
+  // Welcome-card gradient (rose → teal), the hero look of the design.
   static const LinearGradient heroGradient = LinearGradient(
     begin: Alignment.topLeft,
     end: Alignment.bottomRight,
-    colors: [Color(0xFF8B79C4), Color(0xFFC79BC4), Color(0xFFE9B59E)],
-    stops: [0.0, 0.6, 1.0],
+    colors: [Color(0xFFF7B7CB), Color(0xFFF2A7BF), Color(0xFF6FC8C9)],
+    stops: [0.0, 0.45, 1.0],
+  );
+
+  // Teal pill gradient used on primary call-to-action buttons.
+  static const LinearGradient tealGradient = LinearGradient(
+    begin: Alignment.topLeft,
+    end: Alignment.bottomRight,
+    colors: [Color(0xFF74CDCE), Color(0xFF52B6BA)],
   );
 
   static ThemeData light() {
