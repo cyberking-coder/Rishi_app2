@@ -8,6 +8,7 @@ import {
   attachUpload,
   createContent,
   presignContentUpload,
+  uploadCover,
 } from "@/app/actions/content";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -36,6 +37,7 @@ export function UploadContentDialog({ kind }: { kind: ContentKind }) {
   const [artist, setArtist] = useState("");
   const [isPremium, setIsPremium] = useState(true);
   const [file, setFile] = useState<File | null>(null);
+  const [cover, setCover] = useState<File | null>(null);
 
   function reset() {
     setTitle("");
@@ -44,7 +46,21 @@ export function UploadContentDialog({ kind }: { kind: ContentKind }) {
     setArtist("");
     setIsPremium(true);
     setFile(null);
+    setCover(null);
     setProgress(null);
+  }
+
+  function fileToBase64(f: File): Promise<string> {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => {
+        // strip the "data:...;base64," prefix
+        const result = reader.result as string;
+        resolve(result.split(",")[1] ?? "");
+      };
+      reader.onerror = () => reject(new Error("Could not read image"));
+      reader.readAsDataURL(f);
+    });
   }
 
   async function uploadToR2(uploadUrl: string, f: File) {
@@ -102,6 +118,22 @@ export function UploadContentDialog({ kind }: { kind: ContentKind }) {
         objectKey: presigned.objectKey,
       });
       if (!attached.ok) throw new Error(attached.error);
+
+      if (cover) {
+        setProgress("Uploading cover…");
+        const base64 = await fileToBase64(cover);
+        const coverResult = await uploadCover({
+          kind,
+          contentId: created.id,
+          fileName: cover.name,
+          contentType: cover.type || "image/jpeg",
+          base64,
+        });
+        // Non-fatal: the audio is already uploaded; warn but don't fail.
+        if (!coverResult.ok) {
+          toast.error(`Cover image failed: ${coverResult.error}`);
+        }
+      }
 
       toast.success(`${kind === "video" ? "Video" : "Audio"} uploaded`);
       setOpen(false);
@@ -194,6 +226,18 @@ export function UploadContentDialog({ kind }: { kind: ContentKind }) {
               required
               onChange={(e) => setFile(e.target.files?.[0] ?? null)}
             />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="uc-cover">Cover image (optional)</Label>
+            <Input
+              id="uc-cover"
+              type="file"
+              accept="image/*"
+              onChange={(e) => setCover(e.target.files?.[0] ?? null)}
+            />
+            <p className="text-xs text-muted-foreground">
+              Shown on the audio card in the app. Square images look best.
+            </p>
           </div>
           <DialogFooter>
             <Button type="submit" disabled={busy}>

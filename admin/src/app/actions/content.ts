@@ -115,6 +115,44 @@ export async function attachUpload(args: {
   return { ok: true };
 }
 
+/** Uploads a cover image to the public `covers` bucket and stores its URL on
+ *  the content row (audios.cover_art_url / videos.thumbnail_url). The image is
+ *  passed as base64 since cover files are small. */
+export async function uploadCover(args: {
+  kind: ContentKind;
+  contentId: string;
+  fileName: string;
+  contentType: string;
+  base64: string;
+}): Promise<ActionResult> {
+  await requireAdmin();
+  const db = createAdminClient();
+
+  const ext = args.fileName.includes(".")
+    ? args.fileName.split(".").pop()
+    : "jpg";
+  const path = `${args.kind}/${args.contentId}/cover.${ext}`;
+  const bytes = Buffer.from(args.base64, "base64");
+
+  const { error: uploadError } = await db.storage
+    .from("covers")
+    .upload(path, bytes, { contentType: args.contentType, upsert: true });
+  if (uploadError) return { ok: false, error: uploadError.message };
+
+  const { data } = db.storage.from("covers").getPublicUrl(path);
+  const column = args.kind === "video" ? "thumbnail_url" : "cover_art_url";
+  const table = args.kind === "video" ? "videos" : "audios";
+
+  const { error: updateError } = await db
+    .from(table)
+    .update({ [column]: data.publicUrl })
+    .eq("id", args.contentId);
+  if (updateError) return { ok: false, error: updateError.message };
+
+  revalidatePath(args.kind === "video" ? "/videos" : "/audios");
+  return { ok: true };
+}
+
 export async function updateContentStatus(args: {
   kind: ContentKind;
   contentId: string;
