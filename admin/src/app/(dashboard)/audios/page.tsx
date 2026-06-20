@@ -22,7 +22,7 @@ export default async function AudiosPage() {
   const supabase = createClient();
   const { data: audios } = await supabase
     .from("audios")
-    .select("id, title, artist, status, audio_type, is_premium, play_count, created_at")
+    .select("id, title, artist, status, audio_type, is_premium, play_count, created_at, cover_art_url")
     .order("created_at", { ascending: false })
     .returns<Audio[]>();
 
@@ -39,6 +39,7 @@ export default async function AudiosPage() {
           <Table>
             <TableHeader>
               <TableRow>
+                <TableHead className="w-16">Cover</TableHead>
                 <TableHead>Title</TableHead>
                 <TableHead>Artist</TableHead>
                 <TableHead>Type</TableHead>
@@ -51,13 +52,27 @@ export default async function AudiosPage() {
             <TableBody>
               {(audios ?? []).length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={7} className="py-8 text-center text-muted-foreground">
+                  <TableCell colSpan={8} className="py-8 text-center text-muted-foreground">
                     No audios yet.
                   </TableCell>
                 </TableRow>
               ) : (
                 (audios ?? []).map((a) => (
                   <TableRow key={a.id}>
+                    <TableCell>
+                      {a.cover_art_url ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img
+                          src={a.cover_art_url}
+                          alt=""
+                          className="h-10 w-10 rounded-md object-cover"
+                        />
+                      ) : (
+                        <div className="flex h-10 w-10 items-center justify-center rounded-md bg-muted text-xs text-muted-foreground">
+                          —
+                        </div>
+                      )}
+                    </TableCell>
                     <TableCell className="font-medium">{a.title}</TableCell>
                     <TableCell className="text-muted-foreground">
                       {a.artist ?? "—"}
