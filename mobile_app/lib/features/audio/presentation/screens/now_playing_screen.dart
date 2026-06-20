@@ -13,10 +13,12 @@ import '../widgets/speed_selector_sheet.dart';
 class NowPlayingScreen extends ConsumerWidget {
   const NowPlayingScreen({super.key});
 
-  String _fmt(Duration d) {
+  String _formatDuration(Duration d) {
     final h = d.inHours;
     final m = d.inMinutes.remainder(60).toString().padLeft(2, '0');
     final s = d.inSeconds.remainder(60).toString().padLeft(2, '0');
+    // Show hours only for tracks an hour or longer (e.g. 1:23:45),
+    // otherwise stay compact (e.g. 23:45).
     return h > 0 ? '$h:$m:$s' : '$m:$s';
   }
 
@@ -25,106 +27,80 @@ class NowPlayingScreen extends ConsumerWidget {
     final handler = ref.watch(audioHandlerProvider);
 
     return Scaffold(
-      backgroundColor: AppTheme.canvas,
+      backgroundColor: AppTheme.background,
       appBar: AppBar(
         backgroundColor: Colors.transparent,
-        elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios, size: 18),
-          onPressed: () => Navigator.of(context).pop(),
-        ),
-        centerTitle: true,
-        title: const Text('Playing Now',
-            style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
         actions: [
           IconButton(
-            icon: const Icon(Icons.more_horiz),
+            icon: const Icon(Icons.bedtime_outlined),
+            onPressed: () => SleepTimerSheet.show(context, handler),
+          ),
+          IconButton(
+            icon: const Icon(Icons.speed),
             onPressed: () => AudioSpeedSelectorSheet.show(context, handler),
           ),
         ],
       ),
       body: StreamBuilder<MediaItem?>(
         stream: handler.mediaItem,
-        builder: (context, mediaSnap) {
-          final mediaItem = mediaSnap.data;
+        builder: (context, mediaItemSnapshot) {
+          final mediaItem = mediaItemSnapshot.data;
           if (mediaItem == null) {
-            return const Stack(children: [
-              SoftBackground(),
-              Center(child: Text('Nothing playing',
-                  style: TextStyle(color: AppTheme.textSecondary))),
-            ]);
+            return const Stack(
+              children: [
+                SoftBackground(),
+                Center(
+                  child: Text('Nothing playing',
+                      style: TextStyle(color: AppTheme.textSecondary)),
+                ),
+              ],
+            );
           }
 
-          return Stack(children: [
+          return Stack(
+            children: [
             const SoftBackground(),
-            SafeArea(
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 24),
-                child: Column(
-                  children: [
-                    const SizedBox(height: 12),
-                    // ── Glowing disc ──
-                    Center(
-                      child: Container(
-                        width: 260,
-                        height: 260,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          gradient: const SweepGradient(
-                            colors: [
-                              Color(0xFF8B5CF6),
-                              Color(0xFFEC4899),
-                              Color(0xFF6366F1),
-                              Color(0xFF8B5CF6),
-                            ],
-                            stops: [0.0, 0.35, 0.7, 1.0],
+            Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 32),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(12),
+                  child: SizedBox(
+                    width: 260,
+                    height: 260,
+                    child: mediaItem.artUri != null
+                        ? Image.network(mediaItem.artUri.toString(), fit: BoxFit.cover)
+                        : Container(
+                            color: AppTheme.surfaceElevated,
+                            child: const Icon(Icons.music_note, size: 64, color: AppTheme.textSecondary),
                           ),
-                          boxShadow: [
-                            BoxShadow(
-                              color: AppTheme.accent.withValues(alpha: 0.55),
-                              blurRadius: 52,
-                              spreadRadius: 6,
-                            ),
-                          ],
-                        ),
-                        padding: const EdgeInsets.all(6),
-                        child: ClipOval(
-                          child: mediaItem.artUri != null
-                              ? Image.network(mediaItem.artUri.toString(),
-                                  fit: BoxFit.cover)
-                              : Container(
-                                  decoration: const BoxDecoration(
-                                    gradient: LinearGradient(
-                                      begin: Alignment.topLeft,
-                                      end: Alignment.bottomRight,
-                                      colors: [Color(0xFF312E81), Color(0xFF0C4A6E)],
-                                    ),
-                                  ),
-                                  child: const Icon(Icons.self_improvement,
-                                      size: 80, color: Colors.white70),
-                                ),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 28),
-                    // ── Title + artist ──
-                    Text(mediaItem.title,
-                        textAlign: TextAlign.center,
-                        style: const TextStyle(
-                            fontSize: 20, fontWeight: FontWeight.w700)),
-                    if (mediaItem.artist != null) ...[
-                      const SizedBox(height: 4),
-                      Text(mediaItem.artist!,
-                          style: const TextStyle(
-                              color: AppTheme.textSecondary, fontSize: 14)),
-                    ],
-                    const SizedBox(height: 24),
-                    // ── Progress ──
-                    StreamBuilder<PlaybackState>(
-                      stream: handler.playbackState,
-                      builder: (context, stateSnap) {
-                        final playing = stateSnap.data?.playing ?? false;
-                        return StreamBuilder<Duration?>(
+                  ),
+                ),
+                const SizedBox(height: 28),
+                Text(
+                  mediaItem.title,
+                  style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w700),
+                  textAlign: TextAlign.center,
+                ),
+                if (mediaItem.artist != null) ...[
+                  const SizedBox(height: 4),
+                  Text(
+                    mediaItem.artist!,
+                    style: const TextStyle(color: AppTheme.textSecondary),
+                  ),
+                ],
+                const SizedBox(height: 24),
+                StreamBuilder<PlaybackState>(
+                  stream: handler.playbackState,
+                  builder: (context, stateSnapshot) {
+                    final state = stateSnapshot.data;
+                    final playing = state?.playing ?? false;
+
+                    return Column(
+                      children: [
+                        StreamBuilder<Duration?>(
                           stream: handler.durationStream,
                           builder: (context, durSnap) {
                             final duration = durSnap.data ??
@@ -134,229 +110,117 @@ class NowPlayingScreen extends ConsumerWidget {
                             return StreamBuilder<Duration>(
                               stream: handler.positionStream,
                               builder: (context, posSnap) {
-                                var pos = posSnap.data ?? Duration.zero;
-                                if (pos > duration) pos = duration;
+                                var position = posSnap.data ?? Duration.zero;
+                                if (position > duration) position = duration;
                                 final maxMs = duration.inMilliseconds
                                     .toDouble()
-                                    .clamp(1.0, double.infinity);
-                                return Column(children: [
-                                  // Slim progress bar
-                                  SliderTheme(
-                                    data: SliderTheme.of(context).copyWith(
-                                      trackHeight: 4,
-                                      activeTrackColor: AppTheme.accentBright,
-                                      inactiveTrackColor:
-                                          Colors.white.withValues(alpha: 0.12),
-                                      thumbColor: AppTheme.accentBright,
-                                      thumbShape: const RoundSliderThumbShape(
-                                          enabledThumbRadius: 6),
-                                      overlayShape: const RoundSliderOverlayShape(
-                                          overlayRadius: 14),
-                                    ),
-                                    child: Slider(
-                                      min: 0,
-                                      max: maxMs,
-                                      value: pos.inMilliseconds
-                                          .toDouble()
-                                          .clamp(0.0, maxMs),
-                                      onChanged: (v) => handler
-                                          .seek(Duration(milliseconds: v.toInt())),
-                                    ),
-                                  ),
-                                  Padding(
-                                    padding:
-                                        const EdgeInsets.symmetric(horizontal: 8),
-                                    child: Row(
-                                      mainAxisAlignment:
-                                          MainAxisAlignment.spaceBetween,
-                                      children: [
-                                        Text(_fmt(pos),
-                                            style: const TextStyle(
-                                                fontSize: 11,
-                                                color: AppTheme.textDim)),
-                                        Text(_fmt(duration),
-                                            style: const TextStyle(
-                                                fontSize: 11,
-                                                color: AppTheme.textDim)),
-                                      ],
-                                    ),
-                                  ),
-                                  const SizedBox(height: 20),
-                                  // ── Transport controls ──
-                                  Row(
-                                    mainAxisAlignment:
-                                        MainAxisAlignment.spaceEvenly,
-                                    children: [
-                                      // Shuffle (decorative)
-                                      IconButton(
-                                        icon: const Icon(Icons.shuffle,
-                                            color: AppTheme.textDim, size: 22),
-                                        onPressed: () {},
+                                    .clamp(1.0, double.infinity)
+                                    .toDouble();
+                                return Column(
+                                  children: [
+                                    SliderTheme(
+                                      data: SliderTheme.of(context).copyWith(
+                                        activeTrackColor: AppTheme.accent,
+                                        thumbColor: AppTheme.accent,
+                                        inactiveTrackColor: Colors.black12,
                                       ),
-                                      // Skip previous
-                                      IconButton(
-                                        icon: const Icon(Icons.skip_previous,
-                                            color: AppTheme.textSecondary, size: 28),
-                                        onPressed: handler.skipToPrevious,
-                                      ),
-                                      // Play/Pause — violet circle
-                                      GestureDetector(
-                                        onTap: playing
-                                            ? handler.pause
-                                            : handler.play,
-                                        child: Container(
-                                          width: 62,
-                                          height: 62,
-                                          decoration: BoxDecoration(
-                                            shape: BoxShape.circle,
-                                            gradient: AppTheme.heroGradient,
-                                            boxShadow: [
-                                              BoxShadow(
-                                                color: AppTheme.accent
-                                                    .withValues(alpha: 0.5),
-                                                blurRadius: 24,
-                                                offset: const Offset(0, 8),
-                                              ),
-                                            ],
-                                          ),
-                                          child: Icon(
-                                            playing
-                                                ? Icons.pause
-                                                : Icons.play_arrow,
-                                            color: Colors.white,
-                                            size: 28,
-                                          ),
+                                      child: Slider(
+                                        min: 0,
+                                        max: maxMs,
+                                        value: position.inMilliseconds
+                                            .toDouble()
+                                            .clamp(0.0, maxMs)
+                                            .toDouble(),
+                                        onChanged: (value) => handler.seek(
+                                          Duration(milliseconds: value.toInt()),
                                         ),
                                       ),
-                                      // Skip next
-                                      IconButton(
-                                        icon: const Icon(Icons.skip_next,
-                                            color: AppTheme.textSecondary, size: 28),
-                                        onPressed: handler.skipToNext,
+                                    ),
+                                    Padding(
+                                      padding:
+                                          const EdgeInsets.symmetric(horizontal: 8),
+                                      child: Row(
+                                        mainAxisAlignment:
+                                            MainAxisAlignment.spaceBetween,
+                                        children: [
+                                          Text(_formatDuration(position),
+                                              style: const TextStyle(
+                                                  color: AppTheme.textSecondary)),
+                                          Text(_formatDuration(duration),
+                                              style: const TextStyle(
+                                                  color: AppTheme.textSecondary)),
+                                        ],
                                       ),
-                                      // Repeat (decorative)
-                                      IconButton(
-                                        icon: const Icon(Icons.repeat,
-                                            color: AppTheme.textDim, size: 22),
-                                        onPressed: () {},
-                                      ),
-                                    ],
-                                  ),
-                                  // Sleep timer remaining
-                                  ValueListenableBuilder<Duration?>(
-                                    valueListenable: handler.sleepTimerRemaining,
-                                    builder: (context, remaining, _) {
-                                      if (remaining == null)
-                                        return const SizedBox.shrink();
-                                      return Padding(
-                                        padding: const EdgeInsets.only(top: 8),
-                                        child: Text(
-                                          'Sleep timer: ${_fmt(remaining)} left',
-                                          style: const TextStyle(
-                                              color: AppTheme.textSecondary,
-                                              fontSize: 12),
-                                        ),
-                                      );
-                                    },
-                                  ),
-                                  const SizedBox(height: 28),
-                                  // ── Bottom tool row ──
-                                  Row(
-                                    mainAxisAlignment:
-                                        MainAxisAlignment.spaceEvenly,
-                                    children: [
-                                      _ToolButton(
-                                        icon: Icons.favorite_border,
-                                        label: 'Favorite',
-                                        onTap: () {},
-                                      ),
-                                      // Download — wraps existing DownloadButton
-                                      _DownloadTool(
-                                        contentId: mediaItem.id,
-                                        title: mediaItem.title,
-                                        thumbnailUrl:
-                                            mediaItem.artUri?.toString(),
-                                      ),
-                                      _ToolButton(
-                                        icon: Icons.bedtime_outlined,
-                                        label: 'Timer',
-                                        onTap: () => SleepTimerSheet.show(
-                                            context, handler),
-                                      ),
-                                      _ToolButton(
-                                        icon: Icons.more_horiz,
-                                        label: 'More',
-                                        onTap: () =>
-                                            AudioSpeedSelectorSheet.show(
-                                                context, handler),
-                                      ),
-                                    ],
-                                  ),
-                                ]);
+                                    ),
+                                  ],
+                                );
                               },
                             );
                           },
-                        );
-                      },
-                    ),
-                  ],
+                        ),
+                        const SizedBox(height: 16),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            IconButton(
+                              iconSize: 36,
+                              icon: const Icon(Icons.skip_previous),
+                              onPressed: handler.skipToPrevious,
+                            ),
+                            const SizedBox(width: 16),
+                            IconButton(
+                              iconSize: 56,
+                              icon: Icon(playing
+                                  ? Icons.pause_circle_filled
+                                  : Icons.play_circle_filled),
+                              onPressed: playing ? handler.pause : handler.play,
+                            ),
+                            const SizedBox(width: 16),
+                            IconButton(
+                              iconSize: 36,
+                              icon: const Icon(Icons.skip_next),
+                              onPressed: handler.skipToNext,
+                            ),
+                          ],
+                        ),
+                        ValueListenableBuilder<Duration?>(
+                          valueListenable: handler.sleepTimerRemaining,
+                          builder: (context, remaining, _) {
+                            if (remaining == null) return const SizedBox.shrink();
+                            return Padding(
+                              padding: const EdgeInsets.only(top: 12),
+                              child: Text(
+                                'Sleep timer: ${_formatDuration(remaining)} left',
+                                style: const TextStyle(color: AppTheme.textSecondary),
+                              ),
+                            );
+                          },
+                        ),
+                      ],
+                    );
+                  },
+                ),
+              ],
+            ),
+          ),
+            // Topmost so the tap always lands on the button, never the
+            // centred content column behind it.
+            Align(
+              alignment: Alignment.topRight,
+              child: Padding(
+                padding: const EdgeInsets.only(right: 8, top: 4),
+                child: DownloadButton(
+                  contentId: mediaItem.id,
+                  contentType: DownloadContentType.audio,
+                  title: mediaItem.title,
+                  thumbnailUrl: mediaItem.artUri?.toString(),
                 ),
               ),
             ),
-          ]);
+            ],
+          );
         },
       ),
-    );
-  }
-}
-
-class _ToolButton extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  final VoidCallback onTap;
-  const _ToolButton(
-      {required this.icon, required this.label, required this.onTap});
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, color: AppTheme.textDim, size: 22),
-          const SizedBox(height: 6),
-          Text(label,
-              style:
-                  const TextStyle(fontSize: 10, color: AppTheme.textDim)),
-        ],
-      ),
-    );
-  }
-}
-
-class _DownloadTool extends StatelessWidget {
-  final String contentId;
-  final String title;
-  final String? thumbnailUrl;
-  const _DownloadTool(
-      {required this.contentId, required this.title, this.thumbnailUrl});
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        DownloadButton(
-          contentId: contentId,
-          contentType: DownloadContentType.audio,
-          title: title,
-          thumbnailUrl: thumbnailUrl,
-        ),
-        const SizedBox(height: 6),
-        const Text('Download',
-            style: TextStyle(fontSize: 10, color: AppTheme.textDim)),
-      ],
     );
   }
 }

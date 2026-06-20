@@ -17,15 +17,19 @@ class CategoryChip extends StatelessWidget {
         margin: const EdgeInsets.only(right: 8),
         padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 11),
         decoration: BoxDecoration(
-          color: Colors.white.withValues(alpha: 0.07),
+          gradient: const LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [Color(0xFFF3EDFB), AppTheme.accentSoft],
+          ),
           borderRadius: BorderRadius.circular(22),
-          border: Border.all(color: AppTheme.accent.withValues(alpha: 0.35)),
+          border: Border.all(color: AppTheme.accent.withValues(alpha: 0.22)),
         ),
         child: Text(
           category.name,
           style: const TextStyle(
             fontWeight: FontWeight.w600,
-            color: AppTheme.accentBright,
+            color: AppTheme.accent,
           ),
         ),
       ),

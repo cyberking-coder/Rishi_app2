@@ -3,12 +3,12 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../../app/theme/app_theme.dart';
-import '../../../../app/widgets/soft_background.dart';
 import '../../../auth/application/auth_providers.dart';
 import '../../application/profile_providers.dart';
 import '../widgets/device_tile.dart';
 import '../widgets/profile_header.dart';
 import '../widgets/profile_section_card.dart';
+import '../widgets/profile_stat_tile.dart';
 import '../widgets/subscription_status_badge.dart';
 
 class ProfileScreen extends ConsumerWidget {
@@ -17,85 +17,53 @@ class ProfileScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final profileAsync = ref.watch(userProfileProvider);
-    final subscriptionAsync = ref.watch(subscriptionSummaryProvider);
-    final devicesAsync = ref.watch(registeredDevicesProvider);
-    final currentFpAsync = ref.watch(currentDeviceFingerprintProvider);
-    final downloadsCount = ref.watch(downloadsCountProvider);
 
     return Scaffold(
-      backgroundColor: AppTheme.canvas,
-      body: Stack(
-        children: [
-          const SoftBackground(),
-          SafeArea(
-            child: Column(
-              children: [
-                // AppBar row
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                  child: Row(
-                    children: [
-                      IconButton(
-                        icon: const Icon(Icons.arrow_back_ios, size: 18),
-                        onPressed: () => Navigator.of(context).pop(),
-                      ),
-                      const Expanded(
-                        child: Text('Profile',
-                            textAlign: TextAlign.center,
-                            style: TextStyle(
-                                fontSize: 16, fontWeight: FontWeight.w600)),
-                      ),
-                      IconButton(
-                        icon: const Icon(Icons.logout, size: 20),
-                        onPressed: () => _confirmLogout(context, ref),
-                      ),
-                    ],
-                  ),
-                ),
-                Expanded(
-                  child: profileAsync.when(
-                    loading: () => const Center(
-                        child:
-                            CircularProgressIndicator(color: AppTheme.accent)),
-                    error: (e, _) => Center(
-                      child: Text('Could not load profile.\n$e',
-                          textAlign: TextAlign.center,
-                          style: const TextStyle(
-                              color: AppTheme.textSecondary)),
-                    ),
-                    data: (profile) => RefreshIndicator(
-                      color: AppTheme.accent,
-                      onRefresh: () async {
-                        ref.invalidate(userProfileProvider);
-                        ref.invalidate(subscriptionSummaryProvider);
-                        ref.invalidate(registeredDevicesProvider);
-                      },
-                      child: ListView(
-                        padding: const EdgeInsets.fromLTRB(20, 8, 20, 32),
-                        children: [
-                          ProfileHeader(profile: profile),
-                          const SizedBox(height: 20),
-                          // ── Subscription ──
-                          _SubscriptionSection(
-                              subscriptionAsync: subscriptionAsync),
-                          const SizedBox(height: 16),
-                          // ── Devices ──
-                          _DevicesSection(
-                            devicesAsync: devicesAsync,
-                            currentFpAsync: currentFpAsync,
-                          ),
-                          const SizedBox(height: 16),
-                          // ── Stats ──
-                          _StatsSection(downloadsCount: downloadsCount),
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
-              ],
-            ),
+      backgroundColor: AppTheme.background,
+      appBar: AppBar(
+        backgroundColor: AppTheme.background,
+        title: const Text('Profile'),
+        actions: [
+          IconButton(
+            tooltip: 'Log out',
+            icon: const Icon(Icons.logout),
+            onPressed: () => _confirmLogout(context, ref),
           ),
         ],
+      ),
+      body: profileAsync.when(
+        loading: () =>
+            const Center(child: CircularProgressIndicator(color: AppTheme.accent)),
+        error: (e, _) => Center(
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Text(
+              'Could not load profile.\n$e',
+              textAlign: TextAlign.center,
+              style: const TextStyle(color: AppTheme.textSecondary),
+            ),
+          ),
+        ),
+        data: (profile) => RefreshIndicator(
+          color: AppTheme.accent,
+          onRefresh: () async {
+            ref.invalidate(userProfileProvider);
+            ref.invalidate(subscriptionSummaryProvider);
+            ref.invalidate(registeredDevicesProvider);
+          },
+          child: ListView(
+            padding: const EdgeInsets.all(16),
+            children: [
+              ProfileHeader(profile: profile),
+              const SizedBox(height: 24),
+              const _SubscriptionSection(),
+              const SizedBox(height: 16),
+              const _DevicesSection(),
+              const SizedBox(height: 16),
+              const _StatsSection(),
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -118,8 +86,7 @@ class ProfileScreen extends ConsumerWidget {
               await ref.read(authControllerProvider.notifier).logout();
               if (context.mounted) context.go('/login');
             },
-            child:
-                const Text('Log out', style: TextStyle(color: Colors.redAccent)),
+            child: const Text('Log out', style: TextStyle(color: Colors.redAccent)),
           ),
         ],
       ),
@@ -127,18 +94,24 @@ class ProfileScreen extends ConsumerWidget {
   }
 }
 
-class _SubscriptionSection extends StatelessWidget {
-  final AsyncValue subscriptionAsync;
-  const _SubscriptionSection({required this.subscriptionAsync});
+class _SubscriptionSection extends ConsumerWidget {
+  const _SubscriptionSection();
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final async = ref.watch(subscriptionSummaryProvider);
+
     return ProfileSectionCard(
       title: 'SUBSCRIPTION',
-      child: subscriptionAsync.when(
-        loading: () => const CircularProgressIndicator(color: AppTheme.accent),
-        error: (_, __) => const Text('Could not load subscription.',
-            style: TextStyle(color: AppTheme.textSecondary)),
+      child: async.when(
+        loading: () => const SizedBox(
+          height: 40,
+          child: Center(child: CircularProgressIndicator(strokeWidth: 2)),
+        ),
+        error: (_, __) => const Text(
+          'Could not load subscription status.',
+          style: TextStyle(color: AppTheme.textSecondary),
+        ),
         data: (sub) => SubscriptionStatusBadge(subscription: sub),
       ),
     );
@@ -146,32 +119,42 @@ class _SubscriptionSection extends StatelessWidget {
 }
 
 class _DevicesSection extends ConsumerWidget {
-  final AsyncValue devicesAsync;
-  final AsyncValue<String> currentFpAsync;
-  const _DevicesSection(
-      {required this.devicesAsync, required this.currentFpAsync});
+  const _DevicesSection();
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final devicesAsync = ref.watch(registeredDevicesProvider);
+    final fingerprintAsync = ref.watch(currentDeviceFingerprintProvider);
+
     return ProfileSectionCard(
-      title: 'REGISTERED DEVICES',
+      title: 'REGISTERED DEVICE',
       child: devicesAsync.when(
-        loading: () => const CircularProgressIndicator(color: AppTheme.accent),
-        error: (_, __) => const Text('Could not load devices.',
-            style: TextStyle(color: AppTheme.textSecondary)),
+        loading: () => const SizedBox(
+          height: 40,
+          child: Center(child: CircularProgressIndicator(strokeWidth: 2)),
+        ),
+        error: (_, __) => const Text(
+          'Could not load devices.',
+          style: TextStyle(color: AppTheme.textSecondary),
+        ),
         data: (devices) {
           if (devices.isEmpty) {
-            return const Text('No registered devices.',
-                style: TextStyle(color: AppTheme.textSecondary));
+            return const Text(
+              'No device registered yet.',
+              style: TextStyle(color: AppTheme.textSecondary),
+            );
           }
-          final currentFp = currentFpAsync.valueOrNull ?? '';
+
+          final currentFingerprint = fingerprintAsync.valueOrNull;
+
           return Column(
-            children: devices
-                .map((d) => DeviceTile(
-                      device: d,
-                      isCurrentDevice: d.fingerprint == currentFp,
-                    ))
-                .toList(),
+            children: [
+              for (final device in devices)
+                DeviceTile(
+                  device: device,
+                  isCurrentDevice: device.deviceFingerprint == currentFingerprint,
+                ),
+            ],
           );
         },
       ),
@@ -179,24 +162,19 @@ class _DevicesSection extends ConsumerWidget {
   }
 }
 
-class _StatsSection extends StatelessWidget {
-  final int downloadsCount;
-  const _StatsSection({required this.downloadsCount});
+class _StatsSection extends ConsumerWidget {
+  const _StatsSection();
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final downloadsCount = ref.watch(downloadsCountProvider);
+
     return ProfileSectionCard(
-      title: 'STATS',
-      child: Row(
-        children: [
-          const Icon(Icons.download_done_rounded,
-              color: AppTheme.accentBright, size: 20),
-          const SizedBox(width: 10),
-          Text(
-            '$downloadsCount downloaded',
-            style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
-          ),
-        ],
+      child: ProfileStatTile(
+        icon: Icons.download_done,
+        label: 'Downloads',
+        value: '$downloadsCount',
+        onTap: () => context.push('/downloads'),
       ),
     );
   }

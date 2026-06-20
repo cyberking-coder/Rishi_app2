@@ -19,12 +19,14 @@ class GridAudioCard extends StatelessWidget {
     required this.index,
   });
 
-  // Deep indigo/violet gradient tiles — the Featured look from the design.
+  // Calm pastel pairs, cycled by index.
   static const List<List<Color>> _palette = [
-    [Color(0xFF3730A3), Color(0xFF1E1B4B)], // indigo
-    [Color(0xFF7C3AED), Color(0xFF4C1D95)], // violet
-    [Color(0xFF9333EA), Color(0xFF6D28D9)], // purple
-    [Color(0xFF0EA5E9), Color(0xFF0C4A6E)], // sky
+    [Color(0xFFE6DEF9), Color(0xFFC4B3E8)], // lavender
+    [Color(0xFFD9EFE7), Color(0xFFACD7C8)], // mint
+    [Color(0xFFFBE6D9), Color(0xFFF1C0A4)], // peach
+    [Color(0xFFDEE7F9), Color(0xFFB4C5EA)], // periwinkle
+    [Color(0xFFF6DEEC), Color(0xFFE1B2CC)], // rose
+    [Color(0xFFEDE7D6), Color(0xFFD8C9A6)], // sand
   ];
 
   @override
@@ -89,7 +91,7 @@ class GridAudioCard extends StatelessWidget {
                     shape: BoxShape.circle,
                   ),
                   child: const Icon(Icons.play_arrow_rounded,
-                      color: Color(0xFF6D44E0), size: 22),
+                      color: Color(0xFF5B4B8A), size: 22),
                 ),
               ),
               // Title (and artist) bottom-left.
@@ -109,7 +111,7 @@ class GridAudioCard extends StatelessWidget {
                         fontSize: 15,
                         fontWeight: FontWeight.w700,
                         height: 1.2,
-                        color: Colors.white,
+                        color: hasCover ? Colors.white : const Color(0xFF3A2F5C),
                       ),
                     ),
                     if (audio.artist != null && audio.artist!.isNotEmpty)
@@ -121,7 +123,9 @@ class GridAudioCard extends StatelessWidget {
                           overflow: TextOverflow.ellipsis,
                           style: TextStyle(
                             fontSize: 12,
-                            color: Colors.white.withValues(alpha: 0.75),
+                            color: hasCover
+                                ? Colors.white.withValues(alpha: 0.85)
+                                : const Color(0xFF6B5E90),
                           ),
                         ),
                       ),

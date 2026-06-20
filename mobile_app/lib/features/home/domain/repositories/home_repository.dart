@@ -7,6 +7,4 @@ abstract class HomeRepository {
   Future<List<AudioSummary>> getRecentlyAdded();
   Future<List<ContinueListeningItem>> getContinueListening();
   Future<List<CategorySummary>> getCategories();
-  Future<List<AudioSummary>> searchAudios(String query);
-  Future<List<AudioSummary>> getAudiosByCategory(String categoryId);
 }

@@ -2,9 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../../../app/theme/app_theme.dart';
-import '../../../../app/widgets/lotus_logo.dart';
-import '../../../../app/widgets/soft_background.dart';
 import '../../../../core/errors/auth_failure.dart';
 import '../../application/auth_providers.dart';
 import '../../application/auth_state.dart';
@@ -58,23 +55,23 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     });
 
     return Scaffold(
-      backgroundColor: AppTheme.background,
-      body: Stack(
-        children: [
-          const SoftBackground(),
-          SafeArea(
-            child: Center(
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.symmetric(horizontal: 24),
-                child: Form(
-                  key: _formKey,
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      const _WelcomeHero(),
-                      const SizedBox(height: 28),
-                      AuthTextField(
+      body: SafeArea(
+        child: Center(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.symmetric(horizontal: 24),
+            child: Form(
+              key: _formKey,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    'Welcome back',
+                    style: Theme.of(context).textTheme.headlineMedium,
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 32),
+                  AuthTextField(
                     controller: _emailController,
                     label: 'Email',
                     keyboardType: TextInputType.emailAddress,
@@ -118,80 +115,11 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                           )
                         : const Text('Log in'),
                   ),
-                    ],
-                  ),
-                ),
+                ],
               ),
             ),
           ),
-        ],
-      ),
-    );
-  }
-}
-
-/// The welcome hero card: a rose→teal gradient panel with the lotus mark and
-/// a calm greeting — the signature look of the design.
-class _WelcomeHero extends StatelessWidget {
-  const _WelcomeHero();
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(vertical: 32, horizontal: 24),
-      decoration: BoxDecoration(
-        gradient: AppTheme.heroGradient,
-        borderRadius: BorderRadius.circular(28),
-        boxShadow: [
-          BoxShadow(
-            color: AppTheme.accentPink.withValues(alpha: 0.30),
-            blurRadius: 28,
-            offset: const Offset(0, 14),
-          ),
-        ],
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Container(
-            width: 92,
-            height: 92,
-            decoration: const BoxDecoration(
-              color: Colors.white,
-              shape: BoxShape.circle,
-            ),
-            child: const Center(child: LotusLogo(size: 52)),
-          ),
-          const SizedBox(height: 20),
-          const Text(
-            'Welcome to',
-            style: TextStyle(
-              color: Colors.white,
-              fontSize: 16,
-              fontWeight: FontWeight.w400,
-              letterSpacing: 0.5,
-            ),
-          ),
-          const SizedBox(height: 4),
-          const Text(
-            'Anurag Rishi',
-            style: TextStyle(
-              color: Colors.white,
-              fontSize: 28,
-              fontWeight: FontWeight.w800,
-              letterSpacing: 1.0,
-            ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            'Sign in to begin your practice',
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              color: Colors.white.withValues(alpha: 0.9),
-              fontSize: 13,
-            ),
-          ),
-        ],
+        ),
       ),
     );
   }
