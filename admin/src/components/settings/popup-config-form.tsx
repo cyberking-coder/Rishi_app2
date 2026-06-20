@@ -3,8 +3,8 @@
 import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { CalendarDays, Clock } from "lucide-react";
-import { savePopupConfig, type PopupConfig } from "@/app/actions/config";
+import { CalendarDays, Clock, ImagePlus, X } from "lucide-react";
+import { savePopupConfig, uploadPopupImage, type PopupConfig } from "@/app/actions/config";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -61,6 +61,23 @@ export function PopupConfigForm({ initial }: { initial: PopupConfig }) {
   const [title, setTitle] = useState(initial.popup_title ?? "");
   const [body, setBody] = useState(initial.popup_body ?? "");
   const [imageUrl, setImageUrl] = useState(initial.popup_image_url ?? "");
+  const [imageUploading, setImageUploading] = useState(false);
+  const imageInputRef = useRef<HTMLInputElement>(null);
+
+  async function handleImageFile(file: File) {
+    setImageUploading(true);
+    const ext = file.name.split(".").pop() ?? "jpg";
+    const base64 = await new Promise<string>((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve((reader.result as string).split(",")[1]);
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
+    const result = await uploadPopupImage(base64, file.type, ext);
+    setImageUploading(false);
+    if (!result.ok) return toast.error(result.error);
+    setImageUrl(result.url);
+  }
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -178,13 +195,46 @@ export function PopupConfigForm({ initial }: { initial: PopupConfig }) {
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="imageUrl">Image URL (optional)</Label>
-            <Input
-              id="imageUrl"
-              value={imageUrl}
-              onChange={(e) => setImageUrl(e.target.value)}
-              placeholder="https://…"
+            <Label>Pop-up image (optional)</Label>
+            <input
+              ref={imageInputRef}
+              type="file"
+              accept="image/*"
+              className="hidden"
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                if (file) handleImageFile(file);
+                e.target.value = "";
+              }}
             />
+            {imageUrl ? (
+              <div className="relative inline-block">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={imageUrl}
+                  alt="Pop-up preview"
+                  className="h-32 w-auto rounded-md border object-cover"
+                />
+                <button
+                  type="button"
+                  onClick={() => setImageUrl("")}
+                  className="absolute -right-2 -top-2 flex h-5 w-5 items-center justify-center rounded-full bg-destructive text-destructive-foreground"
+                  aria-label="Remove image"
+                >
+                  <X className="h-3 w-3" />
+                </button>
+              </div>
+            ) : null}
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              disabled={imageUploading}
+              onClick={() => imageInputRef.current?.click()}
+            >
+              <ImagePlus className="mr-2 h-4 w-4" />
+              {imageUploading ? "Uploading…" : imageUrl ? "Change image" : "Choose file"}
+            </Button>
           </div>
 
           <Button type="submit" disabled={busy}>

@@ -26,6 +26,28 @@ export async function getPopupConfig(): Promise<PopupConfig | null> {
   return data ?? null;
 }
 
+/** Uploads a popup image to the covers bucket and returns the public URL. */
+export async function uploadPopupImage(
+  base64: string,
+  mimeType: string,
+  ext: string,
+): Promise<{ ok: true; url: string } | { ok: false; error: string }> {
+  await requireAdmin();
+  const admin = createAdminClient();
+
+  const buffer = Buffer.from(base64, "base64");
+  const path = `popup/cover.${ext}`;
+
+  const { error } = await admin.storage
+    .from("covers")
+    .upload(path, buffer, { contentType: mimeType, upsert: true });
+
+  if (error) return { ok: false, error: error.message };
+
+  const { data } = admin.storage.from("covers").getPublicUrl(path);
+  return { ok: true, url: data.publicUrl };
+}
+
 /** Updates the next-event pop-up config. */
 export async function savePopupConfig(input: PopupConfig): Promise<ActionResult> {
   await requireAdmin();
