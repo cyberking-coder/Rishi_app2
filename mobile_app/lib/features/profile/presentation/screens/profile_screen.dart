@@ -203,7 +203,6 @@ class ProfileScreen extends ConsumerWidget {
             onPressed: () async {
               Navigator.pop(ctx);
               await ref.read(authControllerProvider.notifier).logout();
-              if (context.mounted) ctx.mounted; // satisfy lint
               if (context.mounted) context.go('/login');
             },
             child: const Text('Log out',
