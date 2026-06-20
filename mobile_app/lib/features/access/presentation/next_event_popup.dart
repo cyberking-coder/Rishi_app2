@@ -57,7 +57,11 @@ class _PopupCard extends StatelessWidget {
       ),
       child: Stack(
         children: [
-          Padding(
+          ConstrainedBox(
+            constraints: BoxConstraints(
+              maxHeight: MediaQuery.of(context).size.height * 0.8,
+            ),
+            child: SingleChildScrollView(
             padding: const EdgeInsets.fromLTRB(24, 28, 24, 24),
             child: Column(
               mainAxisSize: MainAxisSize.min,
@@ -111,6 +115,7 @@ class _PopupCard extends StatelessWidget {
                     ),
                   ),
               ],
+            ),
             ),
           ),
           if (showClose)
