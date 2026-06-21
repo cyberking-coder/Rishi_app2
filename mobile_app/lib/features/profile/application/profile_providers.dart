@@ -1,3 +1,4 @@
+import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/device/device_info_service.dart';
@@ -41,6 +42,9 @@ final currentDeviceFingerprintProvider =
     FutureProvider.autoDispose<String>((ref) {
   return ref.watch(profileRepositoryProvider).getCurrentDeviceFingerprint();
 });
+
+/// Global theme mode — toggled from the Settings sheet in ProfileScreen.
+final themeModeProvider = StateProvider<ThemeMode>((ref) => ThemeMode.dark);
 
 /// Count of fully-downloaded (playable offline) items, reactive to the
 /// same download stream the Downloads screen uses.

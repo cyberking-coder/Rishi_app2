@@ -8,6 +8,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'app/router/app_router.dart';
 import 'app/theme/app_theme.dart';
+import 'features/profile/application/profile_providers.dart';
 import 'core/config/app_config.dart';
 import 'features/audio/application/audio_player_handler.dart';
 import 'features/audio/application/audio_providers.dart';
@@ -87,13 +88,14 @@ class MeditationApp extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final router = ref.watch(goRouterProvider);
+    final themeMode = ref.watch(themeModeProvider);
 
     return MaterialApp.router(
       title: AppConfig.appName,
       debugShowCheckedModeBanner: false,
-      themeMode: ThemeMode.light,
+      themeMode: themeMode,
       theme: AppTheme.light(),
-      darkTheme: AppTheme.light(),
+      darkTheme: AppTheme.dark(),
       routerConfig: router,
     );
   }

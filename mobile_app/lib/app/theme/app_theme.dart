@@ -93,7 +93,43 @@ class AppTheme {
     );
   }
 
-  /// Kept for any callers still referencing the old name; returns the light
-  /// theme so the whole app shares one look.
-  static ThemeData dark() => light();
+  static ThemeData dark() {
+    const bg = Color(0xFF12082E);
+    const surface = Color(0xFF1C1040);
+    const accent = Color(0xFF8B5CF6);
+    const textPrimary = Colors.white;
+    const textSecondary = Color(0xFFB0A8CC);
+
+    final base = ThemeData.dark(useMaterial3: true);
+    return base.copyWith(
+      scaffoldBackgroundColor: bg,
+      colorScheme: base.colorScheme.copyWith(
+        brightness: Brightness.dark,
+        surface: surface,
+        primary: accent,
+        secondary: accent,
+        onPrimary: Colors.white,
+        onSurface: textPrimary,
+      ),
+      appBarTheme: const AppBarTheme(
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        centerTitle: false,
+        foregroundColor: textPrimary,
+        titleTextStyle: TextStyle(
+          color: textPrimary,
+          fontSize: 20,
+          fontWeight: FontWeight.w700,
+        ),
+        iconTheme: IconThemeData(color: textPrimary),
+      ),
+      textTheme: base.textTheme.apply(
+        bodyColor: textPrimary,
+        displayColor: textPrimary,
+      ),
+      iconTheme: const IconThemeData(color: textPrimary),
+      progressIndicatorTheme: const ProgressIndicatorThemeData(color: accent),
+      dividerTheme: const DividerThemeData(color: Color(0x22FFFFFF)),
+    );
+  }
 }
