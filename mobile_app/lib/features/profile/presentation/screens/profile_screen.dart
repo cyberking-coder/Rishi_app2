@@ -311,9 +311,6 @@ class _SettingsSheetState extends ConsumerState<_SettingsSheet> {
 
   @override
   Widget build(BuildContext context) {
-    final themeMode = ref.watch(themeModeProvider);
-    final isDark = themeMode == ThemeMode.dark;
-
     return Padding(
       padding: const EdgeInsets.fromLTRB(24, 20, 24, 32),
       child: Column(
@@ -383,46 +380,6 @@ class _SettingsSheetState extends ConsumerState<_SettingsSheet> {
                       const TextStyle(color: _kSub, fontSize: 12, height: 1.6)),
             ),
           ],
-          const SizedBox(height: 12),
-
-          // ── Day / Night toggle ──
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-            decoration: BoxDecoration(
-              color: const Color(0xFF120830),
-              borderRadius: BorderRadius.circular(14),
-            ),
-            child: Row(
-              children: [
-                Container(
-                  width: 38,
-                  height: 38,
-                  decoration: BoxDecoration(
-                    color: _kAccent.withOpacity(0.18),
-                    shape: BoxShape.circle,
-                  ),
-                  child: Icon(isDark ? Icons.nights_stay : Icons.wb_sunny,
-                      color: _kAccent, size: 20),
-                ),
-                const SizedBox(width: 14),
-                Expanded(
-                  child: Text(isDark ? 'Night Mode' : 'Day Mode',
-                      style: const TextStyle(
-                          color: _kText,
-                          fontSize: 15,
-                          fontWeight: FontWeight.w600)),
-                ),
-                Switch(
-                  value: isDark,
-                  activeColor: _kAccent,
-                  onChanged: (v) {
-                    ref.read(themeModeProvider.notifier).state =
-                        v ? ThemeMode.dark : ThemeMode.light;
-                  },
-                ),
-              ],
-            ),
-          ),
         ],
       ),
     );

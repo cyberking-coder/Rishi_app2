@@ -2,10 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../../../app/theme/app_theme.dart';
 import '../../application/download_providers.dart';
 import '../../domain/entities/download_status.dart';
 import '../widgets/download_tile.dart';
+
+const _kBg = Color(0xFF12082E);
+const _kAccent = Color(0xFF8B5CF6);
+const _kSub = Color(0xFFB0A8CC);
 
 /// Lists every offline download with its live status, and routes completed
 /// items to the encrypted offline player.
@@ -26,17 +29,18 @@ class _DownloadsScreenState extends ConsumerState<DownloadsScreen> {
     final repo = ref.read(downloadRepositoryProvider);
 
     return Scaffold(
-      backgroundColor: AppTheme.background,
+      backgroundColor: _kBg,
       appBar: AppBar(
-        backgroundColor: AppTheme.background,
-        title: const Text('Downloads'),
+        backgroundColor: _kBg,
+        title: const Text('Downloads', style: TextStyle(color: Colors.white)),
+        iconTheme: const IconThemeData(color: Colors.white),
       ),
       body: tasksAsync.when(
         loading: () =>
-            const Center(child: CircularProgressIndicator(color: AppTheme.accent)),
-        error: (e, _) => Center(
+            const Center(child: CircularProgressIndicator(color: _kAccent)),
+        error: (e, _) => const Center(
           child: Text('Could not load downloads',
-              style: const TextStyle(color: AppTheme.textSecondary)),
+              style: TextStyle(color: _kSub)),
         ),
         data: (tasks) {
           if (tasks.isEmpty) {
@@ -46,7 +50,7 @@ class _DownloadsScreenState extends ConsumerState<DownloadsScreen> {
                 child: Text(
                   'No downloads yet.\nTap the download icon on a title to save it for offline viewing.',
                   textAlign: TextAlign.center,
-                  style: TextStyle(color: AppTheme.textSecondary),
+                  style: TextStyle(color: _kSub),
                 ),
               ),
             );

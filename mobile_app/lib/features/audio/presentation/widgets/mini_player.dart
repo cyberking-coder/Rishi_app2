@@ -31,7 +31,7 @@ class MiniPlayer extends ConsumerWidget {
             return GestureDetector(
               onTap: () => context.push('/now-playing'),
               child: Material(
-                color: AppTheme.surfaceElevated,
+                color: const Color(0xFF1C1040),
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
@@ -39,7 +39,7 @@ class MiniPlayer extends ConsumerWidget {
                       value: progress,
                       minHeight: 2,
                       backgroundColor: Colors.white12,
-                      color: AppTheme.accent,
+                      color: const Color(0xFF8B5CF6),
                     ),
                     SizedBox(
                       height: 56,
@@ -71,7 +71,9 @@ class MiniPlayer extends ConsumerWidget {
                                   mediaItem.title,
                                   maxLines: 1,
                                   overflow: TextOverflow.ellipsis,
-                                  style: const TextStyle(fontWeight: FontWeight.w600),
+                                  style: const TextStyle(
+                                      color: Colors.white,
+                                      fontWeight: FontWeight.w600),
                                 ),
                                 if (mediaItem.artist != null)
                                   Text(
@@ -79,7 +81,7 @@ class MiniPlayer extends ConsumerWidget {
                                     maxLines: 1,
                                     overflow: TextOverflow.ellipsis,
                                     style: const TextStyle(
-                                      color: AppTheme.textSecondary,
+                                      color: Color(0xFFB0A8CC),
                                       fontSize: 12,
                                     ),
                                   ),
@@ -87,7 +89,8 @@ class MiniPlayer extends ConsumerWidget {
                             ),
                           ),
                           IconButton(
-                            icon: Icon(playing ? Icons.pause : Icons.play_arrow),
+                            icon: Icon(playing ? Icons.pause : Icons.play_arrow,
+                                color: Colors.white),
                             onPressed: playing ? handler.pause : handler.play,
                           ),
                           const SizedBox(width: 4),

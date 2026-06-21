@@ -73,24 +73,23 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
             stops: [0.0, 0.55, 1.0],
           ),
         ),
-        child: SafeArea(
-          child: Column(
-            children: [
-              const Spacer(flex: 5),
-              // ── Glowing lotus ──
-              FadeTransition(
-                opacity: _fade,
-                child: ScaleTransition(
-                  scale: _scale,
-                  child: Container(
+        child: Center(
+          child: FadeTransition(
+            opacity: _fade,
+            child: ScaleTransition(
+              scale: _scale,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  // ── Glowing lotus ──
+                  Container(
                     width: 150,
                     height: 150,
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
                       boxShadow: [
                         BoxShadow(
-                          color: const Color(0xFF8B5CF6)
-                              .withValues(alpha: 0.55),
+                          color: const Color(0xFF8B5CF6).withValues(alpha: 0.55),
                           blurRadius: 70,
                           spreadRadius: 18,
                         ),
@@ -100,53 +99,43 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
                       child: LotusLogo(size: 96, color: Color(0xFFB79CF0)),
                     ),
                   ),
-                ),
-              ),
-              const Spacer(flex: 5),
-              // ── Small diamond accent ──
-              FadeTransition(
-                opacity: _fade,
-                child: Transform.rotate(
-                  angle: 0.785398, // 45°
-                  child: Container(
-                    width: 9,
-                    height: 9,
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFB79CF0).withValues(alpha: 0.9),
-                      borderRadius: BorderRadius.circular(2),
+                  const SizedBox(height: 36),
+                  // ── Small diamond accent ──
+                  Transform.rotate(
+                    angle: 0.785398,
+                    child: Container(
+                      width: 9,
+                      height: 9,
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFB79CF0).withValues(alpha: 0.9),
+                        borderRadius: BorderRadius.circular(2),
+                      ),
                     ),
                   ),
-                ),
-              ),
-              const SizedBox(height: 28),
-              // ── Wordmark ──
-              FadeTransition(
-                opacity: _fade,
-                child: const Text(
-                  'Anurag Rishi',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 32,
-                    fontWeight: FontWeight.w800,
-                    letterSpacing: 0.5,
+                  const SizedBox(height: 24),
+                  // ── Wordmark ──
+                  const Text(
+                    'Anurag Rishi',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 32,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: 0.5,
+                    ),
                   ),
-                ),
-              ),
-              const SizedBox(height: 8),
-              FadeTransition(
-                opacity: _fade,
-                child: Text(
-                  'Find Peace Within',
-                  style: TextStyle(
-                    color: const Color(0xFFB79CF0).withValues(alpha: 0.9),
-                    fontSize: 15,
-                    fontWeight: FontWeight.w400,
-                    letterSpacing: 0.3,
+                  const SizedBox(height: 8),
+                  Text(
+                    'Find Peace Within',
+                    style: TextStyle(
+                      color: const Color(0xFFB79CF0).withValues(alpha: 0.9),
+                      fontSize: 15,
+                      fontWeight: FontWeight.w400,
+                      letterSpacing: 0.3,
+                    ),
                   ),
-                ),
+                ],
               ),
-              const Spacer(flex: 2),
-            ],
+            ),
           ),
         ),
       ),
