@@ -14,6 +14,6 @@ class AppConfig {
       'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imd6Y2FucW92cWlyYXJuY3VscWpxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE4MzcwMTgsImV4cCI6MjA5NzQxMzAxOH0.dYb9l9LkBRa5oVnElSswOEIJB_EeE51nBGsWGwr1ZEM';
 
   static const appName = 'Know Thyself';
-  static const audioChannelId = 'com.meditation.app.audio.channel';
+  static const audioChannelId = 'com.knowthyself.app.audio.channel';
   static const audioChannelName = 'Meditation Audio';
 }

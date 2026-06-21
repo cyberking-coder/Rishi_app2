@@ -1,4 +1,4 @@
-package com.meditation.app
+package com.knowthyself.app
 
 import android.os.Bundle
 import android.view.WindowManager

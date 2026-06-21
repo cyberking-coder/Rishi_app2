@@ -34,7 +34,7 @@ if (keystorePropertiesFile.exists()) {
 }
 
 android {
-    namespace "com.meditation.app"
+    namespace "com.knowthyself.app"
     compileSdk = 36
     ndkVersion = flutter.ndkVersion
 
@@ -52,7 +52,7 @@ android {
     }
 
     defaultConfig {
-        applicationId "com.meditation.app"
+        applicationId "com.knowthyself.app"
         minSdk = 21
         targetSdk = 36
         versionCode = flutterVersionCode.toInteger()
