@@ -236,9 +236,8 @@ class _SeekBar extends StatelessWidget {
                   child: Slider(
                     min: 0,
                     max: maxMs,
-                    value: pos.inMilliseconds
-                        .toDouble()
-                        .clamp(0.0, maxMs),
+                    value: (pos.inMilliseconds.toDouble())
+                        .clamp(0.0, maxMs) as double,
                     onChanged: (v) =>
                         handler.seek(Duration(milliseconds: v.toInt())),
                   ),
