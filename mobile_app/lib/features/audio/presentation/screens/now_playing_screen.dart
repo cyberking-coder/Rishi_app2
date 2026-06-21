@@ -216,7 +216,8 @@ class _SeekBar extends StatelessWidget {
             if (pos > duration) pos = duration;
             final maxMs = duration.inMilliseconds
                 .toDouble()
-                .clamp(1.0, double.infinity);
+                .clamp(1.0, double.infinity)
+                .toDouble();
 
             return Padding(
               padding: const EdgeInsets.symmetric(horizontal: 24),
