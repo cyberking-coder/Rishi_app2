@@ -10,6 +10,7 @@ import '../../features/audio/presentation/screens/now_playing_screen.dart';
 import '../../features/downloads/presentation/screens/downloads_screen.dart';
 import '../../features/downloads/presentation/screens/offline_player_screen.dart';
 import '../../features/home/presentation/screens/home_screen.dart';
+import '../../features/home/presentation/screens/browse_screen.dart';
 import '../../features/profile/presentation/screens/profile_screen.dart';
 import '../widgets/app_shell.dart';
 
@@ -61,6 +62,17 @@ final goRouterProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/profile',
         builder: (_, __) => const AppShell(child: ProfileScreen()),
+      ),
+      GoRoute(
+        path: '/search',
+        builder: (_, __) => const BrowseScreen(title: 'Search'),
+      ),
+      GoRoute(
+        path: '/category/:id',
+        builder: (_, state) => BrowseScreen(
+          categoryId: state.pathParameters['id'],
+          title: state.extra as String? ?? 'Category',
+        ),
       ),
     ],
   );

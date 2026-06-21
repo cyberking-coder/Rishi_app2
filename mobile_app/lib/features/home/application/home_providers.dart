@@ -35,3 +35,14 @@ final continueListeningProvider =
 final categoriesProvider = FutureProvider.autoDispose<List<CategorySummary>>(
   (ref) => ref.watch(homeRepositoryProvider).getCategories(),
 );
+
+final searchAudiosProvider =
+    FutureProvider.autoDispose.family<List<AudioSummary>, String>(
+  (ref, query) => ref.watch(homeRepositoryProvider).searchAudios(query),
+);
+
+final categoryAudiosProvider =
+    FutureProvider.autoDispose.family<List<AudioSummary>, String>(
+  (ref, categoryId) =>
+      ref.watch(homeRepositoryProvider).getAudiosByCategory(categoryId),
+);

@@ -31,6 +31,22 @@ class HomeRepositoryImpl implements HomeRepository {
   }
 
   @override
+  Future<List<AudioSummary>> searchAudios(String query) async {
+    if (query.trim().isEmpty) return const [];
+    final rows = await _remote.searchAudios(query);
+    return rows.map(AudioSummary.fromMap).toList();
+  }
+
+  @override
+  Future<List<AudioSummary>> getAudiosByCategory(String categoryId) async {
+    final rows = await _remote.getAudiosByCategory(categoryId);
+    return rows
+        .map((r) => r['audios'] as Map<String, dynamic>)
+        .map(AudioSummary.fromMap)
+        .toList();
+  }
+
+  @override
   Future<List<ContinueListeningItem>> getContinueListening() async {
     final userId = _client.auth.currentUser?.id;
     if (userId == null) return const [];
