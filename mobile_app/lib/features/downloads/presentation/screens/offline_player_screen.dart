@@ -4,9 +4,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:just_audio/just_audio.dart';
 
-import '../../../../app/theme/app_theme.dart';
 import '../../../audio/application/audio_providers.dart';
 import '../../application/download_providers.dart';
+
+const _kBg = Color(0xFF12082E);
+const _kAccent = Color(0xFF8B5CF6);
+const _kSub = Color(0xFFB0A8CC);
 
 /// Plays a fully-downloaded, encrypted audio file entirely offline.
 /// Bytes are decrypted on the fly by the loopback proxy so no plaintext
@@ -74,10 +77,11 @@ class _OfflinePlayerScreenState extends ConsumerState<OfflinePlayerScreen> {
     final player = _player;
 
     return Scaffold(
-      backgroundColor: AppTheme.background,
+      backgroundColor: _kBg,
       appBar: AppBar(
-        backgroundColor: AppTheme.background,
-        title: Text(widget.title),
+        backgroundColor: _kBg,
+        iconTheme: const IconThemeData(color: Colors.white),
+        title: Text(widget.title, style: const TextStyle(color: Colors.white)),
       ),
       body: Center(
         child: _error != null
@@ -86,11 +90,11 @@ class _OfflinePlayerScreenState extends ConsumerState<OfflinePlayerScreen> {
                 child: Text(
                   'Cannot play offline file.\n$_error',
                   textAlign: TextAlign.center,
-                  style: const TextStyle(color: AppTheme.textSecondary),
+                  style: const TextStyle(color: _kSub),
                 ),
               )
             : _loading || player == null
-                ? const CircularProgressIndicator(color: AppTheme.accent)
+                ? const CircularProgressIndicator(color: _kAccent)
                 : _AudioControls(player: player, title: widget.title),
       ),
     );
@@ -110,11 +114,14 @@ class _AudioControls extends StatelessWidget {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          const Icon(Icons.headphones, size: 120, color: AppTheme.accent),
+          const Icon(Icons.headphones, size: 120, color: _kAccent),
           const SizedBox(height: 32),
           Text(
             title,
-            style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+            style: const TextStyle(
+                fontSize: 22,
+                fontWeight: FontWeight.bold,
+                color: Colors.white),
             textAlign: TextAlign.center,
           ),
           const SizedBox(height: 32),
@@ -129,7 +136,7 @@ class _AudioControls extends StatelessWidget {
                   return Column(
                     children: [
                       Slider(
-                        activeColor: AppTheme.accent,
+                        activeColor: _kAccent,
                         value: duration.inSeconds == 0
                             ? 0
                             : (position.inSeconds / duration.inSeconds).clamp(0.0, 1.0),
@@ -141,9 +148,9 @@ class _AudioControls extends StatelessWidget {
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
                           Text(_fmt(position),
-                              style: const TextStyle(color: AppTheme.textSecondary, fontSize: 12)),
+                              style: const TextStyle(color: _kSub, fontSize: 12)),
                           Text(_fmt(duration),
-                              style: const TextStyle(color: AppTheme.textSecondary, fontSize: 12)),
+                              style: const TextStyle(color: _kSub, fontSize: 12)),
                         ],
                       ),
                     ],

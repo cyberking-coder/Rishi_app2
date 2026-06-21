@@ -17,7 +17,7 @@
     <!-- Storage (downloads to app-private dir, no media store permission needed) -->
 
     <application
-        android:label="Anurag _Rishi"
+        android:label="Know Thyself"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher"
         android:roundIcon="@mipmap/ic_launcher_round"
