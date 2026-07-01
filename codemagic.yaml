@@ -11,11 +11,9 @@ workflows:
       flutter: stable
       xcode: latest
       cocoapods: default
-      ios_signing:
-        distribution_type: app_store
-        bundle_identifier: com.anuragrishi.knowthyself
       vars:
         APP_STORE_APPLE_ID: 6786403340
+        BUNDLE_ID: "com.anuragrishi.knowthyself"
 
     triggering:
       events:
@@ -25,10 +23,18 @@ workflows:
           include: true
 
     scripts:
-      - name: Set up code signing (create + apply profiles)
+      - name: Set up code signing (create cert + profile, then apply)
         script: |
           keychain initialize
-          app-store-connect fetch-signing-files "com.anuragrishi.knowthyself" \
+          # Create a distribution certificate if the account has none yet.
+          app-store-connect certificates create \
+            --type IOS_DISTRIBUTION --save \
+            || echo "Distribution certificate already exists — reusing."
+          # Download all distribution certs into the keychain.
+          app-store-connect certificates list \
+            --type IOS_DISTRIBUTION --save || true
+          # Create the App Store provisioning profile for our bundle id.
+          app-store-connect fetch-signing-files "$BUNDLE_ID" \
             --type IOS_APP_STORE \
             --create
           keychain add-certificates
