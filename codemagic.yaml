@@ -28,22 +28,29 @@ workflows:
           set -e
           keychain initialize
 
-          echo "── Existing distribution certificates ──"
-          app-store-connect certificates list --type IOS_DISTRIBUTION --json || true
+          echo "── Revoking any existing distribution certificates (clear orphans / stay under Apple's cert limit) ──"
+          for cert_id in $(app-store-connect certificates list --type IOS_DISTRIBUTION --json 2>/dev/null | python3 -c "import sys, json; data=json.load(sys.stdin); print('\n'.join(c.get('id','') for c in data))" 2>/dev/null); do
+            [ -z "$cert_id" ] && continue
+            echo "Revoking old distribution certificate $cert_id"
+            app-store-connect certificates delete "$cert_id" --certificate-key=@file:/tmp/dist_key.pem 2>/dev/null || \
+              app-store-connect certificates delete "$cert_id" 2>/dev/null || true
+          done
 
-          echo "── Creating a brand-new distribution certificate (with private key) ──"
-          # Generate a private key locally, then create the cert from it so we
-          # KEEP the private key (Apple never lets you re-download it).
+          echo "── Generating a fresh RSA private key ──"
+          openssl genrsa -out /tmp/dist_key.pem 2048
+
+          echo "── Creating a new distribution certificate from that key ──"
           app-store-connect certificates create \
             --type IOS_DISTRIBUTION \
+            --certificate-key=@file:/tmp/dist_key.pem \
             --save
 
-          echo "── Importing certificate(s) into keychain ──"
           keychain add-certificates
 
           echo "── Creating / fetching the App Store provisioning profile ──"
           app-store-connect fetch-signing-files "$BUNDLE_ID" \
             --type IOS_APP_STORE \
+            --certificate-key=@file:/tmp/dist_key.pem \
             --create
 
           keychain add-certificates
