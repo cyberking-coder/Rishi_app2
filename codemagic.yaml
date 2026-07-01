@@ -23,17 +23,12 @@ workflows:
           include: true
 
     scripts:
-      - name: Set up code signing (create cert + profile, then apply)
+      - name: Set up code signing (create + apply cert & profile)
         script: |
           keychain initialize
-          # Create a distribution certificate if the account has none yet.
-          app-store-connect certificates create \
-            --type IOS_DISTRIBUTION --save \
-            || echo "Distribution certificate already exists — reusing."
-          # Download all distribution certs into the keychain.
-          app-store-connect certificates list \
-            --type IOS_DISTRIBUTION --save || true
-          # Create the App Store provisioning profile for our bundle id.
+          # Creates a distribution certificate (with private key) AND the
+          # App Store provisioning profile if they don't exist yet, then
+          # saves both locally for the keychain to import.
           app-store-connect fetch-signing-files "$BUNDLE_ID" \
             --type IOS_APP_STORE \
             --create
