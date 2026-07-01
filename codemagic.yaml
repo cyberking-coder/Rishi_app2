@@ -4,6 +4,9 @@ workflows:
     max_build_duration: 60
     instance_type: mac_mini_m2
 
+    integrations:
+      app_store_connect: integration     # name of the App Store Connect API key added in Codemagic UI
+
     environment:
       flutter: stable
       xcode: latest
@@ -13,8 +16,6 @@ workflows:
         bundle_identifier: com.anuragrishi.knowthyself
       vars:
         APP_STORE_APPLE_ID: 6786403340
-      app_store_connect:
-        auth: integration              # uses the App Store Connect API key you add in Codemagic UI
 
     triggering:
       events:
@@ -24,47 +25,33 @@ workflows:
           include: true
 
     scripts:
-      - name: Set up Flutter
-        script: flutter pub get
+      - name: Set up code signing (apply provisioning profiles)
+        script: xcode-project use-profiles
 
-      - name: Install pods
+      - name: Get Flutter packages
+        script: |
+          cd mobile_app
+          flutter pub get
+
+      - name: Install CocoaPods
         script: |
           cd mobile_app/ios
           pod install
 
-      - name: Build iOS release
+      - name: Flutter build ipa
         script: |
           cd mobile_app
-          flutter build ipa \
-            --release \
-            --export-options-plist=/Users/builder/export_options.plist
-
-      - name: Generate export options
-        script: |
-          cat > /Users/builder/export_options.plist << EOF
-          <?xml version="1.0" encoding="UTF-8"?>
-          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-          <plist version="1.0">
-          <dict>
-            <key>method</key>
-            <string>app-store</string>
-            <key>teamID</key>
-            <string>$(APPLE_TEAM_ID)</string>
-            <key>uploadBitcode</key>
-            <false/>
-            <key>uploadSymbols</key>
-            <true/>
-            <key>compileBitcode</key>
-            <false/>
-          </dict>
-          </plist>
-          EOF
+          flutter build ipa --release \
+            --build-name=1.0.0 \
+            --build-number=$BUILD_NUMBER \
+            --export-options-plist=$HOME/export_options.plist
 
     artifacts:
       - mobile_app/build/ios/ipa/*.ipa
+      - /tmp/xcodebuild_logs/*.log
 
     publishing:
       app_store_connect:
         auth: integration
         submit_to_testflight: true
-        submit_to_app_store: false   # set to true when ready for full release
+        submit_to_app_store: false        # set true when ready for full public release
