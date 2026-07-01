@@ -23,16 +23,34 @@ workflows:
           include: true
 
     scripts:
-      - name: Set up code signing (create + apply cert & profile)
+      - name: Set up code signing (fresh cert + profile)
         script: |
+          set -e
           keychain initialize
-          # Creates a distribution certificate (with private key) AND the
-          # App Store provisioning profile if they don't exist yet, then
-          # saves both locally for the keychain to import.
+
+          echo "── Existing distribution certificates ──"
+          app-store-connect certificates list --type IOS_DISTRIBUTION --json || true
+
+          echo "── Creating a brand-new distribution certificate (with private key) ──"
+          # Generate a private key locally, then create the cert from it so we
+          # KEEP the private key (Apple never lets you re-download it).
+          app-store-connect certificates create \
+            --type IOS_DISTRIBUTION \
+            --save
+
+          echo "── Importing certificate(s) into keychain ──"
+          keychain add-certificates
+
+          echo "── Creating / fetching the App Store provisioning profile ──"
           app-store-connect fetch-signing-files "$BUNDLE_ID" \
             --type IOS_APP_STORE \
             --create
+
           keychain add-certificates
+
+          echo "── Signing identities now in keychain ──"
+          security find-identity -v -p codesigning || true
+
           xcode-project use-profiles
 
       - name: Get Flutter packages
