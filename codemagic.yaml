@@ -12,7 +12,7 @@ workflows:
         distribution_type: app_store
         bundle_identifier: com.anuragrishi.knowthyself
       vars:
-        APP_STORE_APPLE_ID: 6740000000   # ← replace with your App Store app ID after creating it
+        APP_STORE_APPLE_ID: 6786403340
       app_store_connect:
         auth: integration              # uses the App Store Connect API key you add in Codemagic UI
 
