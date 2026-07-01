@@ -71,6 +71,11 @@
 		<string>audio</string>
 		<string>fetch</string>
 	</array>
+	<!-- App uses only exempt encryption (HTTPS/TLS + standard AES to protect
+	     the user's own downloaded content). Declaring this stops App Store
+	     Connect from requiring export-compliance documentation each release. -->
+	<key>ITSAppUsesNonExemptEncryption</key>
+	<false/>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>This app does not use the microphone.</string>
 	<key>NSCameraUsageDescription</key>
