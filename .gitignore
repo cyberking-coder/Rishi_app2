@@ -1,0 +1,9 @@
+
+# Local screenshot/report working folders (committed copies live in docs/)
+appstore_ipad/
+appstore_final/
+appstore_69/
+appstore_65/
+appstore_screenshots/
+generate_report.py
+scratchpad_screens.py
