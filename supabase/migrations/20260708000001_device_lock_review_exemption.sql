@@ -26,7 +26,7 @@ declare
 begin
   -- Look up the caller's email to check the review allowlist.
   select email into v_email from auth.users where id = auth.uid();
-  v_is_review := lower(coalesce(v_email, '')) in ('test@test.com');
+  v_is_review := lower(coalesce(v_email, '')) in ('test@test.com', 'applereview@gmail.com');
 
   if not v_is_review then
     -- Standard strict lock for real users: reject a second device.
