@@ -140,7 +140,11 @@ class ProfileScreen extends ConsumerWidget {
                   iconColor: _kPink,
                   title: 'Subscription',
                   subtitle: subPlan,
-                  onTap: null,
+                  onTap: () => _showSubscriptionDetails(
+                    context,
+                    subPlan,
+                    subAsync.valueOrNull,
+                  ),
                 ),
                 const SizedBox(height: 12),
 
@@ -167,6 +171,85 @@ class ProfileScreen extends ConsumerWidget {
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
       builder: (_) => _SettingsSheet(ref: ref),
+    );
+  }
+
+  void _showSubscriptionDetails(
+    BuildContext context,
+    String planName,
+    dynamic subscription,
+  ) {
+    showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: _kSurface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (_) => Padding(
+        padding: const EdgeInsets.fromLTRB(24, 20, 24, 32),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Center(
+              child: Container(
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: const Color(0x55FFFFFF),
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+            ),
+            const SizedBox(height: 20),
+            const Text('Subscription',
+                style: TextStyle(
+                    color: _kText,
+                    fontSize: 20,
+                    fontWeight: FontWeight.w700)),
+            const SizedBox(height: 20),
+            _DetailRow(label: 'Plan', value: planName),
+            if (subscription != null) ...[
+              _DetailRow(
+                  label: 'Status',
+                  value: subscription.status.toString()),
+              if (subscription.currentPeriodEnd != null)
+                _DetailRow(
+                  label: 'Renews / Expires',
+                  value: subscription.currentPeriodEnd
+                      .toString()
+                      .split(' ')
+                      .first,
+                ),
+            ] else
+              const _DetailRow(label: 'Status', value: 'Active'),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _DetailRow extends StatelessWidget {
+  const _DetailRow({required this.label, required this.value});
+  final String label;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(label, style: const TextStyle(color: _kSub, fontSize: 14)),
+          Text(value,
+              style: const TextStyle(
+                  color: _kText,
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600)),
+        ],
+      ),
     );
   }
 }
