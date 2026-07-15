@@ -151,6 +151,13 @@ class _AlbumArt extends StatelessWidget {
   final Uri? artUri;
   const _AlbumArt({required this.artUri});
 
+  Widget _artFallback() => Container(
+        color: const Color(0xFF1E1445),
+        child: const Center(
+          child: LotusLogo(size: 72, color: Color(0xFF9B6EFF)),
+        ),
+      );
+
   @override
   Widget build(BuildContext context) {
     final size = MediaQuery.of(context).size.width * 0.64;
@@ -177,13 +184,12 @@ class _AlbumArt extends StatelessWidget {
             width: size,
             height: size,
             child: artUri != null
-                ? Image.network(artUri.toString(), fit: BoxFit.cover)
-                : Container(
-                    color: const Color(0xFF1E1445),
-                    child: const Center(
-                      child: LotusLogo(size: 72, color: Color(0xFF9B6EFF)),
-                    ),
-                  ),
+                ? Image.network(
+                    artUri.toString(),
+                    fit: BoxFit.cover,
+                    errorBuilder: (_, __, ___) => _artFallback(),
+                  )
+                : _artFallback(),
           ),
         ),
       ),
@@ -275,8 +281,7 @@ class _Transport extends StatefulWidget {
 }
 
 class _TransportState extends State<_Transport> {
-  bool _shuffle = false;
-  bool _repeat = false;
+  late bool _repeat = widget.handler.isLooping as bool;
 
   @override
   Widget build(BuildContext context) {
@@ -288,18 +293,22 @@ class _TransportState extends State<_Transport> {
         return Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            // Repeat
+            // Repeat (loops the current track — genuinely functional)
             IconButton(
+              tooltip: 'Repeat',
               icon: Icon(Icons.repeat,
                   color: _repeat ? _kAccent : _kTextSecondary, size: 24),
-              onPressed: () => setState(() => _repeat = !_repeat),
+              onPressed: () async {
+                final on = await widget.handler.toggleLoop() as bool;
+                if (mounted) setState(() => _repeat = on);
+              },
             ),
             const SizedBox(width: 8),
-            // Prev
+            // Rewind 15s
             IconButton(
-              icon: const Icon(Icons.skip_previous,
-                  color: _kTextPrimary, size: 32),
-              onPressed: widget.handler.skipToPrevious,
+              tooltip: 'Back 15 seconds',
+              icon: const Icon(Icons.replay_10, color: _kTextPrimary, size: 32),
+              onPressed: () => widget.handler.rewind15(),
             ),
             const SizedBox(width: 8),
             // Play / Pause — large violet circle
@@ -327,19 +336,15 @@ class _TransportState extends State<_Transport> {
               ),
             ),
             const SizedBox(width: 8),
-            // Next
+            // Forward 15s
             IconButton(
-              icon: const Icon(Icons.skip_next,
-                  color: _kTextPrimary, size: 32),
-              onPressed: widget.handler.skipToNext,
+              tooltip: 'Forward 15 seconds',
+              icon: const Icon(Icons.forward_10, color: _kTextPrimary, size: 32),
+              onPressed: () => widget.handler.forward15(),
             ),
             const SizedBox(width: 8),
-            // Shuffle
-            IconButton(
-              icon: Icon(Icons.shuffle,
-                  color: _shuffle ? _kAccent : _kTextSecondary, size: 24),
-              onPressed: () => setState(() => _shuffle = !_shuffle),
-            ),
+            // Spacer to keep the play button visually centered
+            const SizedBox(width: 24),
           ],
         );
       },
@@ -358,8 +363,6 @@ class _ToolRow extends StatefulWidget {
 }
 
 class _ToolRowState extends State<_ToolRow> {
-  bool _favorite = false;
-
   @override
   Widget build(BuildContext context) {
     return Padding(
@@ -367,13 +370,6 @@ class _ToolRowState extends State<_ToolRow> {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceAround,
         children: [
-          // Favorite
-          _ToolButton(
-            icon: _favorite ? Icons.favorite : Icons.favorite_border,
-            label: 'Favorite',
-            color: _favorite ? Colors.pinkAccent : _kTextSecondary,
-            onTap: () => setState(() => _favorite = !_favorite),
-          ),
           // Download — reuses existing DownloadButton widget, wrapped to match style
           _DownloadTool(
             contentId: widget.media.id,

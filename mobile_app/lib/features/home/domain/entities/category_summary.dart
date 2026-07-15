@@ -11,8 +11,8 @@ class CategorySummary {
 
   factory CategorySummary.fromMap(Map<String, dynamic> map) =>
       CategorySummary(
-        id: map['id'] as String,
-        name: map['name'] as String,
-        slug: map['slug'] as String,
+        id: map['id'] as String? ?? '',
+        name: map['name'] as String? ?? 'Untitled',
+        slug: map['slug'] as String? ?? '',
       );
 }

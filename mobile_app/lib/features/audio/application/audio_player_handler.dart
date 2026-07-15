@@ -80,12 +80,33 @@ class AudioPlayerHandler extends BaseAudioHandler
       queueIndex: index,
     ));
 
-    final source = await _repository.getPlaybackSource(track.id);
-    await _player.setAudioSource(AudioSource.uri(Uri.parse(source.url)));
-    await _player.seek(resumeAt ?? Duration(seconds: source.resumePositionSeconds));
-    await _player.play();
-
-    _startProgressTimer();
+    try {
+      final source = await _repository
+          .getPlaybackSource(track.id)
+          .timeout(const Duration(seconds: 30));
+      final uri = Uri.tryParse(source.url);
+      if (uri == null) {
+        throw StateError('Invalid playback URL');
+      }
+      await _player.setAudioSource(AudioSource.uri(uri));
+      await _player.seek(
+          resumeAt ?? Duration(seconds: source.resumePositionSeconds));
+      await _player.play();
+      _startProgressTimer();
+    } catch (e) {
+      // Playback couldn't start (expired access, device lock, network,
+      // bad URL). Clear the now-playing item so no phantom mini-player is
+      // left stuck on screen, reset state, and rethrow so the UI can show
+      // a message.
+      _progressTimer?.cancel();
+      _currentIndex = -1;
+      mediaItem.add(null);
+      playbackState.add(playbackState.value.copyWith(
+        processingState: AudioProcessingState.idle,
+        playing: false,
+      ));
+      rethrow;
+    }
   }
 
   MediaItem _toMediaItem(AudioTrack track) => MediaItem(
@@ -109,6 +130,31 @@ class AudioPlayerHandler extends BaseAudioHandler
 
   @override
   Future<void> seek(Duration position) => _player.seek(position);
+
+  /// Seek backwards 15 seconds (clamped to the start). Used by the player's
+  /// rewind control — always meaningful on a single track.
+  Future<void> rewind15() async {
+    final target = _player.position - const Duration(seconds: 15);
+    await _player.seek(target < Duration.zero ? Duration.zero : target);
+  }
+
+  /// Seek forwards 15 seconds (clamped to the track duration).
+  Future<void> forward15() async {
+    final dur = _player.duration ?? Duration.zero;
+    final target = _player.position + const Duration(seconds: 15);
+    await _player.seek(target > dur ? dur : target);
+  }
+
+  /// Whether the current track is set to loop.
+  bool get isLooping => _player.loopMode == LoopMode.one;
+
+  /// Toggle looping the current track on/off. Genuinely useful for a
+  /// meditation player (repeat a session). Returns the new state.
+  Future<bool> toggleLoop() async {
+    final next = _player.loopMode == LoopMode.one ? LoopMode.off : LoopMode.one;
+    await _player.setLoopMode(next);
+    return next == LoopMode.one;
+  }
 
   @override
   Future<void> skipToNext() => _playIndex(_currentIndex + 1);

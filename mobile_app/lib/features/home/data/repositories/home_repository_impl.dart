@@ -41,7 +41,8 @@ class HomeRepositoryImpl implements HomeRepository {
   Future<List<AudioSummary>> getAudiosByCategory(String categoryId) async {
     final rows = await _remote.getAudiosByCategory(categoryId);
     return rows
-        .map((r) => r['audios'] as Map<String, dynamic>)
+        .map((r) => r['audios'])
+        .whereType<Map<String, dynamic>>()
         .map(AudioSummary.fromMap)
         .toList();
   }

@@ -437,13 +437,22 @@ class _SettingsSheetState extends ConsumerState<_SettingsSheet> {
             title: 'Device Info',
             onTap: () async {
               if (_deviceInfo == null) {
-                final svc = ref.read(deviceInfoServiceProvider);
-                final profile = await svc.getDeviceProfile();
-                setState(() {
-                  _deviceInfo =
-                      'Name: ${profile.name}\nPlatform: ${profile.platform}\nFingerprint: ${profile.fingerprint}';
-                  _showDeviceInfo = true;
-                });
+                try {
+                  final svc = ref.read(deviceInfoServiceProvider);
+                  final profile = await svc.getDeviceProfile();
+                  if (!mounted) return;
+                  setState(() {
+                    _deviceInfo =
+                        'Name: ${profile.name}\nPlatform: ${profile.platform}\nFingerprint: ${profile.fingerprint}';
+                    _showDeviceInfo = true;
+                  });
+                } catch (_) {
+                  if (!mounted) return;
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                        content: Text('Could not load device info.')),
+                  );
+                }
               } else {
                 setState(() => _showDeviceInfo = !_showDeviceInfo);
               }

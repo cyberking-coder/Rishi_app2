@@ -32,7 +32,8 @@ class AudioRepositoryImpl implements AudioRepository {
   Future<List<AudioTrack>> getPlaylistTracks(String playlistId) async {
     final rows = await _remote.getPlaylistTracks(playlistId);
     return rows
-        .map((row) => row['audios'] as Map<String, dynamic>)
+        .map((row) => row['audios'])
+        .whereType<Map<String, dynamic>>()
         .map(AudioTrack.fromMap)
         .toList();
   }

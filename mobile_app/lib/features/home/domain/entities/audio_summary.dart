@@ -16,8 +16,8 @@ class AudioSummary {
   });
 
   factory AudioSummary.fromMap(Map<String, dynamic> map) => AudioSummary(
-        id: map['id'] as String,
-        title: map['title'] as String,
+        id: map['id'] as String? ?? '',
+        title: map['title'] as String? ?? 'Untitled',
         coverArtUrl: map['cover_art_url'] as String?,
         artist: map['artist'] as String?,
         durationSeconds: map['duration_seconds'] as int?,

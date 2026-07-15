@@ -23,6 +23,13 @@ class _DownloadsScreenState extends ConsumerState<DownloadsScreen> {
   // Guards against rapid double-taps spawning multiple player screens.
   bool _navigating = false;
 
+  void _showError(String message) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(message)),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final tasksAsync = ref.watch(downloadTasksProvider);
@@ -64,17 +71,27 @@ class _DownloadsScreenState extends ConsumerState<DownloadsScreen> {
               final task = tasks[index];
               return DownloadTile(
                 task: task,
-                onDelete: () => repo.delete(task.id),
-                onPrimaryAction: () {
-                  switch (task.status) {
-                    case DownloadStatus.downloading:
-                    case DownloadStatus.queued:
-                      repo.pause(task.id);
-                    case DownloadStatus.paused:
-                    case DownloadStatus.failed:
-                      repo.resume(task.id);
-                    default:
-                      break;
+                onDelete: () async {
+                  try {
+                    await repo.delete(task.id);
+                  } catch (e) {
+                    _showError('Could not delete download');
+                  }
+                },
+                onPrimaryAction: () async {
+                  try {
+                    switch (task.status) {
+                      case DownloadStatus.downloading:
+                      case DownloadStatus.queued:
+                        await repo.pause(task.id);
+                      case DownloadStatus.paused:
+                      case DownloadStatus.failed:
+                        await repo.resume(task.id);
+                      default:
+                        break;
+                    }
+                  } catch (e) {
+                    _showError('Action failed. Please try again.');
                   }
                 },
                 onPlay: () async {

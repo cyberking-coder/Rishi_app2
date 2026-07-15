@@ -8,12 +8,28 @@ class ProfileRemoteDataSource {
   ProfileRemoteDataSource(this._client);
 
   Future<Map<String, dynamic>> getProfileRow() async {
-    final userId = _client.auth.currentUser?.id;
-    if (userId == null) throw AuthFailure.unknown('Not logged in');
+    final user = _client.auth.currentUser;
+    if (user == null) throw AuthFailure.unknown('Not logged in');
 
-    final row =
-        await _client.from('profiles').select().eq('id', userId).single();
-    return row;
+    // maybeSingle() (not single()) so a not-yet-provisioned profile row
+    // returns null instead of throwing. Fall back to a minimal row built
+    // from the auth user so the Profile screen still renders.
+    final row = await _client
+        .from('profiles')
+        .select()
+        .eq('id', user.id)
+        .maybeSingle();
+
+    if (row != null) return row;
+
+    return {
+      'id': user.id,
+      'email': user.email,
+      'display_name': user.userMetadata?['display_name'],
+      'role': 'user',
+      'subscription_tier': 'free',
+      'created_at': user.createdAt,
+    };
   }
 
   /// Most recent subscription row regardless of status, ordered newest

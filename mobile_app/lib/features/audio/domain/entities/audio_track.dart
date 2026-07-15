@@ -14,8 +14,8 @@ class AudioTrack {
   });
 
   factory AudioTrack.fromMap(Map<String, dynamic> map) => AudioTrack(
-        id: map['id'] as String,
-        title: map['title'] as String,
+        id: map['id'] as String? ?? '',
+        title: map['title'] as String? ?? 'Untitled',
         artist: map['artist'] as String?,
         coverArtUrl: map['cover_art_url'] as String?,
         durationSeconds: map['duration_seconds'] as int?,

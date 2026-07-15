@@ -49,13 +49,21 @@ class DownloadSourceResolver {
     }
 
     final data = response.data as Map<String, dynamic>;
-    final urlString = switch (type) {
+    final String? urlString = switch (type) {
       // Videos return a quality ladder; download the first (default) one.
-      DownloadContentType.video =>
-        (data['qualities'] as List).first['url'] as String,
-      DownloadContentType.audio => data['url'] as String,
+      DownloadContentType.video => () {
+          final qualities = data['qualities'] as List?;
+          if (qualities == null || qualities.isEmpty) return null;
+          return (qualities.first as Map)['url'] as String?;
+        }(),
+      DownloadContentType.audio => data['url'] as String?,
     };
-    return Uri.parse(urlString);
+    if (urlString == null || urlString.isEmpty) {
+      throw AuthFailure.unknown('Download source unavailable');
+    }
+    final uri = Uri.tryParse(urlString);
+    if (uri == null) throw AuthFailure.unknown('Invalid download URL');
+    return uri;
   }
 
   Future<String> _getActiveDeviceId() async {

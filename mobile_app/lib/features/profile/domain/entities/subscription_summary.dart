@@ -19,10 +19,9 @@ class SubscriptionSummary {
     final plan = map['subscription_plans'] as Map<String, dynamic>?;
     return SubscriptionSummary(
       planName: plan?['name'] as String? ?? 'Unknown plan',
-      status: map['status'] as String,
-      currentPeriodEnd: map['current_period_end'] == null
-          ? null
-          : DateTime.parse(map['current_period_end'] as String),
+      status: map['status'] as String? ?? 'active',
+      currentPeriodEnd:
+          DateTime.tryParse(map['current_period_end'] as String? ?? ''),
       cancelAtPeriodEnd: map['cancel_at_period_end'] as bool? ?? false,
     );
   }
