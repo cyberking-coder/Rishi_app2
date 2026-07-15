@@ -17,6 +17,9 @@ class AccessExpiredView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final hasRetreatCard = access.shouldShowPopup ||
+        (access.popupTitle?.isNotEmpty ?? false);
+
     return SafeArea(
       child: Center(
         child: SingleChildScrollView(
@@ -24,47 +27,54 @@ class AccessExpiredView extends StatelessWidget {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              if (access.shouldShowPopup ||
-                  (access.popupTitle?.isNotEmpty ?? false))
-                NextEventInlineCard(access: access)
-              else ...[
-                Container(
-                  width: 96,
-                  height: 96,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: _kAccent.withOpacity(0.15),
-                    boxShadow: [
-                      BoxShadow(
-                        color: _kAccent.withOpacity(0.35),
-                        blurRadius: 28,
-                        spreadRadius: 2,
-                      ),
-                    ],
-                  ),
-                  child: const Center(
-                    child: LotusLogo(size: 56, color: _kText),
-                  ),
+              // Always show a clear "access ended" message first, so the user
+              // understands why there is no audio — whether or not a next-event
+              // card is configured.
+              Container(
+                width: 96,
+                height: 96,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: _kAccent.withOpacity(0.15),
+                  boxShadow: [
+                    BoxShadow(
+                      color: _kAccent.withOpacity(0.35),
+                      blurRadius: 28,
+                      spreadRadius: 2,
+                    ),
+                  ],
                 ),
-                const SizedBox(height: 24),
-                const Text(
-                  'Your access has ended',
-                  style: TextStyle(
-                    fontSize: 22,
-                    fontWeight: FontWeight.w700,
-                    color: _kText,
-                  ),
+                child: const Center(
+                  child: LotusLogo(size: 56, color: _kText),
                 ),
-                const SizedBox(height: 12),
-                const Text(
-                  'Thank you for being with us.\nWe look forward to seeing you at the next retreat.',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    fontSize: 14,
-                    height: 1.5,
-                    color: _kSub,
-                  ),
+              ),
+              const SizedBox(height: 24),
+              const Text(
+                'Your access has ended',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 22,
+                  fontWeight: FontWeight.w700,
+                  color: _kText,
                 ),
+              ),
+              const SizedBox(height: 12),
+              const Text(
+                'Your subscription period is over, so the audio library is no '
+                'longer available. Thank you for being with us — please contact '
+                'us to renew your access.',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 14,
+                  height: 1.5,
+                  color: _kSub,
+                ),
+              ),
+              // If the admin configured a next-retreat announcement, show it
+              // below the access-ended message.
+              if (hasRetreatCard) ...[
+                const SizedBox(height: 28),
+                NextEventInlineCard(access: access),
               ],
             ],
           ),
