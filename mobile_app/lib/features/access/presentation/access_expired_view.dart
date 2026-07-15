@@ -43,10 +43,10 @@ class AccessExpiredView extends ConsumerWidget {
                 height: 96,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color: _kAccent.withOpacity(0.15),
+                  color: _kAccent.withValues(alpha: 0.15),
                   boxShadow: [
                     BoxShadow(
-                      color: _kAccent.withOpacity(0.35),
+                      color: _kAccent.withValues(alpha: 0.35),
                       blurRadius: 28,
                       spreadRadius: 2,
                     ),
@@ -93,7 +93,7 @@ class AccessExpiredView extends ConsumerWidget {
                 label: const Text('Log Out',
                     style: TextStyle(color: _kText, fontWeight: FontWeight.w600)),
                 style: OutlinedButton.styleFrom(
-                  side: BorderSide(color: _kAccent.withOpacity(0.6)),
+                  side: BorderSide(color: _kAccent.withValues(alpha: 0.6)),
                   padding: const EdgeInsets.symmetric(
                       horizontal: 28, vertical: 12),
                   shape: RoundedRectangleBorder(

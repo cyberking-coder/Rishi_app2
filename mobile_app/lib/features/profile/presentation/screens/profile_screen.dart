@@ -54,7 +54,7 @@ class ProfileScreen extends ConsumerWidget {
                           ),
                           boxShadow: [
                             BoxShadow(
-                              color: _kAccent.withOpacity(0.45),
+                              color: _kAccent.withValues(alpha: 0.45),
                               blurRadius: 24,
                               spreadRadius: 2,
                             ),
@@ -319,9 +319,9 @@ class _Badge extends StatelessWidget {
             width: 60,
             height: 60,
             decoration: BoxDecoration(
-              color: color.withOpacity(0.18),
+              color: color.withValues(alpha: 0.18),
               shape: BoxShape.circle,
-              border: Border.all(color: color.withOpacity(0.5), width: 2),
+              border: Border.all(color: color.withValues(alpha: 0.5), width: 2),
             ),
             child: Center(
               child: Text(emoji, style: const TextStyle(fontSize: 26)),
@@ -367,7 +367,7 @@ class _ListRow extends StatelessWidget {
               width: 38,
               height: 38,
               decoration: BoxDecoration(
-                color: iconColor.withOpacity(0.18),
+                color: iconColor.withValues(alpha: 0.18),
                 shape: BoxShape.circle,
               ),
               child: Icon(icon, color: iconColor, size: 20),
@@ -455,6 +455,9 @@ class _SettingsSheetState extends ConsumerState<_SettingsSheet> {
             title: 'Device Info',
             onTap: () async {
               if (_deviceInfo == null) {
+                // Capture the messenger before the await to avoid using
+                // BuildContext across the async gap.
+                final messenger = ScaffoldMessenger.of(context);
                 try {
                   final svc = ref.read(deviceInfoServiceProvider);
                   final profile = await svc.getDeviceProfile();
@@ -465,8 +468,7 @@ class _SettingsSheetState extends ConsumerState<_SettingsSheet> {
                     _showDeviceInfo = true;
                   });
                 } catch (_) {
-                  if (!mounted) return;
-                  ScaffoldMessenger.of(context).showSnackBar(
+                  messenger.showSnackBar(
                     const SnackBar(
                         content: Text('Could not load device info.')),
                   );
@@ -524,7 +526,7 @@ class _SheetTile extends StatelessWidget {
               width: 38,
               height: 38,
               decoration: BoxDecoration(
-                color: iconColor.withOpacity(0.18),
+                color: iconColor.withValues(alpha: 0.18),
                 shape: BoxShape.circle,
               ),
               child: Icon(icon, color: iconColor, size: 20),
