@@ -59,18 +59,26 @@ class AudioPlayerHandler extends BaseAudioHandler
     List<AudioTrack> tracks, {
     int startIndex = 0,
   }) async {
+    // Flush the OUTGOING track's progress BEFORE swapping _tracks — otherwise
+    // _flushProgress would save the old player position (e.g. 0:07) under the
+    // NEW track's id, causing the new track to wrongly resume at that point.
+    await _flushProgress();
     _tracks = tracks;
     queue.add(tracks.map(_toMediaItem).toList());
-    await _playIndex(startIndex);
+    await _playIndex(startIndex, flush: false);
   }
 
-  Future<void> _playIndex(int index, {Duration? resumeAt}) async {
+  Future<void> _playIndex(
+    int index, {
+    Duration? resumeAt,
+    bool flush = true,
+  }) async {
     if (index < 0 || index >= _tracks.length) {
       await stop();
       return;
     }
 
-    await _flushProgress();
+    if (flush) await _flushProgress();
 
     _currentIndex = index;
     final track = _tracks[index];
