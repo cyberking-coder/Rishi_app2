@@ -11,7 +11,6 @@ import '../widgets/speed_selector_sheet.dart';
 
 // ── Design constants ──────────────────────────────────────────────────────────
 const _kBg = Color(0xFF12082E);
-const _kSurface = Color(0xFF1E1040);
 const _kRing1 = Color(0xFFEC4899); // pink outer ring
 const _kRing2 = Color(0xFF8B5CF6); // violet inner ring
 const _kAccent = Color(0xFF9B6EFF); // buttons / active
@@ -413,14 +412,12 @@ class _ToolRowState extends State<_ToolRow> {
 class _ToolButton extends StatelessWidget {
   final IconData icon;
   final String label;
-  final Color color;
   final VoidCallback? onTap;
   final Widget? trailing;
 
   const _ToolButton({
     required this.icon,
     required this.label,
-    this.color = _kTextSecondary,
     this.onTap,
     this.trailing,
   });
@@ -432,7 +429,7 @@ class _ToolButton extends StatelessWidget {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, color: color, size: 26),
+          Icon(icon, color: _kTextSecondary, size: 26),
           const SizedBox(height: 4),
           Text(label,
               style: const TextStyle(color: _kTextSecondary, fontSize: 11)),

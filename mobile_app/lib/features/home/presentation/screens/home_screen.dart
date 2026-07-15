@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../../../app/theme/app_theme.dart';
 import '../../../access/application/access_providers.dart';
 import '../../../access/domain/access_state.dart';
 import '../../../access/presentation/access_expired_view.dart';
@@ -19,7 +18,6 @@ import '../../domain/entities/continue_listening_item.dart';
 // ── Design tokens ─────────────────────────────────────────────────────────────
 const _kBg         = Color(0xFF12082E);
 const _kSurface    = Color(0xFF1C1040);
-const _kCard       = Color(0xFF221550);
 const _kAccent     = Color(0xFF8B5CF6);
 const _kPink       = Color(0xFFEC4899);
 const _kTextPri    = Colors.white;

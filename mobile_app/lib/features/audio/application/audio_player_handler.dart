@@ -185,6 +185,7 @@ class AudioPlayerHandler extends BaseAudioHandler
     return super.stop();
   }
 
+  @override
   Future<void> setSpeed(double speed) async {
     await _player.setSpeed(speed);
     playbackState.add(playbackState.value.copyWith(speed: speed));

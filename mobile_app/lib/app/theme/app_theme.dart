@@ -98,7 +98,6 @@ class AppTheme {
     const surface = Color(0xFF1C1040);
     const accent = Color(0xFF8B5CF6);
     const textPrimary = Colors.white;
-    const textSecondary = Color(0xFFB0A8CC);
 
     final base = ThemeData.dark(useMaterial3: true);
     return base.copyWith(

@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../../../app/theme/app_theme.dart';
 import '../../../audio/application/audio_providers.dart';
 import '../../../audio/domain/entities/audio_track.dart';
 import '../../application/home_providers.dart';
