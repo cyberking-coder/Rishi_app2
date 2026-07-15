@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../../app/widgets/lotus_logo.dart';
+import '../../auth/application/auth_providers.dart';
 import '../domain/access_state.dart';
 import 'next_event_popup.dart';
 
@@ -9,14 +12,19 @@ const _kSub = Color(0xFFB0A8CC);
 const _kAccent = Color(0xFF8B5CF6);
 
 /// Shown in place of the home content once the user's access window has
-/// lapsed: no audio, just a gentle "access ended" message and — if one is
-/// configured — the next-event card.
-class AccessExpiredView extends StatelessWidget {
+/// lapsed: no audio, just a gentle "access ended" message, a log-out action,
+/// and — if one is configured — the next-event card.
+class AccessExpiredView extends ConsumerWidget {
   final AccessState access;
   const AccessExpiredView({super.key, required this.access});
 
+  Future<void> _logout(BuildContext context, WidgetRef ref) async {
+    await ref.read(authControllerProvider.notifier).logout();
+    if (context.mounted) context.go('/login');
+  }
+
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final hasRetreatCard = access.shouldShowPopup ||
         (access.popupTitle?.isNotEmpty ?? false);
 
@@ -76,6 +84,23 @@ class AccessExpiredView extends StatelessWidget {
                 const SizedBox(height: 28),
                 NextEventInlineCard(access: access),
               ],
+              const SizedBox(height: 32),
+              // Always let an expired user log out (the normal Profile route
+              // is not reachable from this screen).
+              OutlinedButton.icon(
+                onPressed: () => _logout(context, ref),
+                icon: const Icon(Icons.logout, color: _kText, size: 18),
+                label: const Text('Log Out',
+                    style: TextStyle(color: _kText, fontWeight: FontWeight.w600)),
+                style: OutlinedButton.styleFrom(
+                  side: BorderSide(color: _kAccent.withOpacity(0.6)),
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 28, vertical: 12),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                ),
+              ),
             ],
           ),
         ),
