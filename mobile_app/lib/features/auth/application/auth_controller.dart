@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/errors/auth_failure.dart';
+import '../../audio/application/audio_providers.dart';
 import 'auth_providers.dart';
 import 'auth_state.dart';
 
@@ -25,6 +26,9 @@ class AuthController extends Notifier<AuthState> {
   Future<void> logout() async {
     state = const AuthLoading();
     try {
+      // Stop + clear any audio so the next user never inherits the previous
+      // user's mini-player / now-playing track.
+      await ref.read(audioHandlerProvider).reset();
       await ref.read(logoutUseCaseProvider).call();
       state = const AuthUnauthenticated();
     } catch (e) {

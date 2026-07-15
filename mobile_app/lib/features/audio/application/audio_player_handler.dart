@@ -209,6 +209,31 @@ class AudioPlayerHandler extends BaseAudioHandler
     return super.stop();
   }
 
+  /// Fully clears playback state — used on logout so the next user never
+  /// inherits the previous user's mini-player / now-playing track. Best-effort:
+  /// never throws (logout must always proceed).
+  Future<void> reset() async {
+    try {
+      _progressTimer?.cancel();
+      _sleepTimer?.cancel();
+      sleepTimerRemaining.value = null;
+      _tracks = [];
+      _currentIndex = -1;
+      _loading = false;
+      await _player.stop();
+      await _player.setLoopMode(LoopMode.off);
+      mediaItem.add(null);
+      queue.add([]);
+      playbackState.add(playbackState.value.copyWith(
+        processingState: AudioProcessingState.idle,
+        playing: false,
+        queueIndex: null,
+      ));
+    } catch (_) {
+      // ignore — logout must not be blocked by audio teardown
+    }
+  }
+
   @override
   Future<void> setSpeed(double speed) async {
     await _player.setSpeed(speed);
