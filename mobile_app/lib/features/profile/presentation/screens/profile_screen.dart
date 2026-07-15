@@ -93,26 +93,6 @@ class ProfileScreen extends ConsumerWidget {
                 ),
                 const SizedBox(height: 28),
 
-                // ── Stats row ──
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                      vertical: 18, horizontal: 12),
-                  decoration: BoxDecoration(
-                    color: _kSurface,
-                    borderRadius: BorderRadius.circular(16),
-                  ),
-                  child: Row(
-                    children: const [
-                      _StatCell(value: '0', label: 'Day Streak'),
-                      _StatDivider(),
-                      _StatCell(value: '0', label: 'Minutes'),
-                      _StatDivider(),
-                      _StatCell(value: '0', label: 'Sessions'),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 24),
-
                 // ── Achievements ──
                 const Text(
                   'Achievements',
@@ -125,11 +105,35 @@ class ProfileScreen extends ConsumerWidget {
                 const SizedBox(height: 14),
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceAround,
-                  children: const [
-                    _Badge(emoji: '🏆', color: Color(0xFF3B82F6), label: 'First Play'),
-                    _Badge(emoji: '💎', color: Color(0xFFEC4899), label: 'Premium'),
-                    _Badge(emoji: '🔥', color: Color(0xFFF97316), label: '7 Days'),
-                    _Badge(emoji: '🌿', color: Color(0xFF22C55E), label: 'Mindful'),
+                  children: [
+                    _Badge(
+                      emoji: '🏆',
+                      color: const Color(0xFF3B82F6),
+                      label: 'First Play',
+                      onTap: () => _showAchievement(context, '🏆', 'First Play',
+                          'Awarded for playing your first meditation session.'),
+                    ),
+                    _Badge(
+                      emoji: '💎',
+                      color: const Color(0xFFEC4899),
+                      label: 'Premium',
+                      onTap: () => _showAchievement(context, '💎', 'Premium',
+                          'You are a premium member with full access to all content.'),
+                    ),
+                    _Badge(
+                      emoji: '🔥',
+                      color: const Color(0xFFF97316),
+                      label: '7 Days',
+                      onTap: () => _showAchievement(context, '🔥', '7 Days',
+                          'Keep listening for 7 days to unlock this milestone.'),
+                    ),
+                    _Badge(
+                      emoji: '🌿',
+                      color: const Color(0xFF22C55E),
+                      label: 'Mindful',
+                      onTap: () => _showAchievement(context, '🌿', 'Mindful',
+                          'Complete meditation sessions to grow your mindfulness.'),
+                    ),
                   ],
                 ),
                 const SizedBox(height: 24),
@@ -159,6 +163,42 @@ class ProfileScreen extends ConsumerWidget {
             );
           },
         ),
+      ),
+    );
+  }
+
+  void _showAchievement(
+    BuildContext context,
+    String emoji,
+    String title,
+    String description,
+  ) {
+    showDialog<void>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: _kSurface,
+        title: Row(
+          children: [
+            Text(emoji, style: const TextStyle(fontSize: 26)),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(title,
+                  style: const TextStyle(
+                      color: _kText,
+                      fontSize: 18,
+                      fontWeight: FontWeight.w700)),
+            ),
+          ],
+        ),
+        content: Text(description,
+            style: const TextStyle(color: _kSub, fontSize: 14, height: 1.5)),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Got it',
+                style: TextStyle(color: _kAccent, fontWeight: FontWeight.w600)),
+          ),
+        ],
       ),
     );
   }
@@ -256,64 +296,42 @@ class _DetailRow extends StatelessWidget {
 
 // ─────────────────────────────────────────────────────────────────────────────
 
-class _StatCell extends StatelessWidget {
-  const _StatCell({required this.value, required this.label});
-  final String value;
-  final String label;
-
-  @override
-  Widget build(BuildContext context) {
-    return Expanded(
-      child: Column(
-        children: [
-          Text(value,
-              style: const TextStyle(
-                  color: _kText, fontSize: 22, fontWeight: FontWeight.w800)),
-          const SizedBox(height: 4),
-          Text(label,
-              style: const TextStyle(color: _kSub, fontSize: 12)),
-        ],
-      ),
-    );
-  }
-}
-
-class _StatDivider extends StatelessWidget {
-  const _StatDivider();
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(width: 1, height: 36, color: const Color(0x33FFFFFF));
-  }
-}
-
 class _Badge extends StatelessWidget {
-  const _Badge(
-      {required this.emoji, required this.color, required this.label});
+  const _Badge({
+    required this.emoji,
+    required this.color,
+    required this.label,
+    this.onTap,
+  });
   final String emoji;
   final Color color;
   final String label;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      children: [
-        Container(
-          width: 60,
-          height: 60,
-          decoration: BoxDecoration(
-            color: color.withOpacity(0.18),
-            shape: BoxShape.circle,
-            border: Border.all(color: color.withOpacity(0.5), width: 2),
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(40),
+      child: Column(
+        children: [
+          Container(
+            width: 60,
+            height: 60,
+            decoration: BoxDecoration(
+              color: color.withOpacity(0.18),
+              shape: BoxShape.circle,
+              border: Border.all(color: color.withOpacity(0.5), width: 2),
+            ),
+            child: Center(
+              child: Text(emoji, style: const TextStyle(fontSize: 26)),
+            ),
           ),
-          child: Center(
-            child: Text(emoji, style: const TextStyle(fontSize: 26)),
-          ),
-        ),
-        const SizedBox(height: 6),
-        Text(label,
-            style: const TextStyle(color: _kSub, fontSize: 11)),
-      ],
+          const SizedBox(height: 6),
+          Text(label,
+              style: const TextStyle(color: _kSub, fontSize: 11)),
+        ],
+      ),
     );
   }
 }
