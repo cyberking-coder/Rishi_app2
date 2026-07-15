@@ -75,6 +75,12 @@
 	     Connect from requiring export-compliance documentation each release. -->
 	<key>ITSAppUsesNonExemptEncryption</key>
 	<false/>
+	<!-- Required by Apple (validation error 90683): the audio playback
+	     framework (audio_service / just_audio via AVAudioSession) links
+	     against the microphone API, so a purpose string is mandatory even
+	     though this app only plays audio and never records. -->
+	<key>NSMicrophoneUsageDescription</key>
+	<string>This app plays guided meditation audio and does not record. Microphone access is only referenced by the audio playback framework.</string>
 	<key>NSAppTransportSecurity</key>
 	<dict>
 		<key>NSAllowsArbitraryLoads</key>
