@@ -33,7 +33,11 @@ class _BrowseScreenState extends ConsumerState<BrowseScreen> {
     super.dispose();
   }
 
+  bool _starting = false;
+
   Future<void> _play(AudioSummary a) async {
+    if (_starting) return; // guard against a double-tap opening twice
+    _starting = true;
     try {
       await ref.read(audioHandlerProvider).playSingleTrack(AudioTrack(
         id: a.id,
@@ -48,6 +52,8 @@ class _BrowseScreenState extends ConsumerState<BrowseScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(e.toString())),
       );
+    } finally {
+      _starting = false;
     }
   }
 

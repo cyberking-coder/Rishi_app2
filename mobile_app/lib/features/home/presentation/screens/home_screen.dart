@@ -49,7 +49,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     }
   }
 
+  bool _starting = false;
+
   Future<void> _playAudio(AudioSummary audio) async {
+    if (_starting) return; // guard against a double-tap opening twice
+    _starting = true;
     try {
       await ref.read(audioHandlerProvider).playSingleTrack(AudioTrack(
         id: audio.id,
@@ -64,6 +68,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(e.toString())),
       );
+    } finally {
+      _starting = false;
     }
   }
 
@@ -136,13 +142,17 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
             _ContinueBar(
               onTap: (item) async {
                 try {
-                  await ref.read(audioHandlerProvider).playSingleTrack(AudioTrack(
-                    id: item.audioId,
-                    title: item.title,
-                    artist: item.teacher,
-                    coverArtUrl: item.coverArtUrl,
-                    durationSeconds: item.durationSeconds,
-                  ));
+                  await ref.read(audioHandlerProvider).playSingleTrack(
+                        AudioTrack(
+                          id: item.audioId,
+                          title: item.title,
+                          artist: item.teacher,
+                          coverArtUrl: item.coverArtUrl,
+                          durationSeconds: item.durationSeconds,
+                        ),
+                        // Continue Listening resumes where the user left off.
+                        resumeAt: Duration(seconds: item.progressSeconds),
+                      );
                   if (context.mounted) context.push('/now-playing');
                 } catch (e) {
                   if (!context.mounted) return;

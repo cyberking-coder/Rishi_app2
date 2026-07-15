@@ -44,9 +44,14 @@ class AudioPlayerHandler extends BaseAudioHandler
     });
   }
 
-  /// Convenience for "play now" taps (a single audio card, or a
-  /// continue-listening item) -- just a one-track playlist.
-  Future<void> playSingleTrack(AudioTrack track) => loadPlaylist([track]);
+  // Guards against a rapid double-tap kicking off two concurrent loads of
+  // the same track (which caused the audio to "open twice").
+  bool _loading = false;
+
+  /// Convenience for "play now" taps. Starts from the beginning by default;
+  /// pass [resumeAt] (used by Continue Listening) to resume at a position.
+  Future<void> playSingleTrack(AudioTrack track, {Duration? resumeAt}) =>
+      loadPlaylist([track], resumeAt: resumeAt);
 
   AudioTrack? get currentTrack =>
       _currentIndex >= 0 && _currentIndex < _tracks.length
@@ -58,14 +63,31 @@ class AudioPlayerHandler extends BaseAudioHandler
   Future<void> loadPlaylist(
     List<AudioTrack> tracks, {
     int startIndex = 0,
+    Duration? resumeAt,
   }) async {
-    // Flush the OUTGOING track's progress BEFORE swapping _tracks — otherwise
-    // _flushProgress would save the old player position (e.g. 0:07) under the
-    // NEW track's id, causing the new track to wrongly resume at that point.
-    await _flushProgress();
-    _tracks = tracks;
-    queue.add(tracks.map(_toMediaItem).toList());
-    await _playIndex(startIndex, flush: false);
+    if (_loading) return; // ignore re-entrant taps while a load is in flight
+
+    // If the tapped track is already the current one, don't reload it — just
+    // let the existing playback continue (prevents "opening twice").
+    final tapped = tracks.isNotEmpty ? tracks[startIndex] : null;
+    if (tapped != null &&
+        currentTrack?.id == tapped.id &&
+        _player.processingState != ProcessingState.idle) {
+      return;
+    }
+
+    _loading = true;
+    try {
+      // Flush the OUTGOING track's progress BEFORE swapping _tracks — otherwise
+      // _flushProgress would save the old player position under the NEW track's
+      // id, causing the new track to wrongly resume at that point.
+      await _flushProgress();
+      _tracks = tracks;
+      queue.add(tracks.map(_toMediaItem).toList());
+      await _playIndex(startIndex, flush: false, resumeAt: resumeAt);
+    } finally {
+      _loading = false;
+    }
   }
 
   Future<void> _playIndex(
@@ -97,8 +119,10 @@ class AudioPlayerHandler extends BaseAudioHandler
         throw StateError('Invalid playback URL');
       }
       await _player.setAudioSource(AudioSource.uri(uri));
-      await _player.seek(
-          resumeAt ?? Duration(seconds: source.resumePositionSeconds));
+      // Fresh taps start at 0:00; only an explicit resumeAt (Continue
+      // Listening) resumes at a saved position. This prevents a newly-tapped
+      // track from inheriting any other track's position.
+      await _player.seek(resumeAt ?? Duration.zero);
       await _player.play();
       _startProgressTimer();
     } catch (e) {
