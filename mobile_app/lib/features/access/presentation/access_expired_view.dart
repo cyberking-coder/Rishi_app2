@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
 
-import '../../../app/theme/app_theme.dart';
 import '../../../app/widgets/lotus_logo.dart';
 import '../domain/access_state.dart';
 import 'next_event_popup.dart';
+
+const _kText = Colors.white;
+const _kSub = Color(0xFFB0A8CC);
+const _kAccent = Color(0xFF8B5CF6);
 
 /// Shown in place of the home content once the user's access window has
 /// lapsed: no audio, just a gentle "access ended" message and — if one is
@@ -25,14 +28,31 @@ class AccessExpiredView extends StatelessWidget {
                   (access.popupTitle?.isNotEmpty ?? false))
                 NextEventInlineCard(access: access)
               else ...[
-                const LotusLogo(size: 64),
+                Container(
+                  width: 96,
+                  height: 96,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: _kAccent.withOpacity(0.15),
+                    boxShadow: [
+                      BoxShadow(
+                        color: _kAccent.withOpacity(0.35),
+                        blurRadius: 28,
+                        spreadRadius: 2,
+                      ),
+                    ],
+                  ),
+                  child: const Center(
+                    child: LotusLogo(size: 56, color: _kText),
+                  ),
+                ),
                 const SizedBox(height: 24),
                 const Text(
                   'Your access has ended',
                   style: TextStyle(
                     fontSize: 22,
                     fontWeight: FontWeight.w700,
-                    color: AppTheme.textPrimary,
+                    color: _kText,
                   ),
                 ),
                 const SizedBox(height: 12),
@@ -42,7 +62,7 @@ class AccessExpiredView extends StatelessWidget {
                   style: TextStyle(
                     fontSize: 14,
                     height: 1.5,
-                    color: AppTheme.textSecondary,
+                    color: _kSub,
                   ),
                 ),
               ],

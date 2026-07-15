@@ -34,15 +34,22 @@ class _BrowseScreenState extends ConsumerState<BrowseScreen> {
     super.dispose();
   }
 
-  void _play(AudioSummary a) {
-    ref.read(audioHandlerProvider).playSingleTrack(AudioTrack(
-      id: a.id,
-      title: a.title,
-      artist: a.artist,
-      coverArtUrl: a.coverArtUrl,
-      durationSeconds: a.durationSeconds,
-    ));
-    context.push('/now-playing');
+  Future<void> _play(AudioSummary a) async {
+    try {
+      await ref.read(audioHandlerProvider).playSingleTrack(AudioTrack(
+        id: a.id,
+        title: a.title,
+        artist: a.artist,
+        coverArtUrl: a.coverArtUrl,
+        durationSeconds: a.durationSeconds,
+      ));
+      if (mounted) context.push('/now-playing');
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(e.toString())),
+      );
+    }
   }
 
   @override

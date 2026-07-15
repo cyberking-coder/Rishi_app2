@@ -4,6 +4,7 @@
 enum AuthFailureType {
   invalidCredentials,
   deviceLocked,
+  accessExpired,
   emailNotConfirmed,
   network,
   weakPassword,
@@ -25,6 +26,11 @@ class AuthFailure implements Exception {
   factory AuthFailure.deviceLocked() => const AuthFailure(
         AuthFailureType.deviceLocked,
         'This account is already active on another device.',
+      );
+
+  factory AuthFailure.accessExpired() => const AuthFailure(
+        AuthFailureType.accessExpired,
+        'Your access period has ended. Please contact support to renew.',
       );
 
   factory AuthFailure.network() => const AuthFailure(

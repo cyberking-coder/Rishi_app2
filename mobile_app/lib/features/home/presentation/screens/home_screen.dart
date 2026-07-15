@@ -51,15 +51,22 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     }
   }
 
-  void _playAudio(AudioSummary audio) {
-    ref.read(audioHandlerProvider).playSingleTrack(AudioTrack(
-      id: audio.id,
-      title: audio.title,
-      artist: audio.artist,
-      coverArtUrl: audio.coverArtUrl,
-      durationSeconds: audio.durationSeconds,
-    ));
-    context.push('/now-playing');
+  Future<void> _playAudio(AudioSummary audio) async {
+    try {
+      await ref.read(audioHandlerProvider).playSingleTrack(AudioTrack(
+        id: audio.id,
+        title: audio.title,
+        artist: audio.artist,
+        coverArtUrl: audio.coverArtUrl,
+        durationSeconds: audio.durationSeconds,
+      ));
+      if (mounted) context.push('/now-playing');
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(e.toString())),
+      );
+    }
   }
 
   @override
@@ -129,15 +136,22 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
             // ── Continue Listening bar ──
             _ContinueBar(
-              onTap: (item) {
-                ref.read(audioHandlerProvider).playSingleTrack(AudioTrack(
-                  id: item.audioId,
-                  title: item.title,
-                  artist: item.teacher,
-                  coverArtUrl: item.coverArtUrl,
-                  durationSeconds: item.durationSeconds,
-                ));
-                context.push('/now-playing');
+              onTap: (item) async {
+                try {
+                  await ref.read(audioHandlerProvider).playSingleTrack(AudioTrack(
+                    id: item.audioId,
+                    title: item.title,
+                    artist: item.teacher,
+                    coverArtUrl: item.coverArtUrl,
+                    durationSeconds: item.durationSeconds,
+                  ));
+                  if (context.mounted) context.push('/now-playing');
+                } catch (e) {
+                  if (!context.mounted) return;
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text(e.toString())),
+                  );
+                }
               },
             ),
             const SizedBox(height: 24),

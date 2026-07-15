@@ -34,6 +34,9 @@ class AudioRemoteDataSource {
           : 'Playback unavailable';
 
       if (response.status == 403) {
+        if (error.toLowerCase().contains('access period')) {
+          throw AuthFailure.accessExpired();
+        }
         throw AuthFailure.deviceLocked();
       }
       throw AuthFailure.unknown(error);
