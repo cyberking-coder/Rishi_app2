@@ -34,6 +34,29 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
         );
   }
 
+  void _showHowToJoin() {
+    showDialog<void>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('How to get access'),
+        content: const Text(
+          'Know Thyself is a membership app for Anurag Rishi\'s meditation '
+          'program. Access is provided to enrolled members.\n\n'
+          'To join, please contact us and our team will create your account '
+          'and share your login details:\n\n'
+          'Email: ar.happinessmovement@gmail.com\n\n'
+          'Once you receive your credentials, sign in on this screen.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Got it'),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final authState = ref.watch(authControllerProvider);
@@ -114,6 +137,11 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                             child: CircularProgressIndicator(strokeWidth: 2),
                           )
                         : const Text('Log in'),
+                  ),
+                  const SizedBox(height: 12),
+                  TextButton(
+                    onPressed: isLoading ? null : _showHowToJoin,
+                    child: const Text('New here? How to get access'),
                   ),
                 ],
               ),
