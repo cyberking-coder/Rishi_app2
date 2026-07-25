@@ -1,8 +1,7 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { isAdminPanelRole } from "@/lib/roles";
 import type { Profile } from "@/lib/types";
-
-const ADMIN_ROLES = ["admin", "content_manager", "support"];
 
 /**
  * Resolves the current admin's profile, or redirects to /login. Used by
@@ -23,7 +22,7 @@ export async function requireAdmin(): Promise<Profile> {
     .eq("id", user.id)
     .single<Profile>();
 
-  if (!profile || !ADMIN_ROLES.includes(profile.role)) {
+  if (!profile || !isAdminPanelRole(profile.role)) {
     redirect("/login?error=not_authorized");
   }
 

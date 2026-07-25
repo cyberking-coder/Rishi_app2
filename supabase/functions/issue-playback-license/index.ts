@@ -11,6 +11,7 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { handlePreflight, jsonResponse } from "../_shared/cors.ts";
 import { DEFAULT_DOWNLOAD_TTL_SECONDS, presignGet } from "../_shared/r2.ts";
+import { RoleError, requireRole } from "../_shared/roles.ts";
 
 const SIGNED_URL_TTL_SECONDS = DEFAULT_DOWNLOAD_TTL_SECONDS; // 10 minutes
 
@@ -69,6 +70,22 @@ Deno.serve(async (req) => {
     return jsonResponse({ error: "Unauthorized" }, 401);
   }
   const userId = userData.user.id;
+
+  // Retreat access window — mirrors issue-audio-license's gate. No client
+  // calls this function yet (no video playback UI exists in the app), so
+  // adding this check is pure hardening with no behavior change for any
+  // real user today.
+  try {
+    await requireRole(
+      supabase,
+      userId,
+      ["retreat_user", "admin"],
+      "Your access period has ended.",
+    );
+  } catch (e) {
+    if (e instanceof RoleError) return jsonResponse({ error: e.message }, e.status);
+    throw e;
+  }
 
   // Device check: caller must be the account's currently active device.
   const { data: device, error: deviceError } = await supabase

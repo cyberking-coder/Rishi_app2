@@ -1,13 +1,16 @@
 import { createServerClient, type CookieOptions } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
+import { isAdminPanelRole } from "@/lib/roles";
 
 type CookieToSet = { name: string; value: string; options: CookieOptions };
 
 /**
- * Refreshes the Supabase session cookie on every request and bounces
- * unauthenticated visitors to /login. Fine-grained admin-role checks live
- * in `requireAdmin()` on the server, since middleware can't query profiles
- * cheaply on every request.
+ * Refreshes the Supabase session cookie on every request, bounces
+ * unauthenticated visitors to /login, and — as defense in depth — also
+ * bounces an authenticated non-panel-role user (e.g. an ordinary app end
+ * user who signs into the admin login) before any dashboard page renders.
+ * `requireAdmin()` still performs the same check independently on every
+ * page/server action; this doesn't replace that, it just runs earlier.
  */
 export async function middleware(request: NextRequest) {
   let response = NextResponse.next({ request });
@@ -49,6 +52,21 @@ export async function middleware(request: NextRequest) {
     const url = request.nextUrl.clone();
     url.pathname = "/";
     return NextResponse.redirect(url);
+  }
+
+  if (user && !isLoginRoute) {
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("role")
+      .eq("id", user.id)
+      .maybeSingle<{ role: string }>();
+
+    if (!profile || !isAdminPanelRole(profile.role)) {
+      const url = request.nextUrl.clone();
+      url.pathname = "/login";
+      url.searchParams.set("error", "not_authorized");
+      return NextResponse.redirect(url);
+    }
   }
 
   return response;

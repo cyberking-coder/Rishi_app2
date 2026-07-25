@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/auth/app_role.dart';
 import '../../../core/device/device_info_service.dart';
 import '../../../core/network/supabase_client_provider.dart';
+import '../../access/application/access_providers.dart';
 import '../../downloads/application/download_providers.dart';
 import '../../downloads/domain/entities/download_status.dart';
 import '../data/datasources/profile_remote_datasource.dart';
@@ -26,6 +28,16 @@ final profileRepositoryProvider = Provider<ProfileRepository>((ref) {
 
 final userProfileProvider = FutureProvider.autoDispose<UserProfile>((ref) {
   return ref.watch(profileRepositoryProvider).getProfile();
+});
+
+/// The current user's derived Free/Retreat/Admin role. Composes the
+/// profile role and access-window state that are already fetched for the
+/// Profile screen and access banner — no new network call. Not yet read by
+/// any screen; available as infrastructure for future gating.
+final appRoleProvider = FutureProvider.autoDispose<AppRole>((ref) async {
+  final profile = await ref.watch(userProfileProvider.future);
+  final access = await ref.watch(accessStateProvider.future);
+  return resolveAppRole(role: profile.role, hasAccess: access.hasAccess);
 });
 
 final subscriptionSummaryProvider =

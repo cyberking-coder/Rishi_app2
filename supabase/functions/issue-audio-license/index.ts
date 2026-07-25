@@ -7,6 +7,7 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { handlePreflight, jsonResponse } from "../_shared/cors.ts";
 import { DEFAULT_DOWNLOAD_TTL_SECONDS, presignGet } from "../_shared/r2.ts";
+import { RoleError, requireRole } from "../_shared/roles.ts";
 
 const SIGNED_URL_TTL_SECONDS = DEFAULT_DOWNLOAD_TTL_SECONDS;
 
@@ -62,14 +63,20 @@ Deno.serve(async (req) => {
   }
   const userId = userData.user.id;
 
-  // Retreat access window: refuse playback once the user's 30-day access
-  // has lapsed, enforced server-side so a device clock change can't bypass
-  // it. Null expiry == no limit (staff/admin).
-  const { data: hasAccess } = await supabase.rpc("has_active_access", {
-    p_user_id: userId,
-  });
-  if (hasAccess === false) {
-    return jsonResponse({ error: "Your access period has ended." }, 403);
+  // Retreat access window: refuse playback once the user's access has
+  // lapsed, enforced server-side so a device clock change can't bypass it.
+  // Admin/staff roles always pass; everyone else needs an active window
+  // (has_active_access is reused unchanged as the source of truth).
+  try {
+    await requireRole(
+      supabase,
+      userId,
+      ["retreat_user", "admin"],
+      "Your access period has ended.",
+    );
+  } catch (e) {
+    if (e instanceof RoleError) return jsonResponse({ error: e.message }, e.status);
+    throw e;
   }
 
   const { data: device, error: deviceError } = await supabase
