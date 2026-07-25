@@ -215,10 +215,18 @@ requirement or Google Play Billing for digital content. The app never says
      grant does today.
    Either way, `has_active_access`/entitlement-check logic needs **no
    changes** to recognize paid access alongside admin-granted access.
-6. On success, a background job (see §7) sends:
+6. On success, the edge function calls an **n8n** webhook (n8n Pro — already
+   an owned tool, reused rather than adding a new job-queue vendor) which
+   fans out to:
    - a **confirmation email** (Resend/Postmark), and
-   - a **WhatsApp message** (new — see §7 for provider options),
+   - a **WhatsApp message via Wati** (already an owned tool — no new
+     WhatsApp Business Platform vendor decision needed),
    both containing the receipt and a note that the course is now unlocked.
+   n8n handles the orchestration/fan-out; the security-sensitive webhook
+   signature verification itself stays in our own edge function code, not in
+   n8n, so a compromised or misconfigured n8n workflow can't be tricked into
+   granting access — it can only fire notifications for access already
+   granted.
 7. **Unlocking in-app**: the app re-checks entitlement/access state whenever
    it resumes from background — which is exactly what happens when the
    external browser is closed and the user returns to the app after paying.
@@ -264,21 +272,24 @@ data tells us where the bottleneck actually is (see phased rollout in §9).
 | Read-heavy queries (course catalog, dashboards) | **Supabase read replicas** (paid add-on) | Avoids splitting the DB layer into a separate system |
 | Hot-path caching (session validation, popular course/audio metadata, rate-limit counters) | **Upstash Redis** (serverless, pay-per-request — fits our edge-function-based backend better than a self-managed Redis box) | No server to manage, integrates cleanly with Deno edge functions |
 | Media delivery at scale (course video/audio, cover images) | **Cloudflare CDN in front of R2** (Cloudflare is already our storage vendor) | Keeps everything in one vendor relationship, R2 egress to Cloudflare's own CDN is free |
-| Background jobs (webhook processing, certificate PDF generation, email sends, analytics rollups) | **Inngest** or **Trigger.dev** (managed queue/worker platform with a generous free tier, paid at scale) | Edge functions are request/response — durable background jobs need a real queue, and this plugs into Deno/TypeScript cleanly |
+| Background jobs / notification fan-out (webhook processing, certificate generation, email + WhatsApp sends, analytics rollups) | **n8n Pro** — already an owned subscription, no new vendor | Edge functions are request/response — durable background jobs need a real orchestrator; reusing n8n instead of adding Inngest/Trigger.dev removes a line item from this cost table entirely |
 | Bot / abuse protection at the edge (compensates for the "no CAPTCHA on signup" choice) | **Cloudflare WAF + rate limiting** (already sitting in front of R2, extend to API routes) | One vendor, one dashboard, no new integration surface |
 | Error tracking | **Sentry** (Flutter + Next.js + Deno SDKs all exist) | Covers all three runtimes with one tool |
 | Uptime/log monitoring | **Better Stack** (or Supabase's own log drains, evaluated in Phase 5) | Cheap, fast to wire up |
 | Load testing before go-live | **k6** (Grafana Cloud k6, paid tier for larger runs) | Industry standard, scriptable, integrates with CI |
 | Transactional email (verification, receipts, certificates) | **Resend** or **Postmark** | Both have first-class Supabase/Next.js integrations |
-| WhatsApp purchase confirmation | **WhatsApp Business Platform** via a BSP such as **Twilio**, **Gupshup**, or **MSG91** (final choice deferred — see §10) | Needed for the post-purchase confirmation message in §6.1; all three integrate cleanly with a webhook-driven background job |
+| WhatsApp purchase confirmation | **Wati** — already an owned subscription, no new vendor decision needed | Needed for the post-purchase confirmation message in §6.1; triggered from the n8n workflow above. Only marginal cost is WhatsApp's own per-conversation fee (set by Meta, passed through by Wati regardless of BSP) — the platform subscription itself is already sunk |
 | Web checkout hosting (the external payment page in §6) | Same **Vercel/Next.js** setup already used for the admin dashboard | One more route on infrastructure we already operate, not a new deployment target |
 | Video transcoding for course lessons (multiple qualities, matching the `content_assets` "quality ladder" design that already exists in schema but is unpopulated) | **Cloudflare Stream** or **Mux** (evaluated against each other in Phase 4 — decision deferred until we scope lesson-video volume) | Finally populates the multi-quality `content_assets` design instead of the current single-rendition-only reality |
 
 **Why this order matters**: none of this is deployed on day one. Connection
 pooling and caching are cheap and go in early (Phase 5). CDN and WAF are
 close to free and go in early too. Background jobs go in with payments
-(Phase 3), since webhook reliability needs them immediately. Load testing
-(Phase 6) happens *before* any marketing push, not after something breaks.
+(Phase 3), since webhook reliability needs them immediately — and since that
+slot is filled by n8n (already owned) rather than a new vendor, Phase 3 adds
+no new recurring cost for orchestration itself, only for the WhatsApp
+messages Wati sends on our behalf. Load testing (Phase 6) happens *before*
+any marketing push, not after something breaks.
 
 ---
 
@@ -354,10 +365,8 @@ relevant phase's file-level plan is written:
    auto-generated PDF (name, course, date) sufficient for Phase 5?
 4. **Video transcoding vendor** (Cloudflare Stream vs Mux) — deferred to
    Phase 4 per §7, but worth flagging now so it's not a last-minute decision.
-5. **WhatsApp Business Platform provider** (Twilio vs Gupshup vs MSG91) —
-   deferred to Phase 3; likely comes down to existing account/pricing
-   preference rather than a technical difference, since all three support
-   the same webhook-driven send pattern.
+5. ~~WhatsApp Business Platform provider~~ — **resolved: Wati** (already an
+   owned tool). No longer open.
 6. **Blanket subscription vs per-course-only pricing**: §3/§6 now support
    both a course-by-course purchase (via `entitlements`) and a blanket
    premium window (via `access_expires_at`) since the schema already allows
@@ -367,6 +376,10 @@ relevant phase's file-level plan is written:
 7. **Web checkout portal hosting**: new route on the existing admin Next.js
    app, or a separate minimal Next.js deployment? Affects whether Phase 3
    touches `admin/` at all or stands up a new project.
+8. **n8n deployment**: is the existing n8n Pro instance self-hosted or
+   n8n Cloud? Affects whether we need to account for its own uptime/scaling
+   as part of Phase 6, or whether that's already handled by n8n's own
+   managed hosting.
 
 ---
 
