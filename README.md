@@ -37,9 +37,12 @@ be drawn from.
   Supabase Auth, same mechanism already used for admin-created accounts today).
 - Some content (audio, video, and new LMS courses) is marked **free**; some is
   marked **premium**.
-- Free users can **upgrade to premium themselves** by paying — Razorpay for
-  India, Stripe for the rest of the world, auto-selected by region — *or* an
-  admin can still grant premium access manually (today's flow, unchanged).
+- Free users can **unlock premium content/courses themselves** by tapping
+  "Get Access Now," which takes them to an external web checkout (Razorpay
+  for India, Stripe for the rest of the world, auto-selected by region) —
+  never an in-app purchase flow, to stay outside Apple/Google's in-app
+  billing requirements — *or* an admin can still grant premium access
+  manually (today's flow, unchanged).
 - The app gains a proper **LMS**: courses made of modules and lessons (video,
   audio, or text), quizzes with scoring, per-lesson progress tracking, and
   completion certificates.
@@ -76,20 +79,26 @@ task** (Free User / Retreat User / Admin) rather than inventing a fourth concept
 | Role | How it's granted today | How it's granted after this plan |
 |---|---|---|
 | **Admin** | `profiles.role = 'admin'` (or `content_manager`/`support`), created manually in Supabase | Unchanged |
-| **Premium User** | Admin manually sets `access_expires_at` in the future | **Both** admin-grant (unchanged) **and** self-service purchase via Razorpay/Stripe, which sets the same column via a webhook |
-| **Free User** | Doesn't exist yet — all users are admin-created | New: self-signup via the app, `access_expires_at = null` **and no active premium purchase** → free tier, sees only free-marked content |
+| **Premium User** | Admin manually sets `access_expires_at` in the future | **Three** paths now: admin-grant (unchanged, blanket access), self-service **per-course purchase** via the external web checkout (see §6 — grants that one course only), or a self-service **blanket subscription** if we offer one (sets `access_expires_at`, same as admin-grant) |
+| **Free User** | Doesn't exist yet — all users are admin-created | New: self-signup via the app, `access_expires_at = null` **and no active premium purchase/entitlement** → free tier, sees only free-marked content |
 
-**No new database column is required to represent this.** `access_expires_at`
-already means exactly "premium until this date, or forever if null." What's new
-is *how many ways* that field can be set, and a `is_premium` flag already exists
-on `videos`/`audios`/`content_assets` to mark which content requires it — for
-LMS courses we add the same flag on the new `courses` table for consistency.
+**No new database column is required to represent this, for either access
+model.** Blanket premium reuses `access_expires_at` exactly as today. Per-course
+purchases reuse the **existing `entitlements` table** — already fully designed
+(`user_id`, `content_id`, `source`, `expires_at`) but currently unpopulated by
+any code (flagged as dead schema in the original audit). A course purchase
+inserts one row: `source = 'purchase'`, `content_id = <course id>` — course
+access is then "has an active entitlement for this course OR an active
+`access_expires_at` window OR is admin," which is a small extension to the
+gating check, not a new mechanism. `is_premium` already exists on
+`videos`/`audios`/`content_assets` to mark which content requires *some* form
+of access; the new `courses` table gets the same flag for consistency.
 
 **Content gating rule (already partially enforced today via `has_active_access`
 RPC used in `issue-audio-license`):** any content row with `is_premium = true`
-requires an active access window; `is_premium = false` is open to any
-authenticated free user. Course-level lessons inherit this from their parent
-course, so gating logic isn't duplicated per-lesson.
+requires an active access window **or** a matching entitlement; `is_premium =
+false` is open to any authenticated free user. Course-level lessons inherit
+this from their parent course, so gating logic isn't duplicated per-lesson.
 
 ---
 
@@ -172,40 +181,72 @@ admin page already uses.
 
 ---
 
-## 6. Payments — Razorpay + Stripe
+## 6. Payments — Razorpay + Stripe, entirely outside the app
 
-### 6.1 Routing
-Auto-detect by region (billing country / locale) at checkout: Razorpay for
-India (INR), Stripe for everyone else. Both gateways write into the **same
-existing `payments` and `subscriptions` tables** — the schema already has
-`payment_provider`/`provider_subscription_id`/`provider_payment_id` columns
-sitting unused for exactly this purpose.
+**No in-app purchase SDK, no in-app checkout UI, no card form inside the
+Flutter app — deliberately.** Payment happens on a web page, not inside the
+app binary, specifically so we never trigger Apple's In-App Purchase
+requirement or Google Play Billing for digital content. The app never says
+"buy," "premium," or "subscribe" next to a checkout button — the only CTA is
+**"Get Access Now."**
 
-### 6.2 Flow
-1. Free user taps "Go Premium" in the app → mobile app calls a new edge
-   function `create-checkout-session` → returns a Razorpay order or Stripe
-   Checkout session depending on detected region.
-2. User completes payment in the provider's own hosted checkout (Razorpay
-   Checkout / Stripe Checkout) — **card details never touch our servers**,
-   keeping PCI scope minimal.
-3. Provider sends a webhook → new edge functions `razorpay-webhook` and
-   `stripe-webhook` verify the signature, write a `payments` row, upsert the
-   `subscriptions` row, and set `profiles.access_expires_at` — reusing the
-   exact column the admin's manual "grant access" button already writes to,
-   so premium-gating logic (`has_active_access`) needs **zero changes** to
-   support paid access alongside admin-granted access.
-4. Renewal/cancellation/refund webhooks update the same rows going forward.
+### 6.1 Flow
+1. User taps **"Get Access Now"** on a locked course/content item in the app.
+2. The app opens the device's **external browser** (`url_launcher` in
+   `externalApplication` mode — not an in-app WebView, which matters for the
+   same store-policy reasons as not using an SDK) to a web checkout page:
+   `https://<web-portal-domain>/checkout/<course-id>?token=<signed-token>`.
+   The signed token identifies the user + course without requiring them to
+   log in again on the web.
+3. That web page is a small new surface — either a new lightweight route on
+   the existing Next.js admin app's public side, or a new minimal Next.js app
+   reusing the same Supabase project and the same `_shared` R2/CORS patterns
+   already established. It detects region and shows **Razorpay Checkout**
+   (India/INR) or **Stripe Checkout** (everywhere else) — auto-routed exactly
+   as planned, just relocated from "inside the app" to "on the web."
+4. User pays on the provider's own hosted checkout — **card details never
+   touch our servers**, keeping PCI scope minimal, same guarantee as before.
+5. Provider sends a webhook → `razorpay-webhook` / `stripe-webhook` edge
+   functions verify the signature, write a `payments` row, and grant access:
+   - **Course purchase** → insert an `entitlements` row (`source: 'purchase'`,
+     `content_id: <course id>`) — unlocks that course only.
+   - **Blanket subscription purchase** (if offered) → upserts `subscriptions`
+     and sets `profiles.access_expires_at`, exactly as the admin's manual
+     grant does today.
+   Either way, `has_active_access`/entitlement-check logic needs **no
+   changes** to recognize paid access alongside admin-granted access.
+6. On success, a background job (see §7) sends:
+   - a **confirmation email** (Resend/Postmark), and
+   - a **WhatsApp message** (new — see §7 for provider options),
+   both containing the receipt and a note that the course is now unlocked.
+7. **Unlocking in-app**: the app re-checks entitlement/access state whenever
+   it resumes from background — which is exactly what happens when the
+   external browser is closed and the user returns to the app after paying.
+   This reuses the same on-mount refetch pattern `accessStateProvider`
+   already uses today (no new polling system); we extend the resume trigger
+   from "screen mount" to "app lifecycle resume" so the unlock feels
+   immediate without the user needing to force-quit or re-navigate.
+
+### 6.2 Why this shape, explicitly
+Apple and Google both require in-app digital purchases to go through their
+own IAP/Billing systems (with their revenue cut) *if the purchase happens
+inside the app*. Routing the entire payment experience — button tap through
+confirmation — to an external website is the standard way apps avoid that
+requirement for this kind of content. This is a deliberate, real trade-off
+worth having explicitly on record (expanded in §8) rather than silently
+assumed.
 
 ### 6.3 Idempotency & reliability
-Webhooks are the one place at this scale where "every possible paid tool" pays
-for itself immediately: webhook events get queued (see §7) rather than
-processed synchronously, with a `webhook_events` table (new, small) recording
-provider event IDs already seen, so a retried webhook from Razorpay/Stripe
-during a network hiccup can never double-grant or double-charge access.
+Webhook events get queued (see §7) rather than processed synchronously, with
+a `webhook_events` table (new, small) recording provider event IDs already
+seen, so a retried webhook from Razorpay/Stripe during a network hiccup can
+never double-grant access, double-send the WhatsApp/email confirmation, or
+double-charge.
 
 ### 6.4 Admin visibility
-New admin "Billing" page: payment history, active subscriptions, refund
-button (calls the provider's refund API + updates `payments.status`), and
+New admin "Billing" page: payment history, active subscriptions/entitlements,
+refund button (calls the provider's refund API, updates `payments.status`,
+and revokes the matching `entitlements`/`access_expires_at` grant), and
 manual coupon/pricing management if we want promotional pricing later.
 
 ---
@@ -229,6 +270,8 @@ data tells us where the bottleneck actually is (see phased rollout in §9).
 | Uptime/log monitoring | **Better Stack** (or Supabase's own log drains, evaluated in Phase 5) | Cheap, fast to wire up |
 | Load testing before go-live | **k6** (Grafana Cloud k6, paid tier for larger runs) | Industry standard, scriptable, integrates with CI |
 | Transactional email (verification, receipts, certificates) | **Resend** or **Postmark** | Both have first-class Supabase/Next.js integrations |
+| WhatsApp purchase confirmation | **WhatsApp Business Platform** via a BSP such as **Twilio**, **Gupshup**, or **MSG91** (final choice deferred — see §10) | Needed for the post-purchase confirmation message in §6.1; all three integrate cleanly with a webhook-driven background job |
+| Web checkout hosting (the external payment page in §6) | Same **Vercel/Next.js** setup already used for the admin dashboard | One more route on infrastructure we already operate, not a new deployment target |
 | Video transcoding for course lessons (multiple qualities, matching the `content_assets` "quality ladder" design that already exists in schema but is unpopulated) | **Cloudflare Stream** or **Mux** (evaluated against each other in Phase 4 — decision deferred until we scope lesson-video volume) | Finally populates the multi-quality `content_assets` design instead of the current single-rendition-only reality |
 
 **Why this order matters**: none of this is deployed on day one. Connection
@@ -253,6 +296,23 @@ close to free and go in early too. Background jobs go in with payments
   part of this work, since a real payments/subscriptions system raises the
   compliance stakes — a proper "delete my account" edge function is in scope
   for Phase 3.
+- **App Store / Play Store risk of the external-checkout model (§6), flagged
+  directly rather than assumed away**: routing payment entirely to an
+  external website is the standard way to avoid Apple's In-App Purchase cut
+  and Google Play Billing for digital content, and is explicitly what you've
+  asked for. It carries real review risk on iOS in particular — Apple's
+  guidelines have historically restricted linking out to external purchase
+  flows for digital content except under specific exceptions ("reader" apps,
+  or the newer External Purchase Link entitlement available in some regions
+  including the US). This app already has a documented history of App Store
+  review friction (the existing hardcoded review-account device-lock
+  exemption from the original audit exists *because of* past review
+  pressure). Recommendation: budget time in Phase 3 to review current Apple
+  guidelines for the specific entitlement/exception that applies, and treat
+  "will Apple approve this" as an open risk to validate early — ideally via
+  a TestFlight submission — rather than late, so a rejection doesn't block
+  the whole payments phase. Android/Google Play is comparatively more
+  permissive for this pattern but not risk-free either.
 - The existing hardcoded review-account device-lock exemption and the
   FLAG_SECURE removal (both flagged in the original audit) are **out of scope
   for this plan** — separate cleanup, not blocking LMS work, can be revisited
@@ -270,7 +330,7 @@ file-by-file plans are written and approved before coding starts on each one.
 | **0** | Land the Free/Retreat(Premium)/Admin role-resolution work already planned in the prior task (no DB change, pure derivation layer) | — |
 | **1** | Self-service signup (mobile signup screen, `handle_new_user` default tweak, email verification flow) | Phase 0 |
 | **2** | Content gating pass — confirm `is_premium` is consistently enforced across audio/video for the new free-signup population (it already is via `has_active_access`, this phase is verification + admin UI to mark content free/premium per item if not already exposed) | Phase 1 |
-| **3** | Payments: `payments`/`subscriptions` wiring, Razorpay + Stripe checkout, webhooks, background job queue for webhook processing, admin Billing page, account-deletion flow | Phase 1 |
+| **3** | Payments: external web checkout portal, `payments`/`subscriptions`/`entitlements` wiring, Razorpay + Stripe, webhooks, background job queue, email + WhatsApp confirmation, admin Billing page, account-deletion flow | Phase 1 |
 | **4** | LMS core: courses/modules/lessons schema, admin course builder, mobile course catalog + lesson player (including finally building video playback UI), lesson progress | Phase 2 |
 | **5** | Quizzes + certificates | Phase 4 |
 | **6** | Scaling hardening: connection pooling, read replicas, Redis caching, CDN tuning, monitoring/error tracking wired up | Can start in parallel with Phase 3 onward, tuned continuously |
@@ -294,6 +354,19 @@ relevant phase's file-level plan is written:
    auto-generated PDF (name, course, date) sufficient for Phase 5?
 4. **Video transcoding vendor** (Cloudflare Stream vs Mux) — deferred to
    Phase 4 per §7, but worth flagging now so it's not a last-minute decision.
+5. **WhatsApp Business Platform provider** (Twilio vs Gupshup vs MSG91) —
+   deferred to Phase 3; likely comes down to existing account/pricing
+   preference rather than a technical difference, since all three support
+   the same webhook-driven send pattern.
+6. **Blanket subscription vs per-course-only pricing**: §3/§6 now support
+   both a course-by-course purchase (via `entitlements`) and a blanket
+   premium window (via `access_expires_at`) since the schema already allows
+   either. Confirming whether we actually sell blanket subscriptions, or
+   keep pricing strictly per-course, changes what the web checkout page in
+   §6.1 needs to present at Phase 3.
+7. **Web checkout portal hosting**: new route on the existing admin Next.js
+   app, or a separate minimal Next.js deployment? Affects whether Phase 3
+   touches `admin/` at all or stands up a new project.
 
 ---
 
