@@ -23,6 +23,18 @@ class AuthController extends Notifier<AuthState> {
     }
   }
 
+  Future<void> signInWithGoogle() async {
+    state = const AuthLoading();
+    try {
+      final user = await ref.read(signInWithGoogleUseCaseProvider).call();
+      state = AuthAuthenticated(user);
+    } on AuthFailure catch (failure) {
+      state = AuthFailureState(failure);
+    } catch (e) {
+      state = AuthFailureState(AuthFailure.unknown(e.toString()));
+    }
+  }
+
   Future<void> signUp({
     required String email,
     required String password,

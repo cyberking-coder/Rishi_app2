@@ -1,5 +1,6 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../../../../core/config/app_config.dart';
 import '../../../../core/device/device_info_service.dart';
 import '../../../../core/errors/auth_failure.dart';
 
@@ -82,6 +83,46 @@ class AuthRemoteDataSource {
     if (response.session == null) {
       // Email confirmation required — no active session yet.
       return null;
+    }
+
+    try {
+      await _registerDevice();
+    } on DeviceLockedException {
+      await _client.auth.signOut();
+      throw AuthFailure.deviceLocked();
+    }
+
+    return user;
+  }
+
+  /// Launches Google sign-in via a browser-based OAuth redirect. Unlike
+  /// [signInAndRegisterDevice]/[signUp], the resulting session doesn't come
+  /// back as a direct return value — the browser redirect completes
+  /// asynchronously via the `meditationapp://login-callback` deep link, so
+  /// this waits for the auth stream to report a signed-in session before
+  /// registering the device, mirroring the same device-lock enforcement as
+  /// any other sign-in method.
+  Future<User> signInWithGoogle() async {
+    try {
+      await _client.auth.signInWithOAuth(
+        OAuthProvider.google,
+        redirectTo: AppConfig.googleOAuthRedirectUrl,
+      );
+    } on AuthException catch (e) {
+      throw _mapAuthException(e);
+    }
+
+    final authState = await _client.auth.onAuthStateChange
+        .firstWhere((s) => s.event == AuthChangeEvent.signedIn)
+        .timeout(
+          const Duration(minutes: 2),
+          onTimeout: () =>
+              throw AuthFailure.unknown('Google sign-in was not completed.'),
+        );
+
+    final user = authState.session?.user;
+    if (user == null) {
+      throw AuthFailure.unknown('Google sign-in failed. Please try again.');
     }
 
     try {

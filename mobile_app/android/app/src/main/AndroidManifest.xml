@@ -34,12 +34,13 @@
             android:hardwareAccelerated="true"
             android:windowSoftInputMode="adjustResize">
 
-            <!-- Deep link for password reset emails -->
+            <!-- Deep link for password reset emails and OAuth (Google) sign-in redirects -->
             <intent-filter android:autoVerify="true">
                 <action android:name="android.intent.action.VIEW" />
                 <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.BROWSABLE" />
                 <data android:scheme="meditationapp" android:host="reset-password" />
+                <data android:scheme="meditationapp" android:host="login-callback" />
             </intent-filter>
 
             <intent-filter>

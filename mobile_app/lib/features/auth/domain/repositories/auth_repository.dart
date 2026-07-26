@@ -9,6 +9,11 @@ abstract class AuthRepository {
   /// signed out again before the error is thrown).
   Future<AppUser> login({required String email, required String password});
 
+  /// Signs in (or creates an account, on first use) via Google OAuth.
+  /// Registers/validates this device the same way [login] does — throws
+  /// [AuthFailure] on any failure, including device-lock rejection.
+  Future<AppUser> signInWithGoogle();
+
   /// Creates a new account. Returns the signed-in [AppUser] if the project
   /// auto-confirms new accounts (session issued immediately, device also
   /// registered in that case) — otherwise returns null, meaning the

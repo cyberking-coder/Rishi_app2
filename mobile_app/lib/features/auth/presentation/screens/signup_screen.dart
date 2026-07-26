@@ -138,6 +138,16 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
                               : const Text('Create account'),
                         ),
                         const SizedBox(height: 12),
+                        OutlinedButton.icon(
+                          onPressed: isLoading
+                              ? null
+                              : () => ref
+                                  .read(authControllerProvider.notifier)
+                                  .signInWithGoogle(),
+                          icon: const Icon(Icons.g_mobiledata, size: 28),
+                          label: const Text('Continue with Google'),
+                        ),
+                        const SizedBox(height: 12),
                         TextButton(
                           onPressed:
                               isLoading ? null : () => Navigator.pop(context),

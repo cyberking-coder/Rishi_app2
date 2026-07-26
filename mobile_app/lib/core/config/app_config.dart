@@ -16,4 +16,10 @@ class AppConfig {
   static const appName = 'Know Thyself';
   static const audioChannelId = 'com.knowthyself.app.audio.channel';
   static const audioChannelName = 'Meditation Audio';
+
+  /// Deep link Supabase redirects back to once a browser-based OAuth flow
+  /// (e.g. Google) completes. Shares the `meditationapp://` scheme already
+  /// registered for password-reset emails; must also be added to the
+  /// Supabase project's Authentication > URL Configuration redirect list.
+  static const googleOAuthRedirectUrl = 'meditationapp://login-callback';
 }
