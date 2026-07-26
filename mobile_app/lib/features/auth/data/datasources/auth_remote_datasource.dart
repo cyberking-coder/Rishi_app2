@@ -50,6 +50,50 @@ class AuthRemoteDataSource {
     return user;
   }
 
+  /// Creates a new account. If the Supabase project auto-confirms new
+  /// users (a session comes back immediately), this also registers the
+  /// device — the same device-lock enforcement applies to a self-signup as
+  /// to any login. Returns null when email confirmation is required
+  /// instead (no session yet); the caller shows a "check your email"
+  /// message in that case.
+  Future<User?> signUp({
+    required String email,
+    required String password,
+    String? displayName,
+  }) async {
+    final AuthResponse response;
+    try {
+      response = await _client.auth.signUp(
+        email: email,
+        password: password,
+        data: displayName == null || displayName.isEmpty
+            ? null
+            : {'display_name': displayName},
+      );
+    } on AuthException catch (e) {
+      throw _mapAuthException(e);
+    }
+
+    final user = response.user;
+    if (user == null) {
+      throw AuthFailure.unknown('Sign up failed. Please try again.');
+    }
+
+    if (response.session == null) {
+      // Email confirmation required — no active session yet.
+      return null;
+    }
+
+    try {
+      await _registerDevice();
+    } on DeviceLockedException {
+      await _client.auth.signOut();
+      throw AuthFailure.deviceLocked();
+    }
+
+    return user;
+  }
+
   Future<void> _registerDevice() async {
     final profile = await _deviceInfoService.getDeviceProfile();
     try {
@@ -87,6 +131,14 @@ class AuthRemoteDataSource {
         AuthFailureType.emailNotConfirmed,
         'Please verify your email before logging in.',
       );
+    }
+    if (message.contains('already registered') ||
+        message.contains('already exists')) {
+      return AuthFailure.emailAlreadyRegistered();
+    }
+    if (message.contains('password') &&
+        (message.contains('weak') || message.contains('at least'))) {
+      return AuthFailure.weakPassword(e.message);
     }
     return AuthFailure.unknown(e.message);
   }

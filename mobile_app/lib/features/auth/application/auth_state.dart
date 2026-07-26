@@ -22,6 +22,13 @@ class AuthUnauthenticated extends AuthState {
   const AuthUnauthenticated();
 }
 
+/// Sign-up succeeded but the project requires email confirmation before a
+/// session is issued — distinct from [AuthUnauthenticated] so the sign-up
+/// screen can show a "check your email" message instead of a plain form.
+class AuthSignUpPending extends AuthState {
+  const AuthSignUpPending();
+}
+
 class AuthFailureState extends AuthState {
   final AuthFailure failure;
   const AuthFailureState(this.failure);

@@ -140,6 +140,11 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                   ),
                   const SizedBox(height: 12),
                   TextButton(
+                    onPressed:
+                        isLoading ? null : () => context.push('/signup'),
+                    child: const Text('Sign up for free'),
+                  ),
+                  TextButton(
                     onPressed: isLoading ? null : _showHowToJoin,
                     child: const Text('New here? How to get access'),
                   ),

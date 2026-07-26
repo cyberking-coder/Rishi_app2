@@ -29,6 +29,26 @@ class AuthRepositoryImpl implements AuthRepository {
   }
 
   @override
+  Future<AppUser?> signUp({
+    required String email,
+    required String password,
+    String? displayName,
+  }) async {
+    try {
+      final user = await _remote.signUp(
+        email: email,
+        password: password,
+        displayName: displayName,
+      );
+      return user == null ? null : _toAppUser(user);
+    } on AuthFailure {
+      rethrow;
+    } catch (e) {
+      throw AuthFailure.unknown(e.toString());
+    }
+  }
+
+  @override
   Future<void> logout() => _remote.signOut();
 
   @override

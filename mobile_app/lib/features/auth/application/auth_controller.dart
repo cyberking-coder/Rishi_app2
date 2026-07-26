@@ -23,6 +23,26 @@ class AuthController extends Notifier<AuthState> {
     }
   }
 
+  Future<void> signUp({
+    required String email,
+    required String password,
+    String? displayName,
+  }) async {
+    state = const AuthLoading();
+    try {
+      final user = await ref.read(signUpUseCaseProvider).call(
+            email: email,
+            password: password,
+            displayName: displayName,
+          );
+      state = user == null ? const AuthSignUpPending() : AuthAuthenticated(user);
+    } on AuthFailure catch (failure) {
+      state = AuthFailureState(failure);
+    } catch (e) {
+      state = AuthFailureState(AuthFailure.unknown(e.toString()));
+    }
+  }
+
   Future<void> logout() async {
     state = const AuthLoading();
     try {

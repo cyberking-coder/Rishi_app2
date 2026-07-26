@@ -6,6 +6,7 @@ enum AuthFailureType {
   deviceLocked,
   accessExpired,
   emailNotConfirmed,
+  emailAlreadyRegistered,
   network,
   weakPassword,
   userNotFound,
@@ -36,6 +37,16 @@ class AuthFailure implements Exception {
   factory AuthFailure.network() => const AuthFailure(
         AuthFailureType.network,
         'No internet connection. Please try again.',
+      );
+
+  factory AuthFailure.emailAlreadyRegistered() => const AuthFailure(
+        AuthFailureType.emailAlreadyRegistered,
+        'An account with this email already exists. Try logging in instead.',
+      );
+
+  factory AuthFailure.weakPassword([String? detail]) => AuthFailure(
+        AuthFailureType.weakPassword,
+        detail ?? 'Password is too weak. Use at least 6 characters.',
       );
 
   factory AuthFailure.unknown([String? detail]) => AuthFailure(

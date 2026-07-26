@@ -9,6 +9,17 @@ abstract class AuthRepository {
   /// signed out again before the error is thrown).
   Future<AppUser> login({required String email, required String password});
 
+  /// Creates a new account. Returns the signed-in [AppUser] if the project
+  /// auto-confirms new accounts (session issued immediately, device also
+  /// registered in that case) — otherwise returns null, meaning the
+  /// account was created and the caller must confirm their email before
+  /// logging in.
+  Future<AppUser?> signUp({
+    required String email,
+    required String password,
+    String? displayName,
+  });
+
   Future<void> logout();
 
   Future<void> sendPasswordResetEmail({required String email});

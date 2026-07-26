@@ -9,6 +9,7 @@ import '../domain/repositories/auth_repository.dart';
 import '../domain/usecases/forgot_password_usecase.dart';
 import '../domain/usecases/login_usecase.dart';
 import '../domain/usecases/logout_usecase.dart';
+import '../domain/usecases/sign_up_usecase.dart';
 import 'auth_controller.dart';
 import 'auth_state.dart';
 
@@ -29,6 +30,10 @@ final loginUseCaseProvider = Provider<LoginUseCase>((ref) {
 
 final logoutUseCaseProvider = Provider<LogoutUseCase>((ref) {
   return LogoutUseCase(ref.watch(authRepositoryProvider));
+});
+
+final signUpUseCaseProvider = Provider<SignUpUseCase>((ref) {
+  return SignUpUseCase(ref.watch(authRepositoryProvider));
 });
 
 final forgotPasswordUseCaseProvider = Provider<ForgotPasswordUseCase>((ref) {
