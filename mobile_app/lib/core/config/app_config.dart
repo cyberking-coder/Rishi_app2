@@ -18,8 +18,14 @@ class AppConfig {
   static const audioChannelName = 'Meditation Audio';
 
   /// Deep link Supabase redirects back to once a browser-based OAuth flow
-  /// (e.g. Google) completes. Shares the `meditationapp://` scheme already
-  /// registered for password-reset emails; must also be added to the
-  /// Supabase project's Authentication > URL Configuration redirect list.
-  static const googleOAuthRedirectUrl = 'meditationapp://login-callback';
+  /// (e.g. Google) completes, or once a signup confirmation email link is
+  /// tapped. Shares the `meditationapp://` scheme already registered for
+  /// password-reset emails; must also be added to the Supabase project's
+  /// Authentication > URL Configuration redirect list.
+  static const authRedirectUrl = 'meditationapp://login-callback';
+
+  /// Deep link for password-reset emails — the intent-filter/URL-type for
+  /// this host already exists natively; this was previously never passed
+  /// explicitly, so reset emails fell back to Supabase's default Site URL.
+  static const passwordResetRedirectUrl = 'meditationapp://reset-password';
 }

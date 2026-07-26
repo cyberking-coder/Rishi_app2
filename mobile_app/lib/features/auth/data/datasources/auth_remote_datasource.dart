@@ -70,6 +70,7 @@ class AuthRemoteDataSource {
         data: displayName == null || displayName.isEmpty
             ? null
             : {'display_name': displayName},
+        emailRedirectTo: AppConfig.authRedirectUrl,
       );
     } on AuthException catch (e) {
       throw _mapAuthException(e);
@@ -106,7 +107,7 @@ class AuthRemoteDataSource {
     try {
       await _client.auth.signInWithOAuth(
         OAuthProvider.google,
-        redirectTo: AppConfig.googleOAuthRedirectUrl,
+        redirectTo: AppConfig.authRedirectUrl,
       );
     } on AuthException catch (e) {
       throw _mapAuthException(e);
@@ -156,7 +157,10 @@ class AuthRemoteDataSource {
 
   Future<void> sendPasswordResetEmail(String email) async {
     try {
-      await _client.auth.resetPasswordForEmail(email);
+      await _client.auth.resetPasswordForEmail(
+        email,
+        redirectTo: AppConfig.passwordResetRedirectUrl,
+      );
     } on AuthException catch (e) {
       throw _mapAuthException(e);
     }

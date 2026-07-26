@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../../core/auth/app_role.dart';
 import '../../../../core/device/device_info_service.dart';
 import '../../../auth/application/auth_providers.dart';
 import '../../application/profile_providers.dart';
@@ -20,6 +21,7 @@ class ProfileScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final profileAsync = ref.watch(userProfileProvider);
     final subAsync = ref.watch(subscriptionSummaryProvider);
+    final roleAsync = ref.watch(appRoleProvider);
 
     return Scaffold(
       backgroundColor: _kBg,
@@ -33,7 +35,13 @@ class ProfileScreen extends ConsumerWidget {
                 style: const TextStyle(color: _kSub)),
           ),
           data: (profile) {
-            final subPlan = subAsync.valueOrNull?.planName ?? 'Premium';
+            final role = roleAsync.valueOrNull;
+            // A real subscription plan name (once payments are wired up)
+            // takes priority; otherwise fall back to the derived
+            // Free/Premium/Admin tier instead of always assuming Premium.
+            final subPlan = subAsync.valueOrNull?.planName ?? _roleLabel(role);
+            final showCrown =
+                role == AppRole.admin || role == AppRole.retreatUser;
 
             return ListView(
               padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
@@ -76,8 +84,9 @@ class ProfileScreen extends ConsumerWidget {
                       Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          const Text('👑 ',
-                              style: TextStyle(fontSize: 14)),
+                          if (showCrown)
+                            const Text('👑 ',
+                                style: TextStyle(fontSize: 14)),
                           Text(
                             '$subPlan Member',
                             style: const TextStyle(
@@ -165,6 +174,18 @@ class ProfileScreen extends ConsumerWidget {
         ),
       ),
     );
+  }
+
+  String _roleLabel(AppRole? role) {
+    switch (role) {
+      case AppRole.admin:
+        return 'Admin';
+      case AppRole.retreatUser:
+        return 'Premium';
+      case AppRole.freeUser:
+      case null:
+        return 'Free';
+    }
   }
 
   void _showAchievement(
