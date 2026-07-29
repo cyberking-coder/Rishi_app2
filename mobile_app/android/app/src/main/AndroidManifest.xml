@@ -74,4 +74,15 @@
             android:name="flutterEmbedding"
             android:value="2" />
     </application>
+
+    <!-- Android 11+ (API 30+) restricts package visibility by default -
+         without this, url_launcher can't see any browser app to open the
+         external checkout link, and launchUrl silently fails. -->
+    <queries>
+        <intent>
+            <action android:name="android.intent.action.VIEW" />
+            <category android:name="android.intent.category.BROWSABLE" />
+            <data android:scheme="https" />
+        </intent>
+    </queries>
 </manifest>
