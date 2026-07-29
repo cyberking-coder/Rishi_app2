@@ -12,10 +12,9 @@ export type UserTier = "admin" | "retreat" | "free";
 export function resolveTier(profile: Profile): UserTier {
   if (STAFF_ROLES.includes(profile.role)) return "admin";
 
-  if (profile.access_started_at) {
-    const expiresAt = profile.access_expires_at;
-    if (!expiresAt || new Date(expiresAt) > new Date()) return "retreat";
+  if (profile.access_expires_at) {
+    return new Date(profile.access_expires_at) > new Date() ? "retreat" : "free";
   }
 
-  return "free";
+  return profile.access_started_at ? "retreat" : "free";
 }

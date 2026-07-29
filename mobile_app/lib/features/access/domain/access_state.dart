@@ -12,12 +12,14 @@ class AccessState {
   /// profiles.role. Null is treated as a non-staff user.
   final String? role;
 
-  /// When the account was actually granted a window (set by an admin
-  /// action). Null means "never granted" — the self-signup default.
+  /// When the account was actually granted a window (set by most admin
+  /// grant actions, but not all — see [tier]). Only consulted when
+  /// [expiresAt] is null, to disambiguate "never granted" from "granted
+  /// unlimited access".
   final DateTime? accessStartedAt;
 
-  /// When the user's access lapses. Null == no expiry, but only meaningful
-  /// once [accessStartedAt] is set (see [tier]).
+  /// When the user's access lapses. A non-null value always wins (see
+  /// [tier]) — active iff in the future, regardless of [accessStartedAt].
   final DateTime? expiresAt;
 
   /// Pop-up content (admin-editable). Null fields mean "not configured".
@@ -40,11 +42,12 @@ class AccessState {
 
   UserTier get tier {
     if (role != null && _staffRoles.contains(role)) return UserTier.admin;
-    if (accessStartedAt != null &&
-        (expiresAt == null || expiresAt!.isAfter(DateTime.now()))) {
-      return UserTier.retreat;
+    if (expiresAt != null) {
+      return expiresAt!.isAfter(DateTime.now())
+          ? UserTier.retreat
+          : UserTier.free;
     }
-    return UserTier.free;
+    return accessStartedAt != null ? UserTier.retreat : UserTier.free;
   }
 
   /// True while the user may still see and play content.
