@@ -3,8 +3,26 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../../core/device/device_info_service.dart';
+import '../../../access/application/access_providers.dart';
+import '../../../access/domain/access_state.dart';
 import '../../../auth/application/auth_providers.dart';
 import '../../application/profile_providers.dart';
+
+/// Falls back to the real access tier when there's no `subscriptions` row
+/// (true for every account today - that table isn't populated by any code
+/// yet). Without this, the plan label always defaulted to the literal
+/// string 'Premium' for every user, free or not.
+String _planLabelFor(UserTier? tier) {
+  switch (tier) {
+    case UserTier.admin:
+      return 'Staff';
+    case UserTier.retreat:
+      return 'Premium';
+    case UserTier.free:
+    case null:
+      return 'Free';
+  }
+}
 
 const _kBg = Color(0xFF12082E);
 const _kSurface = Color(0xFF1C1040);
@@ -20,6 +38,7 @@ class ProfileScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final profileAsync = ref.watch(userProfileProvider);
     final subAsync = ref.watch(subscriptionSummaryProvider);
+    final access = ref.watch(accessStateProvider).valueOrNull;
 
     return Scaffold(
       backgroundColor: _kBg,
@@ -33,7 +52,10 @@ class ProfileScreen extends ConsumerWidget {
                 style: const TextStyle(color: _kSub)),
           ),
           data: (profile) {
-            final subPlan = subAsync.valueOrNull?.planName ?? 'Premium';
+            final subPlan = subAsync.valueOrNull?.planName ??
+                _planLabelFor(access?.tier);
+            final isFree = subAsync.valueOrNull == null &&
+                access?.tier == UserTier.free;
 
             return ListView(
               padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
@@ -76,12 +98,13 @@ class ProfileScreen extends ConsumerWidget {
                       Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          const Text('👑 ',
-                              style: TextStyle(fontSize: 14)),
+                          if (!isFree)
+                            const Text('👑 ',
+                                style: TextStyle(fontSize: 14)),
                           Text(
                             '$subPlan Member',
-                            style: const TextStyle(
-                              color: _kPink,
+                            style: TextStyle(
+                              color: isFree ? _kSub : _kPink,
                               fontSize: 14,
                               fontWeight: FontWeight.w600,
                             ),
@@ -148,6 +171,7 @@ class ProfileScreen extends ConsumerWidget {
                     context,
                     subPlan,
                     subAsync.valueOrNull,
+                    isFree,
                   ),
                 ),
                 const SizedBox(height: 12),
@@ -218,6 +242,7 @@ class ProfileScreen extends ConsumerWidget {
     BuildContext context,
     String planName,
     dynamic subscription,
+    bool isFree,
   ) {
     showModalBottomSheet<void>(
       context: context,
@@ -262,7 +287,8 @@ class ProfileScreen extends ConsumerWidget {
                       .first,
                 ),
             ] else
-              const _DetailRow(label: 'Status', value: 'Active'),
+              _DetailRow(
+                  label: 'Status', value: isFree ? 'No active plan' : 'Active'),
           ],
         ),
       ),
