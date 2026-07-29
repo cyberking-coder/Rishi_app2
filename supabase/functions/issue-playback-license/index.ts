@@ -70,16 +70,6 @@ Deno.serve(async (req) => {
   }
   const userId = userData.user.id;
 
-  // Retreat access window: refuse playback once the user's access has
-  // lapsed, enforced server-side so a device clock change can't bypass it.
-  // Mirrors the check in issue-audio-license.
-  const { data: hasAccess } = await supabase.rpc("has_active_access", {
-    p_user_id: userId,
-  });
-  if (hasAccess === false) {
-    return jsonResponse({ error: "Your access period has ended." }, 403);
-  }
-
   // Device check: caller must be the account's currently active device.
   const { data: device, error: deviceError } = await supabase
     .from("devices")
@@ -106,16 +96,30 @@ Deno.serve(async (req) => {
   }
 
   if (video.is_premium) {
-    const { data: entitlement } = await supabase
-      .from("entitlements")
-      .select("id")
-      .eq("user_id", userId)
-      .or(`content_id.eq.${videoId},content_id.is.null`)
-      .gt("expires_at", new Date().toISOString())
-      .maybeSingle();
+    // Retreat access window: refuse playback once the user's access has
+    // lapsed, enforced server-side so a device clock change can't bypass
+    // it. Only applies to premium content - free content is playable by
+    // any authenticated, non-device-locked user regardless of access
+    // window. Mirrors the check in issue-audio-license.
+    const { data: hasAccess } = await supabase.rpc("has_active_access", {
+      p_user_id: userId,
+    });
 
-    if (!entitlement) {
-      return jsonResponse({ error: "No active entitlement for this video" }, 402);
+    if (hasAccess !== true) {
+      const { data: entitlement } = await supabase
+        .from("entitlements")
+        .select("id")
+        .eq("user_id", userId)
+        .or(`content_id.eq.${videoId},content_id.is.null`)
+        .gt("expires_at", new Date().toISOString())
+        .maybeSingle();
+
+      if (!entitlement) {
+        return jsonResponse(
+          { error: "No active entitlement for this video" },
+          402,
+        );
+      }
     }
   }
 
