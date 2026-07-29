@@ -19,6 +19,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { formatDate } from "@/lib/utils";
+import { resolveTier } from "@/lib/access";
 import type { Profile } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
@@ -99,7 +100,7 @@ export default async function UsersPage() {
                       <UserStatusBadge status={u.status} />
                     </TableCell>
                     <TableCell>
-                      <AccessCell expiresAt={u.access_expires_at} />
+                      <AccessCell profile={u} />
                     </TableCell>
                     <TableCell className="text-muted-foreground">
                       {formatDate(u.created_at)}
@@ -118,8 +119,15 @@ export default async function UsersPage() {
   );
 }
 
-/** Shows the user's remaining access window as a coloured badge. */
-function AccessCell({ expiresAt }: { expiresAt: string | null }) {
+/** Shows the user's resolved tier / remaining access window as a badge. */
+function AccessCell({ profile }: { profile: Profile }) {
+  const tier = resolveTier(profile);
+
+  if (tier === "free") {
+    return <Badge variant="outline">Free</Badge>;
+  }
+
+  const expiresAt = profile.access_expires_at;
   if (!expiresAt) {
     return <Badge variant="outline">Unlimited</Badge>;
   }
