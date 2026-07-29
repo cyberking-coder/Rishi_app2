@@ -2,8 +2,9 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../domain/access_state.dart';
 
-/// Reads the caller's access window (profiles.access_expires_at) and the
-/// global pop-up config (app_config) in two light queries.
+/// Reads the caller's role + access window (profiles.role,
+/// access_started_at, access_expires_at) and the global pop-up config
+/// (app_config) in two light queries.
 class AccessRemoteDataSource {
   final SupabaseClient _client;
 
@@ -15,7 +16,7 @@ class AccessRemoteDataSource {
 
     final profile = await _client
         .from('profiles')
-        .select('access_expires_at')
+        .select('role, access_started_at, access_expires_at')
         .eq('id', userId)
         .maybeSingle();
 
@@ -36,6 +37,8 @@ class AccessRemoteDataSource {
         v == null ? null : DateTime.tryParse(v as String)?.toLocal();
 
     return AccessState(
+      role: profile?['role'] as String?,
+      accessStartedAt: parse(profile?['access_started_at']),
       expiresAt: parse(profile?['access_expires_at']),
       popupEnabled: (config?['popup_enabled'] as bool?) ?? false,
       popupStartAt: parse(config?['popup_start_at']),

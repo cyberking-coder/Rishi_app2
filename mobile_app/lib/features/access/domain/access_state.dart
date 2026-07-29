@@ -1,8 +1,23 @@
-/// The user's retreat-access window plus the global "next event" pop-up.
-/// Drives whether the home screen shows audio at all and whether the
-/// pop-up is displayed.
+/// admin: staff role, unlimited access to everything.
+/// retreat: an active (possibly unlimited) access window was granted.
+/// free: never granted a window (self-signup default) or it expired.
+enum UserTier { admin, retreat, free }
+
+const _staffRoles = {'admin', 'content_manager', 'support'};
+
+/// The user's role/retreat-access window plus the global "next event"
+/// pop-up. Drives whether the home screen shows audio at all and whether
+/// the pop-up is displayed.
 class AccessState {
-  /// When the user's access lapses. Null == no expiry (staff/admin).
+  /// profiles.role. Null is treated as a non-staff user.
+  final String? role;
+
+  /// When the account was actually granted a window (set by an admin
+  /// action). Null means "never granted" — the self-signup default.
+  final DateTime? accessStartedAt;
+
+  /// When the user's access lapses. Null == no expiry, but only meaningful
+  /// once [accessStartedAt] is set (see [tier]).
   final DateTime? expiresAt;
 
   /// Pop-up content (admin-editable). Null fields mean "not configured".
@@ -13,6 +28,8 @@ class AccessState {
   final String? popupImageUrl;
 
   const AccessState({
+    required this.role,
+    required this.accessStartedAt,
     required this.expiresAt,
     required this.popupEnabled,
     required this.popupStartAt,
@@ -21,8 +38,17 @@ class AccessState {
     required this.popupImageUrl,
   });
 
+  UserTier get tier {
+    if (role != null && _staffRoles.contains(role)) return UserTier.admin;
+    if (accessStartedAt != null &&
+        (expiresAt == null || expiresAt!.isAfter(DateTime.now()))) {
+      return UserTier.retreat;
+    }
+    return UserTier.free;
+  }
+
   /// True while the user may still see and play content.
-  bool get hasAccess => expiresAt == null || expiresAt!.isAfter(DateTime.now());
+  bool get hasAccess => tier != UserTier.free;
 
   /// True once access has lapsed — home hides audio, downloads are purged.
   bool get isExpired => !hasAccess;
@@ -45,6 +71,8 @@ class AccessState {
   }
 
   static const empty = AccessState(
+    role: null,
+    accessStartedAt: null,
     expiresAt: null,
     popupEnabled: false,
     popupStartAt: null,

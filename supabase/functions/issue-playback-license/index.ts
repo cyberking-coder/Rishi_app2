@@ -70,6 +70,16 @@ Deno.serve(async (req) => {
   }
   const userId = userData.user.id;
 
+  // Retreat access window: refuse playback once the user's access has
+  // lapsed, enforced server-side so a device clock change can't bypass it.
+  // Mirrors the check in issue-audio-license.
+  const { data: hasAccess } = await supabase.rpc("has_active_access", {
+    p_user_id: userId,
+  });
+  if (hasAccess === false) {
+    return jsonResponse({ error: "Your access period has ended." }, 403);
+  }
+
   // Device check: caller must be the account's currently active device.
   const { data: device, error: deviceError } = await supabase
     .from("devices")
