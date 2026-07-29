@@ -7,8 +7,10 @@ import '../data/repositories/auth_repository_impl.dart';
 import '../domain/entities/app_user.dart';
 import '../domain/repositories/auth_repository.dart';
 import '../domain/usecases/forgot_password_usecase.dart';
+import '../domain/usecases/google_sign_in_usecase.dart';
 import '../domain/usecases/login_usecase.dart';
 import '../domain/usecases/logout_usecase.dart';
+import '../domain/usecases/signup_usecase.dart';
 import 'auth_controller.dart';
 import 'auth_state.dart';
 
@@ -33,6 +35,14 @@ final logoutUseCaseProvider = Provider<LogoutUseCase>((ref) {
 
 final forgotPasswordUseCaseProvider = Provider<ForgotPasswordUseCase>((ref) {
   return ForgotPasswordUseCase(ref.watch(authRepositoryProvider));
+});
+
+final signUpUseCaseProvider = Provider<SignUpUseCase>((ref) {
+  return SignUpUseCase(ref.watch(authRepositoryProvider));
+});
+
+final googleSignInUseCaseProvider = Provider<GoogleSignInUseCase>((ref) {
+  return GoogleSignInUseCase(ref.watch(authRepositoryProvider));
 });
 
 final authControllerProvider =

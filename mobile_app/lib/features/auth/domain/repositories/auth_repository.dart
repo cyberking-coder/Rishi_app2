@@ -9,6 +9,20 @@ abstract class AuthRepository {
   /// signed out again before the error is thrown).
   Future<AppUser> login({required String email, required String password});
 
+  /// Creates a new account, then registers this device. Returns `null` when
+  /// the project requires email confirmation (no session yet — the caller
+  /// must confirm via the emailed link before logging in); returns the new
+  /// [AppUser] when the session is created immediately.
+  Future<AppUser?> signUp({
+    required String email,
+    required String password,
+    String? displayName,
+  });
+
+  /// Signs in (or, for a first-time caller, silently creates the account)
+  /// via native Google Sign-In, then registers this device.
+  Future<AppUser> signInWithGoogle();
+
   Future<void> logout();
 
   Future<void> sendPasswordResetEmail({required String email});

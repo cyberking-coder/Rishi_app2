@@ -9,6 +9,9 @@ enum AuthFailureType {
   network,
   weakPassword,
   userNotFound,
+  emailAlreadyRegistered,
+  googleSignInCancelled,
+  googleSignInNotConfigured,
   unknown,
 }
 
@@ -36,6 +39,26 @@ class AuthFailure implements Exception {
   factory AuthFailure.network() => const AuthFailure(
         AuthFailureType.network,
         'No internet connection. Please try again.',
+      );
+
+  factory AuthFailure.weakPassword([String? detail]) => AuthFailure(
+        AuthFailureType.weakPassword,
+        detail ?? 'Password should be at least 6 characters.',
+      );
+
+  factory AuthFailure.emailAlreadyRegistered() => const AuthFailure(
+        AuthFailureType.emailAlreadyRegistered,
+        'An account with this email already exists. Try logging in instead.',
+      );
+
+  factory AuthFailure.googleSignInCancelled() => const AuthFailure(
+        AuthFailureType.googleSignInCancelled,
+        'Google sign-in was cancelled.',
+      );
+
+  factory AuthFailure.googleSignInNotConfigured() => const AuthFailure(
+        AuthFailureType.googleSignInNotConfigured,
+        'Google sign-in is not set up yet. Please use email/password.',
       );
 
   factory AuthFailure.unknown([String? detail]) => AuthFailure(

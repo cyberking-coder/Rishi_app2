@@ -29,6 +29,38 @@ class AuthRepositoryImpl implements AuthRepository {
   }
 
   @override
+  Future<AppUser?> signUp({
+    required String email,
+    required String password,
+    String? displayName,
+  }) async {
+    try {
+      final user = await _remote.signUp(
+        email: email,
+        password: password,
+        displayName: displayName,
+      );
+      return user == null ? null : _toAppUser(user);
+    } on AuthFailure {
+      rethrow;
+    } catch (e) {
+      throw AuthFailure.unknown(e.toString());
+    }
+  }
+
+  @override
+  Future<AppUser> signInWithGoogle() async {
+    try {
+      final user = await _remote.signInWithGoogleAndRegisterDevice();
+      return _toAppUser(user);
+    } on AuthFailure {
+      rethrow;
+    } catch (e) {
+      throw AuthFailure.unknown(e.toString());
+    }
+  }
+
+  @override
   Future<void> logout() => _remote.signOut();
 
   @override
@@ -59,6 +91,10 @@ class AuthRepositoryImpl implements AuthRepository {
   AppUser _toAppUser(User user) => AppUser(
         id: user.id,
         email: user.email ?? '',
-        displayName: user.userMetadata?['display_name'] as String?,
+        // Email/password sign up stores 'display_name'; Google sign-in
+        // populates 'full_name'/'name' from the ID token claims instead.
+        displayName: user.userMetadata?['display_name'] as String? ??
+            user.userMetadata?['full_name'] as String? ??
+            user.userMetadata?['name'] as String?,
       );
 }
