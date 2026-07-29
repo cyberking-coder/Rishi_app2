@@ -77,6 +77,7 @@ export default async function VideosPage() {
                         kind="video"
                         contentId={v.id}
                         status={v.status}
+                        isPremium={v.is_premium}
                       />
                     </TableCell>
                   </TableRow>

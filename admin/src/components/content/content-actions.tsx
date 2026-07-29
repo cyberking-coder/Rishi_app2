@@ -23,6 +23,7 @@ import {
 } from "@/components/ui/dialog";
 import {
   deleteContent,
+  setContentPremium,
   updateContentStatus,
   uploadCover,
 } from "@/app/actions/content";
@@ -44,10 +45,12 @@ export function ContentActions({
   kind,
   contentId,
   status,
+  isPremium,
 }: {
   kind: ContentKind;
   contentId: string;
   status: ContentStatus;
+  isPremium: boolean;
 }) {
   const router = useRouter();
   const [confirmOpen, setConfirmOpen] = useState(false);
@@ -78,6 +81,17 @@ export function ContentActions({
     router.refresh();
   }
 
+  async function togglePremium() {
+    const result = await setContentPremium({
+      kind,
+      contentId,
+      isPremium: !isPremium,
+    });
+    if (!result.ok) return toast.error(result.error);
+    toast.success(isPremium ? "Marked free" : "Marked premium");
+    router.refresh();
+  }
+
   async function onDelete() {
     const result = await deleteContent({ kind, contentId });
     if (!result.ok) return toast.error(result.error);
@@ -105,6 +119,9 @@ export function ContentActions({
           <DropdownMenuLabel>Actions</DropdownMenuLabel>
           <DropdownMenuItem onClick={() => coverInputRef.current?.click()}>
             Set cover image
+          </DropdownMenuItem>
+          <DropdownMenuItem onClick={togglePremium}>
+            Mark {isPremium ? "free" : "premium"}
           </DropdownMenuItem>
           <DropdownMenuSeparator />
           {status !== "published" && (

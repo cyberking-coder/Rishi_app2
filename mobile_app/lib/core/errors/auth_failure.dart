@@ -12,6 +12,7 @@ enum AuthFailureType {
   emailAlreadyRegistered,
   googleSignInCancelled,
   googleSignInNotConfigured,
+  premiumRequired,
   unknown,
 }
 
@@ -59,6 +60,11 @@ class AuthFailure implements Exception {
   factory AuthFailure.googleSignInNotConfigured() => const AuthFailure(
         AuthFailureType.googleSignInNotConfigured,
         'Google sign-in is not set up yet. Please use email/password.',
+      );
+
+  factory AuthFailure.premiumRequired() => const AuthFailure(
+        AuthFailureType.premiumRequired,
+        'This is premium content. Contact us to unlock full access.',
       );
 
   factory AuthFailure.unknown([String? detail]) => AuthFailure(
