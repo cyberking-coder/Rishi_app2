@@ -92,7 +92,7 @@
 	     both placeholders below with its Client ID and REVERSED_CLIENT_ID
 	     (shown on the client's details page / its downloaded plist). -->
 	<key>GIDClientID</key>
-	<string>REPLACE_WITH_GOOGLE_IOS_CLIENT_ID.apps.googleusercontent.com</string>
+	<string>395908400723-qlv7qnkm0p6ml5c28opm7p1l0iksiul9.apps.googleusercontent.com</string>
 	<key>CFBundleURLTypes</key>
 	<array>
 		<dict>
@@ -100,7 +100,7 @@
 			<string>Editor</string>
 			<key>CFBundleURLSchemes</key>
 			<array>
-				<string>REPLACE_WITH_REVERSED_GOOGLE_IOS_CLIENT_ID</string>
+				<string>com.googleusercontent.apps.395908400723-qlv7qnkm0p6ml5c28opm7p1l0iksiul9</string>
 			</array>
 		</dict>
 	</array>
