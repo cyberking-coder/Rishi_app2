@@ -8,7 +8,7 @@
 /// See mobile_app/README or the Phase 1 setup notes for the full checklist
 /// (Android SHA-1 registration, iOS URL scheme, Supabase provider config).
 const String googleWebClientId =
-    'REPLACE_WITH_GOOGLE_CLOUD_WEB_CLIENT_ID.apps.googleusercontent.com';
+    '395908400723-a03gbndf3bcecahi97s3rg80p911poas.apps.googleusercontent.com';
 
 bool get isGoogleSignInConfigured =>
     !googleWebClientId.startsWith('REPLACE_WITH_');
