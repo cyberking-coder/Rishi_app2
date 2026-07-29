@@ -23,6 +23,41 @@ class AuthController extends Notifier<AuthState> {
     }
   }
 
+  Future<void> signUp({
+    required String email,
+    required String password,
+    String? displayName,
+  }) async {
+    state = const AuthLoading();
+    try {
+      final user = await ref.read(signUpUseCaseProvider).call(
+            email: email,
+            password: password,
+            displayName: displayName,
+          );
+      // A null user means the project requires email confirmation — no
+      // session yet. Reuse AuthUnauthenticated as the "succeeded, nothing
+      // more to do here" signal, same convention as sendPasswordResetEmail.
+      state = user != null ? AuthAuthenticated(user) : const AuthUnauthenticated();
+    } on AuthFailure catch (failure) {
+      state = AuthFailureState(failure);
+    } catch (e) {
+      state = AuthFailureState(AuthFailure.unknown(e.toString()));
+    }
+  }
+
+  Future<void> signInWithGoogle() async {
+    state = const AuthLoading();
+    try {
+      final user = await ref.read(googleSignInUseCaseProvider).call();
+      state = AuthAuthenticated(user);
+    } on AuthFailure catch (failure) {
+      state = AuthFailureState(failure);
+    } catch (e) {
+      state = AuthFailureState(AuthFailure.unknown(e.toString()));
+    }
+  }
+
   Future<void> logout() async {
     state = const AuthLoading();
     try {

@@ -6,6 +6,8 @@ import '../../../../core/errors/auth_failure.dart';
 import '../../application/auth_providers.dart';
 import '../../application/auth_state.dart';
 import '../widgets/auth_text_field.dart';
+import '../widgets/auth_validators.dart';
+import '../widgets/google_sign_in_button.dart';
 
 class LoginScreen extends ConsumerStatefulWidget {
   const LoginScreen({super.key});
@@ -32,29 +34,6 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
           email: _emailController.text.trim(),
           password: _passwordController.text,
         );
-  }
-
-  void _showHowToJoin() {
-    showDialog<void>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('How to get access'),
-        content: const Text(
-          'Know Thyself is a membership app for Anurag Rishi\'s meditation '
-          'program. Access is provided to enrolled members.\n\n'
-          'To join, please contact us and our team will create your account '
-          'and share your login details:\n\n'
-          'Email: ar.happinessmovement@gmail.com\n\n'
-          'Once you receive your credentials, sign in on this screen.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('Got it'),
-          ),
-        ],
-      ),
-    );
   }
 
   @override
@@ -98,25 +77,14 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                     controller: _emailController,
                     label: 'Email',
                     keyboardType: TextInputType.emailAddress,
-                    validator: (value) {
-                      if (value == null || value.trim().isEmpty) {
-                        return 'Email is required';
-                      }
-                      if (!value.contains('@')) return 'Enter a valid email';
-                      return null;
-                    },
+                    validator: validateEmail,
                   ),
                   const SizedBox(height: 16),
                   AuthTextField(
                     controller: _passwordController,
                     label: 'Password',
                     obscureText: true,
-                    validator: (value) {
-                      if (value == null || value.isEmpty) {
-                        return 'Password is required';
-                      }
-                      return null;
-                    },
+                    validator: validatePasswordRequired,
                   ),
                   Align(
                     alignment: Alignment.centerRight,
@@ -138,10 +106,24 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                           )
                         : const Text('Log in'),
                   ),
+                  const SizedBox(height: 16),
+                  const Row(
+                    children: [
+                      Expanded(child: Divider()),
+                      Padding(
+                        padding: EdgeInsets.symmetric(horizontal: 12),
+                        child: Text('or'),
+                      ),
+                      Expanded(child: Divider()),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                  GoogleSignInButton(enabled: !isLoading),
                   const SizedBox(height: 12),
                   TextButton(
-                    onPressed: isLoading ? null : _showHowToJoin,
-                    child: const Text('New here? How to get access'),
+                    onPressed:
+                        isLoading ? null : () => context.push('/signup'),
+                    child: const Text('New here? Create a free account'),
                   ),
                 ],
               ),

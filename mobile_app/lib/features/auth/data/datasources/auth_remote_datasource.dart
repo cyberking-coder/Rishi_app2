@@ -1,5 +1,7 @@
+import 'package:google_sign_in/google_sign_in.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../../../../core/config/google_auth_config.dart';
 import '../../../../core/device/device_info_service.dart';
 import '../../../../core/errors/auth_failure.dart';
 
@@ -50,6 +52,99 @@ class AuthRemoteDataSource {
     return user;
   }
 
+  /// Creates a new account, then registers this device. Returns `null` if
+  /// the project requires email confirmation (no session issued yet).
+  Future<User?> signUp({
+    required String email,
+    required String password,
+    String? displayName,
+  }) async {
+    final AuthResponse response;
+    try {
+      response = await _client.auth.signUp(
+        email: email,
+        password: password,
+        data: displayName == null || displayName.isEmpty
+            ? null
+            : {'display_name': displayName},
+      );
+    } on AuthException catch (e) {
+      throw _mapSignUpException(e);
+    }
+
+    if (response.session == null) {
+      // Email confirmation required — no session until the user verifies.
+      return null;
+    }
+
+    final user = response.user;
+    if (user == null) {
+      throw AuthFailure.unknown('Sign up failed. Please try again.');
+    }
+
+    try {
+      await _registerDevice();
+    } on DeviceLockedException {
+      await _client.auth.signOut();
+      throw AuthFailure.deviceLocked();
+    }
+
+    return user;
+  }
+
+  /// Signs in with Google via the native account picker, then exchanges the
+  /// ID token with Supabase and registers this device. Works identically
+  /// for a brand-new Google user (the `handle_new_user` trigger provisions
+  /// their profile the same way it does for email/password sign up) and a
+  /// returning one.
+  Future<User> signInWithGoogleAndRegisterDevice() async {
+    if (!isGoogleSignInConfigured) {
+      throw AuthFailure.googleSignInNotConfigured();
+    }
+
+    final googleSignIn = GoogleSignIn(serverClientId: googleWebClientId);
+    final GoogleSignInAccount? googleUser;
+    try {
+      googleUser = await googleSignIn.signIn();
+    } catch (e) {
+      throw AuthFailure.unknown('Google sign-in failed: $e');
+    }
+    if (googleUser == null) {
+      throw AuthFailure.googleSignInCancelled();
+    }
+
+    final googleAuth = await googleUser.authentication;
+    final idToken = googleAuth.idToken;
+    if (idToken == null) {
+      throw AuthFailure.unknown('Google sign-in failed: missing ID token.');
+    }
+
+    final AuthResponse response;
+    try {
+      response = await _client.auth.signInWithIdToken(
+        provider: OAuthProvider.google,
+        idToken: idToken,
+        accessToken: googleAuth.accessToken,
+      );
+    } on AuthException catch (e) {
+      throw _mapAuthException(e);
+    }
+
+    final user = response.user;
+    if (user == null) {
+      throw AuthFailure.unknown('Google sign-in failed. Please try again.');
+    }
+
+    try {
+      await _registerDevice();
+    } on DeviceLockedException {
+      await _client.auth.signOut();
+      throw AuthFailure.deviceLocked();
+    }
+
+    return user;
+  }
+
   Future<void> _registerDevice() async {
     final profile = await _deviceInfoService.getDeviceProfile();
     try {
@@ -87,6 +182,19 @@ class AuthRemoteDataSource {
         AuthFailureType.emailNotConfirmed,
         'Please verify your email before logging in.',
       );
+    }
+    return AuthFailure.unknown(e.message);
+  }
+
+  AuthFailure _mapSignUpException(AuthException e) {
+    final message = e.message.toLowerCase();
+    if (message.contains('already registered') ||
+        message.contains('already exists') ||
+        message.contains('user already')) {
+      return AuthFailure.emailAlreadyRegistered();
+    }
+    if (message.contains('password')) {
+      return AuthFailure.weakPassword(e.message);
     }
     return AuthFailure.unknown(e.message);
   }
