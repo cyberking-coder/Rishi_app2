@@ -31,9 +31,33 @@ class HomeScreen extends ConsumerStatefulWidget {
   ConsumerState<HomeScreen> createState() => _HomeScreenState();
 }
 
-class _HomeScreenState extends ConsumerState<HomeScreen> {
+class _HomeScreenState extends ConsumerState<HomeScreen>
+    with WidgetsBindingObserver {
   bool _popupShown = false;
   bool _purged = false;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    // Re-check access when the app comes back to the foreground - this is
+    // what makes a purchase feel like it unlocks immediately when the user
+    // returns from the external checkout browser, without needing to
+    // force-quit or manually re-navigate.
+    if (state == AppLifecycleState.resumed) {
+      ref.invalidate(accessStateProvider);
+    }
+  }
 
   void _onAccess(AccessState access) {
     if (access.isExpired && !_purged) {
@@ -55,7 +79,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     if (_starting) return; // guard against a double-tap opening twice
     final access = ref.read(accessStateProvider).valueOrNull;
     if (audio.isPremium && access?.hasAccess != true) {
-      showPremiumLockedMessage(context);
+      showPremiumLockedMessage(context, ref);
       return;
     }
     _starting = true;

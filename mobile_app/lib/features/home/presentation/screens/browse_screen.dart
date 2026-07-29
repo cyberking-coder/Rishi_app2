@@ -41,7 +41,7 @@ class _BrowseScreenState extends ConsumerState<BrowseScreen> {
     if (_starting) return; // guard against a double-tap opening twice
     final access = ref.read(accessStateProvider).valueOrNull;
     if (a.isPremium && access?.hasAccess != true) {
-      showPremiumLockedMessage(context);
+      showPremiumLockedMessage(context, ref);
       return;
     }
     _starting = true;
