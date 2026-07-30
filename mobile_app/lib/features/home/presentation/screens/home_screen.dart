@@ -13,6 +13,8 @@ import '../../application/home_providers.dart';
 import '../../domain/entities/audio_summary.dart';
 import '../../domain/entities/category_summary.dart';
 import '../../domain/entities/continue_listening_item.dart';
+import '../../../lms/application/lms_providers.dart';
+import '../../../lms/domain/entities/course_summary.dart';
 import '../widgets/premium_lock.dart';
 
 // ── Design tokens ─────────────────────────────────────────────────────────────
@@ -161,6 +163,18 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
             const SizedBox(height: 12),
             _CategoriesRow(
               onTap: (c) => context.push('/category/${c.id}', extra: c.name),
+            ),
+            const SizedBox(height: 22),
+
+            // ── Courses ──
+            _SectionTitle(
+              title: 'Courses',
+              action: 'See All',
+              onAction: () => context.push('/courses'),
+            ),
+            const SizedBox(height: 12),
+            _CoursesRow(
+              onTap: (c) => context.push('/course/${c.id}', extra: c.title),
             ),
             const SizedBox(height: 22),
 
@@ -777,6 +791,110 @@ class _ContinueBar extends ConsumerWidget {
                     color: Colors.white, size: 22),
               ),
             ]),
+          ),
+        );
+      },
+    );
+  }
+}
+
+// ── Courses row ───────────────────────────────────────────────────────────────
+class _CoursesRow extends ConsumerWidget {
+  final void Function(CourseSummary) onTap;
+  const _CoursesRow({required this.onTap});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final async = ref.watch(coursesProvider);
+    final access = ref.watch(accessStateProvider).valueOrNull;
+
+    return async.when(
+      // The row is supplementary to the audio-first home screen, so it
+      // stays out of the way entirely while loading or on error rather
+      // than showing a spinner mid-page.
+      loading: () => const SizedBox.shrink(),
+      error: (_, __) => const SizedBox.shrink(),
+      data: (courses) {
+        if (courses.isEmpty) return const SizedBox.shrink();
+        return SizedBox(
+          height: 150,
+          child: ListView.builder(
+            scrollDirection: Axis.horizontal,
+            padding: const EdgeInsets.symmetric(horizontal: 20),
+            itemCount: courses.length,
+            itemBuilder: (context, i) {
+              final course = courses[i];
+              final locked = course.isPremium && access?.hasAccess != true;
+              return GestureDetector(
+                onTap: () => onTap(course),
+                child: Container(
+                  width: 150,
+                  margin: const EdgeInsets.only(right: 12),
+                  decoration: BoxDecoration(
+                    color: _kSurface,
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(
+                        color: Colors.white.withValues(alpha: 0.08)),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      SizedBox(
+                        height: 78,
+                        width: double.infinity,
+                        child: Stack(fit: StackFit.expand, children: [
+                          ClipRRect(
+                            borderRadius: const BorderRadius.vertical(
+                                top: Radius.circular(16)),
+                            child: course.coverImageUrl != null
+                                ? Image.network(course.coverImageUrl!,
+                                    fit: BoxFit.cover)
+                                : Container(
+                                    decoration: const BoxDecoration(
+                                      gradient: LinearGradient(
+                                        begin: Alignment.topLeft,
+                                        end: Alignment.bottomRight,
+                                        colors: [
+                                          Color(0xFF6D28D9),
+                                          Color(0xFF4C1D95)
+                                        ],
+                                      ),
+                                    ),
+                                    child: const Icon(Icons.school_outlined,
+                                        color: Colors.white54, size: 28),
+                                  ),
+                          ),
+                          if (locked) const PremiumLockBadge(),
+                        ]),
+                      ),
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(10, 8, 10, 0),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(course.title,
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w700,
+                                    color: _kTextPri,
+                                    height: 1.3)),
+                            const SizedBox(height: 3),
+                            Text(
+                              '${course.lessonCount} '
+                              '${course.lessonCount == 1 ? "lesson" : "lessons"}',
+                              style: const TextStyle(
+                                  fontSize: 10, color: _kTextSec),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            },
           ),
         );
       },

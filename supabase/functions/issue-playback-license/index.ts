@@ -123,20 +123,30 @@ Deno.serve(async (req) => {
     }
   }
 
+  // Prefer HLS renditions (the quality-ladder design), but fall back to a
+  // single-file MP4. The admin upload path produces video_mp4, so without
+  // this fallback every video uploaded through the dashboard 404s here —
+  // the same gap that was already fixed on the audio side.
   const { data: assets, error: assetsError } = await supabase
     .from("content_assets")
-    .select("resolution, bitrate, r2_path")
+    .select("resolution, bitrate, r2_path, asset_type")
     .eq("content_id", videoId)
-    .eq("asset_type", "video_hls")
+    .in("asset_type", ["video_hls", "video_mp4"])
     .eq("status", "ready")
-    .returns<AssetRow[]>();
+    .returns<Array<AssetRow & { asset_type: string }>>();
 
   if (assetsError || !assets || assets.length === 0) {
     return jsonResponse({ error: "No playable renditions for this video" }, 404);
   }
 
+  // Never mix the two: an HLS manifest and a progressive MP4 aren't
+  // interchangeable qualities of one stream, so return whichever family
+  // is present rather than a mixed ladder the player can't reason about.
+  const hls = assets.filter((a) => a.asset_type === "video_hls");
+  const playable = hls.length > 0 ? hls : assets;
+
   const qualities = await Promise.all(
-    assets.map(async (asset) => ({
+    playable.map(async (asset) => ({
       label: asset.resolution ?? "auto",
       bitrate: asset.bitrate,
       url: await presignGet(asset.r2_path, SIGNED_URL_TTL_SECONDS),
