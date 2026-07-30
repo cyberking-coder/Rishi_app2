@@ -40,10 +40,21 @@ interface RazorpayPaymentEntity {
 }
 
 Deno.serve(async (req) => {
+  // Deliberately verbose logging throughout: this function is called by
+  // Razorpay's servers, not by us, so a silent failure here is invisible
+  // (the payment still succeeds on Razorpay's side either way). Every
+  // early-exit path logs why, so the Supabase function logs alone are
+  // enough to diagnose a non-unlocking payment.
+  console.log("[razorpay-webhook] invoked", {
+    method: req.method,
+    hasSignature: !!req.headers.get("X-Razorpay-Signature"),
+  });
+
   const preflight = handlePreflight(req);
   if (preflight) return preflight;
 
   if (req.method !== "POST") {
+    console.log("[razorpay-webhook] rejected: not POST");
     return jsonResponse({ error: "Method not allowed" }, 405);
   }
 
@@ -51,8 +62,16 @@ Deno.serve(async (req) => {
   // any JSON parsing.
   const rawBody = await req.text();
   const signature = req.headers.get("X-Razorpay-Signature");
+  const secretConfigured = !!Deno.env.get("RAZORPAY_WEBHOOK_SECRET");
   const validSignature = await verifyRazorpayWebhookSignature(rawBody, signature);
   if (!validSignature) {
+    // Most common causes: RAZORPAY_WEBHOOK_SECRET unset/empty, or set to a
+    // different value than the one entered in Razorpay's webhook config.
+    console.error("[razorpay-webhook] signature verification FAILED", {
+      secretConfigured,
+      signaturePresent: !!signature,
+      bodyLength: rawBody.length,
+    });
     return jsonResponse({ error: "Invalid signature" }, 400);
   }
 
@@ -60,18 +79,23 @@ Deno.serve(async (req) => {
   try {
     event = JSON.parse(rawBody);
   } catch {
+    console.error("[razorpay-webhook] body was not valid JSON");
     return jsonResponse({ error: "Invalid JSON body" }, 400);
   }
 
   const eventType = event.event;
+  console.log("[razorpay-webhook] event received:", eventType);
+
   if (eventType !== "payment.captured" && eventType !== "payment.failed") {
     // Acknowledge everything else with 200 so Razorpay doesn't retry
     // events we deliberately ignore.
+    console.log("[razorpay-webhook] ignoring unhandled event type");
     return jsonResponse({ ok: true, ignored: eventType ?? "unknown" });
   }
 
   const payment = event.payload?.payment?.entity;
   if (!payment?.id) {
+    console.error("[razorpay-webhook] payload had no payment entity");
     return jsonResponse({ error: "Malformed payload" }, 400);
   }
 
@@ -91,8 +115,10 @@ Deno.serve(async (req) => {
     // Unique violation == already processed. Any other error is a real
     // failure — return non-200 so Razorpay retries.
     if (dedupeError.code === "23505") {
+      console.log("[razorpay-webhook] already processed, skipping:", eventKey);
       return jsonResponse({ ok: true, alreadyProcessed: true });
     }
+    console.error("[razorpay-webhook] dedupe insert failed:", dedupeError.message);
     return jsonResponse({ error: dedupeError.message }, 500);
   }
 
@@ -103,18 +129,29 @@ Deno.serve(async (req) => {
   let notes: Record<string, string>;
   try {
     notes = await fetchRazorpayOrderNotes(payment.order_id);
-  } catch {
+    console.log("[razorpay-webhook] fetched order notes", {
+      orderId: payment.order_id,
+      keys: Object.keys(notes),
+    });
+  } catch (e) {
+    console.error("[razorpay-webhook] order fetch failed, falling back to payment.notes:", e);
     notes = payment.notes ?? {};
   }
   if (!notes.user_id || !notes.plan_id) {
+    console.log("[razorpay-webhook] order notes incomplete, trying payment.notes");
     notes = payment.notes ?? {};
   }
 
   const userId = notes.user_id;
   const planId = notes.plan_id;
   if (!userId || !planId) {
+    console.error("[razorpay-webhook] no user_id/plan_id anywhere", {
+      orderNoteKeys: Object.keys(notes),
+      paymentNoteKeys: Object.keys(payment.notes ?? {}),
+    });
     return jsonResponse({ error: "Payment missing user_id/plan_id notes" }, 400);
   }
+  console.log("[razorpay-webhook] resolved", { userId, planId });
 
   const { data: plan, error: planError } = await supabase
     .from("subscription_plans")
@@ -191,8 +228,13 @@ Deno.serve(async (req) => {
     .eq("id", userId);
 
   if (profileError) {
+    console.error("[razorpay-webhook] GRANT FAILED:", profileError.message);
     return jsonResponse({ error: profileError.message }, 500);
   }
+  console.log("[razorpay-webhook] access granted", {
+    userId,
+    accessExpiresAt: periodEnd.toISOString(),
+  });
 
   const { data: existingSub } = await supabase
     .from("subscriptions")
