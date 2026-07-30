@@ -3,8 +3,8 @@ import "./globals.css";
 import { Toaster } from "@/components/ui/sonner";
 
 export const metadata: Metadata = {
-  title: "OTT Admin",
-  description: "Administration dashboard for the OTT platform",
+  title: "Know Thyself Admin",
+  description: "Administration dashboard for Know Thyself",
 };
 
 export default function RootLayout({
@@ -13,7 +13,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en" className="dark">
+    <html lang="en">
       <body className="antialiased">
         {children}
         <Toaster />

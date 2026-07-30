@@ -3,27 +3,32 @@
 @tailwind utilities;
 
 @layer base {
+  /* Warm, light "editorial" palette: a soft cream canvas with white
+     cards floating on it, rather than the usual grey-on-grey. The canvas
+     being tinted is what makes plain white cards read as elevated
+     without heavy shadows. */
   :root {
-    --background: 0 0% 100%;
-    --foreground: 240 10% 3.9%;
+    --background: 36 33% 94%;
+    --foreground: 24 10% 12%;
     --card: 0 0% 100%;
-    --card-foreground: 240 10% 3.9%;
+    --card-foreground: 24 10% 12%;
     --popover: 0 0% 100%;
-    --popover-foreground: 240 10% 3.9%;
-    --primary: 346 77% 49%;
-    --primary-foreground: 0 0% 98%;
-    --secondary: 240 4.8% 95.9%;
-    --secondary-foreground: 240 5.9% 10%;
-    --muted: 240 4.8% 95.9%;
-    --muted-foreground: 240 3.8% 46.1%;
-    --accent: 240 4.8% 95.9%;
-    --accent-foreground: 240 5.9% 10%;
-    --destructive: 0 84.2% 60.2%;
+    --popover-foreground: 24 10% 12%;
+    --primary: 24 12% 16%;
+    --primary-foreground: 36 33% 97%;
+    --secondary: 36 25% 90%;
+    --secondary-foreground: 24 10% 20%;
+    --muted: 36 20% 92%;
+    --muted-foreground: 24 6% 45%;
+    --accent: 36 30% 90%;
+    --accent-foreground: 24 10% 16%;
+    --destructive: 0 72% 48%;
     --destructive-foreground: 0 0% 98%;
-    --border: 240 5.9% 90%;
-    --input: 240 5.9% 90%;
-    --ring: 346 77% 49%;
-    --radius: 0.6rem;
+    --border: 30 15% 88%;
+    --input: 30 15% 85%;
+    --ring: 30 25% 60%;
+    /* Generous corners are the defining trait of the reference layout. */
+    --radius: 1.25rem;
   }
 
   .dark {

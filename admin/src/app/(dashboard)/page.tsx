@@ -1,16 +1,19 @@
-import { Users, Smartphone, Film, Music, Eye, Headphones } from "lucide-react";
-import { createClient } from "@/lib/supabase/server";
-import { PageHeader } from "@/components/page-header";
-import { StatCard } from "@/components/stat-card";
+import Link from "next/link";
 import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-import { ContentStatusBadge } from "@/components/status-badge";
+  ChevronRight,
+  GraduationCap,
+  Headphones,
+  Music,
+  Smartphone,
+  Users,
+} from "lucide-react";
+import { createClient } from "@/lib/supabase/server";
+import { StatCard } from "@/components/stat-card";
+import { Badge } from "@/components/ui/badge";
+import { Card, CardContent } from "@/components/ui/card";
 import { formatDate, formatNumber } from "@/lib/utils";
-import type { Video } from "@/lib/types";
+import { resolveTier } from "@/lib/access";
+import type { Audio, Profile } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
@@ -19,103 +22,198 @@ async function count(
   eq?: { column: string; value: string | boolean },
 ): Promise<number> {
   const supabase = createClient();
-  const query = supabase
-    .from(table)
-    .select("*", { count: "exact", head: true });
+  const query = supabase.from(table).select("*", { count: "exact", head: true });
   const { count: c } = eq ? await query.eq(eq.column, eq.value) : await query;
   return c ?? 0;
+}
+
+function greeting(): string {
+  const h = new Date().getHours();
+  if (h < 12) return "Good morning";
+  if (h < 17) return "Good afternoon";
+  return "Good evening";
 }
 
 export default async function DashboardPage() {
   const supabase = createClient();
 
-  const [users, activeDevices, videos, audios] = await Promise.all([
+  const [users, activeDevices, audios, courses] = await Promise.all([
     count("profiles"),
     count("devices", { column: "is_active", value: true }),
-    count("videos", { column: "status", value: "published" }),
     count("audios", { column: "status", value: "published" }),
+    count("courses", { column: "status", value: "published" }),
   ]);
 
-  const { data: viewAgg } = await supabase
-    .from("videos")
-    .select("view_count");
-  const totalViews = (viewAgg ?? []).reduce(
-    (sum, row) => sum + ((row as { view_count: number }).view_count ?? 0),
-    0,
-  );
+  const [{ data: playAgg }, { data: topAudios }, { data: recentUsers }] =
+    await Promise.all([
+      supabase.from("audios").select("play_count"),
+      supabase
+        .from("audios")
+        .select("id, title, artist, cover_art_url, play_count, is_premium")
+        .eq("status", "published")
+        .order("play_count", { ascending: false })
+        .limit(5)
+        .returns<
+          Pick<
+            Audio,
+            | "id"
+            | "title"
+            | "artist"
+            | "cover_art_url"
+            | "play_count"
+            | "is_premium"
+          >[]
+        >(),
+      supabase
+        .from("profiles")
+        .select("*")
+        .order("created_at", { ascending: false })
+        .limit(5)
+        .returns<Profile[]>(),
+    ]);
 
-  const { data: playAgg } = await supabase.from("audios").select("play_count");
   const totalPlays = (playAgg ?? []).reduce(
     (sum, row) => sum + ((row as { play_count: number }).play_count ?? 0),
     0,
   );
 
-  const { data: recent } = await supabase
-    .from("videos")
-    .select("id, title, status, view_count, created_at")
-    .order("created_at", { ascending: false })
-    .limit(5)
-    .returns<Pick<Video, "id" | "title" | "status" | "view_count" | "created_at">[]>();
-
   return (
-    <div>
-      <PageHeader
-        title="Dashboard"
-        description="Platform overview and recent activity."
-      />
-
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        <StatCard title="Total Users" value={formatNumber(users)} icon={Users} />
-        <StatCard
-          title="Active Devices"
-          value={formatNumber(activeDevices)}
-          icon={Smartphone}
-          hint="One active device per account"
-        />
-        <StatCard
-          title="Published Videos"
-          value={formatNumber(videos)}
-          icon={Film}
-        />
-        <StatCard
-          title="Published Audios"
-          value={formatNumber(audios)}
-          icon={Music}
-        />
-        <StatCard
-          title="Total Video Views"
-          value={formatNumber(totalViews)}
-          icon={Eye}
-        />
-        <StatCard
-          title="Total Audio Plays"
-          value={formatNumber(totalPlays)}
-          icon={Headphones}
-        />
+    <div className="space-y-5">
+      <div>
+        <h1 className="text-3xl font-semibold tracking-tight">{greeting()}</h1>
+        <p className="mt-1 text-sm text-muted-foreground">
+          Here&apos;s how Know Thyself is doing today.
+        </p>
       </div>
 
-      <Card className="mt-6">
-        <CardHeader>
-          <CardTitle>Recently added videos</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-3">
-          {(recent ?? []).length === 0 ? (
-            <p className="text-sm text-muted-foreground">No videos yet.</p>
-          ) : (
-            (recent ?? []).map((v) => (
-              <div
-                key={v.id}
-                className="flex items-center justify-between border-b pb-3 last:border-0 last:pb-0"
+      <div className="grid gap-4 lg:grid-cols-3">
+        {/* Left: the numbers */}
+        <div className="grid gap-4 sm:grid-cols-2 lg:col-span-2">
+          <StatCard
+            title="Total members"
+            value={formatNumber(users)}
+            icon={Users}
+          />
+          <StatCard
+            title="Active devices"
+            value={formatNumber(activeDevices)}
+            icon={Smartphone}
+            hint="One per account"
+          />
+          <StatCard
+            title="Published audio"
+            value={formatNumber(audios)}
+            icon={Music}
+          />
+          <StatCard
+            title="Published courses"
+            value={formatNumber(courses)}
+            icon={GraduationCap}
+          />
+          <StatCard
+            title="Total plays"
+            value={formatNumber(totalPlays)}
+            icon={Headphones}
+            className="sm:col-span-2"
+          />
+        </div>
+
+        {/* Right: newest members */}
+        <Card>
+          <CardContent className="p-5">
+            <div className="mb-4 flex items-center justify-between">
+              <h2 className="font-medium">Newest members</h2>
+              <Link
+                href="/users"
+                className="flex items-center gap-0.5 text-xs text-muted-foreground hover:text-foreground"
               >
-                <div>
-                  <p className="font-medium">{v.title}</p>
-                  <p className="text-xs text-muted-foreground">
-                    {formatDate(v.created_at)} · {formatNumber(v.view_count)} views
+                All <ChevronRight className="h-3 w-3" />
+              </Link>
+            </div>
+
+            {(recentUsers ?? []).length === 0 ? (
+              <p className="text-sm text-muted-foreground">No members yet.</p>
+            ) : (
+              <div className="space-y-3">
+                {(recentUsers ?? []).map((u) => {
+                  const tier = resolveTier(u);
+                  return (
+                    <div key={u.id} className="flex items-center gap-3">
+                      <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-accent text-xs font-medium">
+                        {(u.display_name ?? "?").slice(0, 1).toUpperCase()}
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-sm">
+                          {u.display_name ?? "Unnamed"}
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          {formatDate(u.created_at)}
+                        </p>
+                      </div>
+                      <Badge
+                        variant={tier === "free" ? "outline" : "default"}
+                        className="shrink-0"
+                      >
+                        {tier === "admin"
+                          ? "Staff"
+                          : tier === "retreat"
+                            ? "Premium"
+                            : "Free"}
+                      </Badge>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Most played */}
+      <Card>
+        <CardContent className="p-5">
+          <div className="mb-4 flex items-center justify-between">
+            <h2 className="font-medium">Most played</h2>
+            <Link
+              href="/audios"
+              className="flex items-center gap-0.5 text-xs text-muted-foreground hover:text-foreground"
+            >
+              All audio <ChevronRight className="h-3 w-3" />
+            </Link>
+          </div>
+
+          {(topAudios ?? []).length === 0 ? (
+            <p className="text-sm text-muted-foreground">
+              Nothing published yet.
+            </p>
+          ) : (
+            <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5">
+              {(topAudios ?? []).map((a) => (
+                <div key={a.id}>
+                  <div className="mb-2 aspect-square overflow-hidden rounded-2xl bg-accent">
+                    {a.cover_art_url ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={a.cover_art_url}
+                        alt=""
+                        className="h-full w-full object-cover"
+                      />
+                    ) : (
+                      <div className="flex h-full items-center justify-center">
+                        <Music className="h-6 w-6 text-muted-foreground" />
+                      </div>
+                    )}
+                  </div>
+                  <p className="truncate text-sm font-medium">{a.title}</p>
+                  <p className="truncate text-xs text-muted-foreground">
+                    {a.artist ?? "—"}
+                  </p>
+                  <p className="mt-0.5 text-xs text-muted-foreground">
+                    {formatNumber(a.play_count)} plays
                   </p>
                 </div>
-                <ContentStatusBadge status={v.status} />
-              </div>
-            ))
+              ))}
+            </div>
           )}
         </CardContent>
       </Card>
