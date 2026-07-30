@@ -21,9 +21,11 @@ import { createLesson } from "@/app/actions/courses";
 import {
   attachUpload,
   createContent,
+  presignBunnyVideoUpload,
   presignContentUpload,
   updateContentStatus,
 } from "@/app/actions/content";
+import { uploadVideoToBunny } from "@/lib/bunny-upload-client";
 import type { Audio, LessonType, Video } from "@/lib/types";
 
 type MediaMode = "existing" | "upload";
@@ -87,14 +89,14 @@ export function AddLessonDialog({
     setProgress(null);
   }
 
-  /** Uploads mediaFile as a new draft audio/video, publishes it, and
-   *  returns its id so it can be attached to the lesson being created. */
-  async function uploadNewMedia(kind: "audio" | "video"): Promise<string> {
+  /** Uploads mediaFile as a new draft audio track (via R2), publishes it,
+   *  and returns its id so it can be attached to the lesson being created. */
+  async function uploadNewAudio(): Promise<string> {
     if (!mediaFile) throw new Error("Choose a file to upload");
 
     setProgress("Creating record…");
     const created = await createContent({
-      kind,
+      kind: "audio",
       title: title.trim(),
       isPremium: coursePremium,
     });
@@ -102,7 +104,7 @@ export function AddLessonDialog({
 
     setProgress("Preparing upload…");
     const presigned = await presignContentUpload({
-      kind,
+      kind: "audio",
       contentId: created.id,
       fileName: mediaFile.name,
       contentType: mediaFile.type || "application/octet-stream",
@@ -113,7 +115,7 @@ export function AddLessonDialog({
 
     setProgress("Finalizing…");
     const attached = await attachUpload({
-      kind,
+      kind: "audio",
       contentId: created.id,
       objectKey: presigned.objectKey,
     });
@@ -121,8 +123,41 @@ export function AddLessonDialog({
 
     // Lessons can only attach published media (the license functions
     // require it) — publish right away rather than leaving admins to
-    // find this content in the Audios/Videos tab and flip it manually.
-    await updateContentStatus({ kind, contentId: created.id, status: "published" });
+    // find this content in the Audios tab and flip it manually.
+    await updateContentStatus({ kind: "audio", contentId: created.id, status: "published" });
+
+    return created.id;
+  }
+
+  /** Uploads mediaFile as a new draft video straight to Bunny Stream
+   *  (no R2 involved at all), publishes it, and returns its id. */
+  async function uploadNewVideo(): Promise<string> {
+    if (!mediaFile) throw new Error("Choose a file to upload");
+
+    setProgress("Creating record…");
+    const created = await createContent({
+      kind: "video",
+      title: title.trim(),
+      isPremium: coursePremium,
+    });
+    if (!created.ok) throw new Error(created.error);
+
+    setProgress("Starting Bunny upload…");
+    const creds = await presignBunnyVideoUpload({
+      contentId: created.id,
+      title: title.trim(),
+    });
+    if (!creds.ok) throw new Error(creds.error);
+
+    await uploadVideoToBunny(mediaFile, title.trim(), creds, (pct) =>
+      setProgress(`Uploading to Bunny… ${pct}%`),
+    );
+
+    setProgress("Finalizing…");
+    // Lessons can only attach published media (the license functions
+    // require it) — publish right away. Bunny still needs to encode the
+    // file, tracked separately via bunny_status.
+    await updateContentStatus({ kind: "video", contentId: created.id, status: "published" });
 
     return created.id;
   }
@@ -141,10 +176,10 @@ export function AddLessonDialog({
       let finalVideoId = lessonType === "video" ? videoId : undefined;
 
       if (lessonType === "audio" && audioMode === "upload") {
-        finalAudioId = await uploadNewMedia("audio");
+        finalAudioId = await uploadNewAudio();
       }
       if (lessonType === "video" && videoMode === "upload") {
-        finalVideoId = await uploadNewMedia("video");
+        finalVideoId = await uploadNewVideo();
       }
 
       setProgress("Adding lesson…");
@@ -339,9 +374,9 @@ export function AddLessonDialog({
                     onChange={(e) => setMediaFile(e.target.files?.[0] ?? null)}
                   />
                   <p className="text-xs text-muted-foreground">
-                    Uploaded from your device, then sent to Bunny Stream for
-                    encoding — it&apos;ll show as &quot;Encoding&quot; in the
-                    Videos tab until it&apos;s ready to play.
+                    Uploads straight to Bunny Stream from your browser, then
+                    Bunny encodes it — it&apos;ll show as &quot;Encoding&quot;
+                    in the Videos tab until it&apos;s ready to play.
                   </p>
                 </>
               )}

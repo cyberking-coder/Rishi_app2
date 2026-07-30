@@ -7,9 +7,12 @@ import { Upload } from "lucide-react";
 import {
   attachUpload,
   createContent,
+  presignBunnyVideoUpload,
   presignContentUpload,
+  updateContentStatus,
   uploadCover,
 } from "@/app/actions/content";
+import { uploadVideoToBunny } from "@/lib/bunny-upload-client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -99,25 +102,43 @@ export function UploadContentDialog({ kind }: { kind: ContentKind }) {
       });
       if (!created.ok) throw new Error(created.error);
 
-      setProgress("Preparing upload…");
-      const presigned = await presignContentUpload({
-        kind,
-        contentId: created.id,
-        fileName: file.name,
-        contentType: file.type || "application/octet-stream",
-      });
-      if (!presigned.ok) throw new Error(presigned.error);
+      if (kind === "video") {
+        // Video uploads go straight from this browser to Bunny Stream —
+        // no R2 staging, no server-to-server pull. Bunny then owns
+        // encoding; bunny_status tracks progress on this page.
+        setProgress("Starting Bunny upload…");
+        const creds = await presignBunnyVideoUpload({
+          contentId: created.id,
+          title: title.trim(),
+        });
+        if (!creds.ok) throw new Error(creds.error);
 
-      setProgress("Uploading to storage…");
-      await uploadToR2(presigned.uploadUrl, file);
+        await uploadVideoToBunny(file, title.trim(), creds, (pct) =>
+          setProgress(`Uploading to Bunny… ${pct}%`),
+        );
 
-      setProgress("Finalizing…");
-      const attached = await attachUpload({
-        kind,
-        contentId: created.id,
-        objectKey: presigned.objectKey,
-      });
-      if (!attached.ok) throw new Error(attached.error);
+        await updateContentStatus({ kind, contentId: created.id, status: "processing" });
+      } else {
+        setProgress("Preparing upload…");
+        const presigned = await presignContentUpload({
+          kind,
+          contentId: created.id,
+          fileName: file.name,
+          contentType: file.type || "application/octet-stream",
+        });
+        if (!presigned.ok) throw new Error(presigned.error);
+
+        setProgress("Uploading to storage…");
+        await uploadToR2(presigned.uploadUrl, file);
+
+        setProgress("Finalizing…");
+        const attached = await attachUpload({
+          kind,
+          contentId: created.id,
+          objectKey: presigned.objectKey,
+        });
+        if (!attached.ok) throw new Error(attached.error);
+      }
 
       if (cover) {
         setProgress("Uploading cover…");
@@ -164,8 +185,9 @@ export function UploadContentDialog({ kind }: { kind: ContentKind }) {
         <DialogHeader>
           <DialogTitle>Upload {kind}</DialogTitle>
           <DialogDescription>
-            Creates a draft, uploads the file directly to R2, then marks it
-            processing.
+            {kind === "video"
+              ? "Creates a draft and uploads the file directly to Bunny Stream for encoding."
+              : "Creates a draft, uploads the file directly to R2, then marks it processing."}
           </DialogDescription>
         </DialogHeader>
         <form onSubmit={onSubmit} className="space-y-4">

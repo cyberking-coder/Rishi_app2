@@ -3,8 +3,8 @@
 import { revalidatePath } from "next/cache";
 import { requireAdmin } from "@/lib/auth";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { buildObjectKey, deleteObject, presignGet, presignUpload } from "@/lib/r2";
-import { createBunnyVideo, fetchBunnyVideo, getBunnyStatus } from "@/lib/bunny";
+import { buildObjectKey, deleteObject, presignUpload } from "@/lib/r2";
+import { createBunnyTusUpload, getBunnyStatus } from "@/lib/bunny";
 import { slugify } from "@/lib/utils";
 import type { ContentKind, ContentStatus } from "@/lib/types";
 import type { ActionResult } from "./users";
@@ -62,6 +62,33 @@ export async function createContent(
   return { ok: true, id: data.id };
 }
 
+/** Signs a direct browser-to-Bunny TUS upload for a video row, skipping
+ *  R2 entirely — no staging copy, no server-to-server pull. */
+export async function presignBunnyVideoUpload(args: {
+  contentId: string;
+  title: string;
+}): Promise<
+  | { ok: true; videoId: string; libraryId: string; signature: string; expire: number }
+  | { ok: false; error: string }
+> {
+  await requireAdmin();
+  try {
+    const upload = await createBunnyTusUpload(args.title);
+    const db = createAdminClient();
+    const { error } = await db
+      .from("videos")
+      .update({ bunny_video_id: upload.videoId, bunny_status: "processing" })
+      .eq("id", args.contentId);
+    if (error) return { ok: false, error: error.message };
+    return { ok: true, ...upload };
+  } catch (e) {
+    return {
+      ok: false,
+      error: e instanceof Error ? e.message : "Could not start Bunny upload",
+    };
+  }
+}
+
 /** Presigns a direct-to-R2 PUT URL for a content file. */
 export async function presignContentUpload(args: {
   kind: ContentKind;
@@ -112,39 +139,10 @@ export async function attachUpload(args: {
   });
   if (assetError) return { ok: false, error: assetError.message };
 
-  // Video also goes to Bunny Stream for transcoding into an adaptive
-  // ladder. Bunny pulls it from a presigned R2 URL rather than us
-  // proxying the bytes. The R2 copy stays as the fallback source, so a
-  // Bunny failure degrades to the original single-file playback rather
-  // than losing the upload.
-  if (args.kind === "video") {
-    try {
-      const { data: video } = await db
-        .from("videos")
-        .select("title")
-        .eq("id", args.contentId)
-        .maybeSingle<{ title: string }>();
-
-      const bunnyId = await createBunnyVideo(video?.title ?? "Untitled");
-      // Long TTL: Bunny has to download the whole file, which for a large
-      // lesson can take well past a normal playback-length signature.
-      const sourceUrl = await presignGet(args.objectKey, 3600);
-      await fetchBunnyVideo(bunnyId, sourceUrl);
-
-      await db
-        .from("videos")
-        .update({ bunny_video_id: bunnyId, bunny_status: "processing" })
-        .eq("id", args.contentId);
-    } catch (e) {
-      // Non-fatal: the upload itself succeeded and R2 playback still
-      // works. Surfacing this as an error would imply the upload failed.
-      console.error("Bunny handoff failed:", e);
-      await db
-        .from("videos")
-        .update({ bunny_status: "failed" })
-        .eq("id", args.contentId);
-    }
-  }
+  // Video no longer routes through here — it uploads straight to Bunny
+  // via presignBunnyVideoUpload (see below), so there's no R2 file for
+  // this function to hand off. This path now only serves audio (and any
+  // legacy R2-only video row from before the direct-upload switch).
 
   revalidatePath(args.kind === "video" ? "/videos" : "/audios");
   return { ok: true };

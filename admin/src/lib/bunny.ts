@@ -1,3 +1,4 @@
+import { createHash } from "crypto";
 import { env } from "./env";
 
 const BUNNY_API = "https://video.bunnycdn.com/library";
@@ -56,6 +57,29 @@ export async function fetchBunnyVideo(
   if (!res.ok) {
     throw new Error(`Bunny fetch failed: ${res.status} ${await res.text()}`);
   }
+}
+
+/**
+ * Creates a Bunny video slot and signs a short-lived TUS upload
+ * credential for it, so the admin's browser can upload the file bytes
+ * straight to Bunny — no R2 staging, no server-side proxying of large
+ * video files. The API key itself never leaves the server; only this
+ * scoped, time-boxed signature does.
+ */
+export async function createBunnyTusUpload(title: string): Promise<{
+  videoId: string;
+  libraryId: string;
+  signature: string;
+  expire: number;
+}> {
+  const { apiKey, libraryId } = env.bunny();
+  const videoId = await createBunnyVideo(title);
+  const expire = Math.floor(Date.now() / 1000) + 3600;
+  const signature = createHash("sha256")
+    .update(`${libraryId}${apiKey}${expire}${videoId}`)
+    .digest("hex");
+
+  return { videoId, libraryId, signature, expire };
 }
 
 /** Bunny's numeric encode status, mapped to our own vocabulary.
