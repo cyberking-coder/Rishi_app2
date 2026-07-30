@@ -133,13 +133,10 @@ class AppTheme {
       textButtonTheme: TextButtonThemeData(
         style: TextButton.styleFrom(foregroundColor: sage),
       ),
-      cardTheme: CardTheme(
-        color: surface,
-        elevation: 0,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(radiusCard),
-        ),
-      ),
+      // No cardTheme: nothing in the app uses the Material Card widget
+      // (every card here is a styled Container), and the CardTheme ->
+      // CardThemeData rename across Flutter versions makes declaring one
+      // a portability cost for no benefit.
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
         fillColor: surface,

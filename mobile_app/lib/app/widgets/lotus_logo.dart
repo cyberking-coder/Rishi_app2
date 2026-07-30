@@ -16,7 +16,7 @@ class LotusLogo extends StatelessWidget {
       width: size,
       height: size,
       child: CustomPaint(
-        painter: _LotusPainter(color ?? AppTheme.accent),
+        painter: _LotusPainter(color ?? AppTheme.sage),
       ),
     );
   }

@@ -92,7 +92,7 @@ class DownloadTile extends StatelessWidget {
                       minHeight: 3,
                       backgroundColor: Colors.white12,
                       valueColor:
-                          const AlwaysStoppedAnimation(AppTheme.accent),
+                          const AlwaysStoppedAnimation(AppTheme.sage),
                     ),
                   ),
                 ],
@@ -113,7 +113,7 @@ class DownloadTile extends StatelessWidget {
     switch (task.status) {
       case DownloadStatus.completed:
         return IconButton(
-          icon: const Icon(Icons.play_circle_fill, color: AppTheme.accent),
+          icon: const Icon(Icons.play_circle_fill, color: AppTheme.sage),
           onPressed: onPlay,
         );
       case DownloadStatus.downloading:

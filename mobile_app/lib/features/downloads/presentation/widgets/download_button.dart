@@ -57,7 +57,7 @@ class DownloadButton extends ConsumerWidget {
       case DownloadStatus.completed:
         return IconButton(
           tooltip: 'Downloaded — tap to remove',
-          icon: const Icon(Icons.download_done, color: AppTheme.accent),
+          icon: const Icon(Icons.download_done, color: AppTheme.sage),
           onPressed: () => _confirmDelete(context, () => repo.delete(task.id)),
         );
 
@@ -95,7 +95,7 @@ class DownloadButton extends ConsumerWidget {
     showDialog<void>(
       context: context,
       builder: (ctx) => AlertDialog(
-        backgroundColor: AppTheme.surfaceElevated,
+        backgroundColor: AppTheme.surfaceCream,
         title: const Text('Remove download?'),
         content: const Text('This deletes the offline copy from this device.'),
         actions: [
@@ -144,7 +144,7 @@ class _ProgressRing extends StatelessWidget {
                 value: progress == 0 ? null : progress,
                 strokeWidth: 2.5,
                 backgroundColor: Colors.black12,
-                valueColor: const AlwaysStoppedAnimation(AppTheme.accent),
+                valueColor: const AlwaysStoppedAnimation(AppTheme.sage),
               ),
             ),
             Icon(icon, size: 16),
