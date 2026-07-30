@@ -67,15 +67,7 @@ class _PremiumLockedDialogState extends ConsumerState<_PremiumLockedDialog> {
     try {
       final url =
           await ref.read(checkoutRemoteDataSourceProvider).getCheckoutUrl();
-      // inAppBrowserView = Chrome Custom Tab (Android) /
-      // SFSafariViewController (iOS): the checkout slides up over the app
-      // instead of hard-switching to a separate browser app, so it reads
-      // as part of the app to the user. Deliberately NOT inAppWebView -
-      // payment still runs in the real system browser process, which both
-      // keeps this outside Apple/Google's in-app-purchase rules for
-      // digital content and lets UPI apps (GPay/PhonePe) and bank OTP
-      // pages hand off correctly, which a plain WebView tends to break.
-      final opened = await launchUrl(url, mode: LaunchMode.inAppBrowserView);
+      final opened = await launchUrl(url, mode: LaunchMode.externalApplication);
       if (!opened) throw Exception('Could not open checkout');
       if (mounted) Navigator.pop(context);
     } catch (_) {
