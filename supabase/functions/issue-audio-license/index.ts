@@ -62,6 +62,20 @@ Deno.serve(async (req) => {
   }
   const userId = userData.user.id;
 
+  const { data: device, error: deviceError } = await supabase
+    .from("devices")
+    .select("id, is_active")
+    .eq("id", deviceId)
+    .eq("user_id", userId)
+    .maybeSingle();
+
+  if (deviceError || !device || !device.is_active) {
+    return jsonResponse(
+      { error: "This account is already active on another device." },
+      403,
+    );
+  }
+
   const { data: audio, error: audioError } = await supabase
     .from("audios")
     .select("id, is_premium, status")
@@ -73,29 +87,12 @@ Deno.serve(async (req) => {
   }
 
   if (audio.is_premium) {
-    // Device lock: only enforced for premium content. Free content is
-    // playable by any authenticated user on any device - the lock exists
-    // to stop PAID access being shared, and a free account has nothing
-    // worth sharing. Mirrors register_device, which likewise only locks
-    // non-free tiers.
-    const { data: device, error: deviceError } = await supabase
-      .from("devices")
-      .select("id, is_active")
-      .eq("id", deviceId)
-      .eq("user_id", userId)
-      .maybeSingle();
-
-    if (deviceError || !device || !device.is_active) {
-      return jsonResponse(
-        { error: "This account is already active on another device." },
-        403,
-      );
-    }
-
     // Retreat access window: refuse playback once the user's access has
     // lapsed, enforced server-side so a device clock change can't bypass
-    // it. An active entitlement (e.g. a future per-content purchase) is an
-    // alternate way to unlock the same premium content.
+    // it. Only applies to premium content - free content is playable by
+    // any authenticated, non-device-locked user regardless of access
+    // window. An active entitlement (e.g. a future per-content purchase)
+    // is an alternate way to unlock the same premium content.
     const { data: hasAccess } = await supabase.rpc("has_active_access", {
       p_user_id: userId,
     });
