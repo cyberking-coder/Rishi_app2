@@ -53,6 +53,7 @@ export async function updateCourse(args: {
   title?: string;
   description?: string | null;
   categoryId?: string | null;
+  isPremium?: boolean;
 }): Promise<ActionResult> {
   await requireAdmin();
   const db = createAdminClient();
@@ -61,9 +62,45 @@ export async function updateCourse(args: {
   if (args.title !== undefined) patch.title = args.title;
   if (args.description !== undefined) patch.description = args.description;
   if (args.categoryId !== undefined) patch.category_id = args.categoryId || null;
+  if (args.isPremium !== undefined) patch.is_premium = args.isPremium;
 
   const { error } = await db.from("courses").update(patch).eq("id", args.courseId);
   if (error) return { ok: false, error: error.message };
+
+  revalidatePath("/courses");
+  revalidatePath(`/courses/${args.courseId}`);
+  return { ok: true };
+}
+
+/** Uploads a course cover image to the public `covers` bucket (same
+ *  bucket the audio/video cover art uses) and stores its URL. Passed as
+ *  base64 since cover files are small. */
+export async function uploadCourseCover(args: {
+  courseId: string;
+  fileName: string;
+  contentType: string;
+  base64: string;
+}): Promise<ActionResult> {
+  await requireAdmin();
+  const db = createAdminClient();
+
+  const ext = args.fileName.includes(".")
+    ? args.fileName.split(".").pop()
+    : "jpg";
+  const path = `course/${args.courseId}/cover.${ext}`;
+  const bytes = Buffer.from(args.base64, "base64");
+
+  const { error: uploadError } = await db.storage
+    .from("covers")
+    .upload(path, bytes, { contentType: args.contentType, upsert: true });
+  if (uploadError) return { ok: false, error: uploadError.message };
+
+  const { data } = db.storage.from("covers").getPublicUrl(path);
+  const { error: updateError } = await db
+    .from("courses")
+    .update({ cover_image_url: data.publicUrl })
+    .eq("id", args.courseId);
+  if (updateError) return { ok: false, error: updateError.message };
 
   revalidatePath("/courses");
   revalidatePath(`/courses/${args.courseId}`);

@@ -4,9 +4,12 @@ import { ChevronLeft } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { PageHeader } from "@/components/page-header";
 import { CourseBuilder } from "@/components/courses/course-builder";
+import { CourseFormDialog } from "@/components/courses/course-form-dialog";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import type {
   Audio,
+  Category,
   Course,
   CourseModule,
   LessonWithMedia,
@@ -35,32 +38,38 @@ export default async function CourseBuilderPage({
 
   if (!course) notFound();
 
-  const [{ data: modules }, { data: audios }, { data: videos }] = await Promise.all([
-    supabase
-      .from("course_modules")
-      .select(
-        "*, lessons(*, audios(id, title, is_premium), videos(id, title, is_premium))",
-      )
-      .eq("course_id", id)
-      .order("position", { ascending: true })
-      .returns<ModuleWithLessons[]>(),
-    // The library the builder picks lesson media from. Only published
-    // audio can be attached — attaching a draft would produce a lesson
-    // that silently fails at playback, since the license functions
-    // require status = 'published'.
-    supabase
-      .from("audios")
-      .select("*")
-      .eq("status", "published")
-      .order("created_at", { ascending: false })
-      .returns<Audio[]>(),
-    supabase
-      .from("videos")
-      .select("*")
-      .eq("status", "published")
-      .order("created_at", { ascending: false })
-      .returns<Video[]>(),
-  ]);
+  const [{ data: modules }, { data: audios }, { data: videos }, { data: categories }] =
+    await Promise.all([
+      supabase
+        .from("course_modules")
+        .select(
+          "*, lessons(*, audios(id, title, is_premium), videos(id, title, is_premium))",
+        )
+        .eq("course_id", id)
+        .order("position", { ascending: true })
+        .returns<ModuleWithLessons[]>(),
+      // The library the builder picks lesson media from. Only published
+      // audio can be attached — attaching a draft would produce a lesson
+      // that silently fails at playback, since the license functions
+      // require status = 'published'.
+      supabase
+        .from("audios")
+        .select("*")
+        .eq("status", "published")
+        .order("created_at", { ascending: false })
+        .returns<Audio[]>(),
+      supabase
+        .from("videos")
+        .select("*")
+        .eq("status", "published")
+        .order("created_at", { ascending: false })
+        .returns<Video[]>(),
+      supabase
+        .from("categories")
+        .select("*")
+        .order("name", { ascending: true })
+        .returns<Category[]>(),
+    ]);
 
   // Lessons come back nested but unordered; sort them here so the builder
   // component stays presentational.
@@ -92,6 +101,11 @@ export default async function CourseBuilderPage({
             >
               {course.status}
             </Badge>
+            <CourseFormDialog
+              categories={categories ?? []}
+              course={course}
+              trigger={<Button variant="outline" size="sm">Edit details</Button>}
+            />
           </div>
         }
       />

@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { PageHeader } from "@/components/page-header";
-import { CreateCourseDialog } from "@/components/courses/create-course-dialog";
+import { CourseFormDialog } from "@/components/courses/course-form-dialog";
 import { CourseActions } from "@/components/courses/course-actions";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
@@ -60,7 +60,7 @@ export default async function CoursesPage() {
       <PageHeader
         title="Courses"
         description="Build courses from modules and lessons. Lessons reuse your existing audio library."
-        action={<CreateCourseDialog categories={categories ?? []} />}
+        action={<CourseFormDialog categories={categories ?? []} />}
       />
 
       <Card>
