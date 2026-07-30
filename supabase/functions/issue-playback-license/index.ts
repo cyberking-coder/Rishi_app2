@@ -70,21 +70,6 @@ Deno.serve(async (req) => {
   }
   const userId = userData.user.id;
 
-  // Device check: caller must be the account's currently active device.
-  const { data: device, error: deviceError } = await supabase
-    .from("devices")
-    .select("id, is_active")
-    .eq("id", deviceId)
-    .eq("user_id", userId)
-    .maybeSingle();
-
-  if (deviceError || !device || !device.is_active) {
-    return jsonResponse(
-      { error: "This account is already active on another device." },
-      403,
-    );
-  }
-
   const { data: video, error: videoError } = await supabase
     .from("videos")
     .select("id, is_premium, status, r2_path")
@@ -96,11 +81,27 @@ Deno.serve(async (req) => {
   }
 
   if (video.is_premium) {
+    // Device lock: only enforced for premium content. Free content is
+    // playable by any authenticated user on any device - the lock exists
+    // to stop PAID access being shared, and a free account has nothing
+    // worth sharing. Mirrors issue-audio-license and register_device.
+    const { data: device, error: deviceError } = await supabase
+      .from("devices")
+      .select("id, is_active")
+      .eq("id", deviceId)
+      .eq("user_id", userId)
+      .maybeSingle();
+
+    if (deviceError || !device || !device.is_active) {
+      return jsonResponse(
+        { error: "This account is already active on another device." },
+        403,
+      );
+    }
+
     // Retreat access window: refuse playback once the user's access has
     // lapsed, enforced server-side so a device clock change can't bypass
-    // it. Only applies to premium content - free content is playable by
-    // any authenticated, non-device-locked user regardless of access
-    // window. Mirrors the check in issue-audio-license.
+    // it. Mirrors the check in issue-audio-license.
     const { data: hasAccess } = await supabase.rpc("has_active_access", {
       p_user_id: userId,
     });

@@ -181,6 +181,12 @@ See Section 7 for the bug-fix chronology of the LMS/payments work (Phases 0-3a).
 - Check if that account has an **old device row** with `is_active = true` from a different emulator/device
 - Fix: Reset device via admin → log out → log back in
 
+### Device lock (one device per account)
+- **Only applies to paying/staff accounts.** Free-tier users are deliberately unlocked — see Phase 3a's device-lock change in Section 7. The lock exists to stop *paid* access being shared; a free account has nothing worth sharing, and locking it just creates "I changed phones and can't log in" support load from users who haven't paid anything.
+- A free user logging in on a new device silently makes it the active one (old device deactivated) rather than being rejected.
+- The moment a user pays, they become `retreat` tier and the strict lock applies from their next login onward — whichever device they were last on stays active and becomes their locked device. No extra bookkeeping needed.
+- The App Review test accounts (`test@test.com`, `applereview@gmail.com`) remain exempt, as they have been since the Apple 2.1 rejection fix.
+
 ### Extending / revoking access
 - Admin panel → Users → `•••` → Grant days / End access now
 - `access_expires_at = null` **and** `access_started_at` set means unlimited (staff/admin accounts, or a manually-granted lifetime user)
@@ -275,6 +281,12 @@ Video content itself was left untouched — there's still no video playback UI a
 | Checkout URL kept breaking across pushes | The Vercel preview URL used during testing (`rishi-app2-<hash>-...vercel.app`) is tied to one specific deployment and changes on every push. `mobile_app/lib/core/config/checkout_config.dart` needs updating each time, until this branch is merged to `main` (or set as the Vercel production branch) so the stable production domain can be used instead. |
 
 **Bug found and fixed after further testing**: the full flow — tap "Get Access Now" → checkout page → Razorpay test payment completes → "Payment received" shown → return to app — worked, except the content did not actually unlock. Root cause: `razorpay-webhook` read `user_id`/`plan_id` off `payment.notes`, but those notes were only ever set on the Razorpay **order** at creation time (`admin/src/lib/razorpay.ts`) — Checkout.js never re-passes `notes` when opening the payment modal, so `payment.notes` arrived empty and the webhook 400'd silently (from the user's perspective — the payment itself still showed as successful, since that part is genuinely independent of the webhook). Fixed by having the webhook fetch the order directly from Razorpay's API (`fetchRazorpayOrderNotes` in `_shared/razorpay.ts`) using `payment.order_id`, with `payment.notes` kept only as a fallback. **This requires `RAZORPAY_KEY_ID` to now also be set as a Supabase Edge Function secret** (previously only needed by the admin app) — see Section 8.
+
+**Device lock relaxed to paying users only** (`supabase/migrations/20260730000002_device_lock_premium_only.sql`): free-tier accounts are no longer locked to one device. Enforced in two places, both changed together — relaxing only one would have left free users still hitting "already active on another device" at the other:
+1. `register_device` RPC — free tier now soft-swaps (new device becomes active, old one deactivated) instead of raising `DEVICE_LOCKED`. Retreat/admin unchanged (strict rejection). Review-account exemption preserved.
+2. `issue-audio-license` / `issue-playback-license` — the device check moved inside the `if (is_premium)` block, exactly like the `has_active_access` check was in Phase 2. Free content plays on any device; premium content still requires being on the account's active device.
+
+A user who pays becomes `retreat` the moment the webhook sets their access window, so the strict lock starts applying from their next login with no migration or extra state.
 
 **Required external setup** (all done during this session, but written here so a fresh environment can be reconstructed):
 - Razorpay: test-mode API key ID + secret; a registered webhook (`payment.captured` event) pointing at the deployed `razorpay-webhook` function, with its own webhook secret.
