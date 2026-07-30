@@ -55,11 +55,8 @@ class _CourseDetailScreenState extends ConsumerState<CourseDetailScreen> {
         return;
 
       case LessonType.video:
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Video lessons are coming soon.'),
-          ),
-        );
+        context.push('/lesson-video/${lesson.id}', extra: lesson);
+        await _markComplete(lesson);
         return;
 
       case LessonType.audio:
@@ -304,7 +301,7 @@ class _LessonTile extends StatelessWidget {
         if (secs == null) return 'Audio';
         return 'Audio · ${(secs / 60).ceil()} min';
       case LessonType.video:
-        return 'Video · coming soon';
+        return 'Video';
       case LessonType.text:
         return 'Reading';
     }

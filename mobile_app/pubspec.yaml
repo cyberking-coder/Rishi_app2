@@ -23,6 +23,8 @@ dependencies:
   pointycastle: ^3.9.1
   google_sign_in: ^6.2.1
   url_launcher: ^6.3.0
+  video_player: ^2.9.1
+  chewie: ^1.8.5
 
 dev_dependencies:
   flutter_test:

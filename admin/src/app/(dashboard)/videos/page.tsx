@@ -3,6 +3,7 @@ import { PageHeader } from "@/components/page-header";
 import { UploadContentDialog } from "@/components/content/upload-content-dialog";
 import { ContentActions } from "@/components/content/content-actions";
 import { ContentStatusBadge } from "@/components/status-badge";
+import { BunnyStatusCell } from "@/components/content/bunny-status-cell";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import {
@@ -22,7 +23,7 @@ export default async function VideosPage() {
   const supabase = createClient();
   const { data: videos } = await supabase
     .from("videos")
-    .select("id, title, status, video_type, is_premium, view_count, created_at")
+    .select("id, title, status, video_type, is_premium, view_count, created_at, bunny_video_id, bunny_status")
     .order("created_at", { ascending: false })
     .returns<Video[]>();
 
@@ -44,6 +45,7 @@ export default async function VideosPage() {
                 <TableHead>Access</TableHead>
                 <TableHead>Views</TableHead>
                 <TableHead>Status</TableHead>
+                <TableHead>Streaming</TableHead>
                 <TableHead>Added</TableHead>
                 <TableHead className="w-12" />
               </TableRow>
@@ -51,7 +53,7 @@ export default async function VideosPage() {
             <TableBody>
               {(videos ?? []).length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={7} className="py-8 text-center text-muted-foreground">
+                  <TableCell colSpan={8} className="py-8 text-center text-muted-foreground">
                     No videos yet.
                   </TableCell>
                 </TableRow>
@@ -68,6 +70,13 @@ export default async function VideosPage() {
                     <TableCell>{formatNumber(v.view_count)}</TableCell>
                     <TableCell>
                       <ContentStatusBadge status={v.status} />
+                    </TableCell>
+                    <TableCell>
+                      <BunnyStatusCell
+                        videoId={v.id}
+                        bunnyVideoId={v.bunny_video_id}
+                        bunnyStatus={v.bunny_status}
+                      />
                     </TableCell>
                     <TableCell className="text-muted-foreground">
                       {formatDate(v.created_at)}

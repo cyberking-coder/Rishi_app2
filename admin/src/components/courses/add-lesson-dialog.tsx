@@ -167,7 +167,7 @@ export function AddLessonDialog({
               <p className="mt-1 text-xs text-muted-foreground">
                 {videoLibrary.length === 0
                   ? "No published video yet — upload one in the Videos tab first."
-                  : "Heads up: the mobile app has no video player yet, so video lessons will show as coming soon until that ships."}
+                  : "Check the Videos tab shows this one as Ready — a video still encoding on Bunny won't play yet."}
               </p>
             </div>
           )}

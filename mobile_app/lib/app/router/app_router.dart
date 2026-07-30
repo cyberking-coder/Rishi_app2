@@ -16,6 +16,7 @@ import '../../features/lms/domain/entities/lesson.dart';
 import '../../features/lms/presentation/screens/course_detail_screen.dart';
 import '../../features/lms/presentation/screens/courses_screen.dart';
 import '../../features/lms/presentation/screens/text_lesson_screen.dart';
+import '../../features/lms/presentation/screens/video_lesson_screen.dart';
 import '../../features/profile/presentation/screens/profile_screen.dart';
 import '../widgets/app_shell.dart';
 
@@ -77,6 +78,11 @@ final goRouterProvider = Provider<GoRouter>((ref) {
           courseId: state.pathParameters['id']!,
           title: state.extra as String? ?? 'Course',
         ),
+      ),
+      GoRoute(
+        path: '/lesson-video/:id',
+        builder: (_, state) =>
+            VideoLessonScreen(lesson: state.extra as Lesson),
       ),
       GoRoute(
         path: '/lesson-text/:id',

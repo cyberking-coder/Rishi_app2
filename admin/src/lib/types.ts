@@ -43,6 +43,8 @@ export interface Video {
   is_premium: boolean;
   status: ContentStatus;
   r2_path: string | null;
+  bunny_video_id: string | null;
+  bunny_status: "uploading" | "processing" | "ready" | "failed" | null;
   view_count: number;
   created_at: string;
   updated_at: string;
