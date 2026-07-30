@@ -10,12 +10,12 @@ import '../widgets/sleep_timer_sheet.dart';
 import '../widgets/speed_selector_sheet.dart';
 
 // ── Design constants ──────────────────────────────────────────────────────────
-const _kBg = Color(0xFF12082E);
-const _kRing1 = Color(0xFFEC4899); // pink outer ring
-const _kRing2 = Color(0xFF8B5CF6); // violet inner ring
-const _kAccent = Color(0xFF9B6EFF); // buttons / active
+const _kBg = Color(0xFF1B2723);         // deep sage, immersive stage
+const _kRing1 = Color(0xFFEFD9A8);      // sand outer ring
+const _kRing2 = Color(0xFF8FB3A6);      // sage inner ring
+const _kAccent = Color(0xFF8FB3A6);     // buttons / active
 const _kTextPrimary = Colors.white;
-const _kTextSecondary = Color(0xFFB0A8CC);
+const _kTextSecondary = Color(0xFFA8BBB2);
 
 class NowPlayingScreen extends ConsumerWidget {
   const NowPlayingScreen({super.key});

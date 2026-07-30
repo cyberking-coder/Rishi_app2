@@ -50,7 +50,8 @@ final goRouterProvider = Provider<GoRouter>((ref) {
       GoRoute(path: '/signup', builder: (_, __) => const SignupScreen()),
       GoRoute(
         path: '/home',
-        builder: (_, __) => const AppShell(child: HomeScreen()),
+        builder: (_, __) =>
+            const AppShell(tab: AppTab.home, child: HomeScreen()),
       ),
       GoRoute(
         path: '/now-playing',
@@ -58,7 +59,8 @@ final goRouterProvider = Provider<GoRouter>((ref) {
       ),
       GoRoute(
         path: '/downloads',
-        builder: (_, __) => const AppShell(child: DownloadsScreen()),
+        builder: (_, __) =>
+            const AppShell(tab: AppTab.downloads, child: DownloadsScreen()),
       ),
       GoRoute(
         path: '/offline-player/:contentId',
@@ -69,9 +71,14 @@ final goRouterProvider = Provider<GoRouter>((ref) {
       ),
       GoRoute(
         path: '/profile',
-        builder: (_, __) => const AppShell(child: ProfileScreen()),
+        builder: (_, __) =>
+            const AppShell(tab: AppTab.profile, child: ProfileScreen()),
       ),
-      GoRoute(path: '/courses', builder: (_, __) => const CoursesScreen()),
+      GoRoute(
+        path: '/courses',
+        builder: (_, __) =>
+            const AppShell(tab: AppTab.courses, child: CoursesScreen()),
+      ),
       GoRoute(
         path: '/course/:id',
         builder: (_, state) => CourseDetailScreen(

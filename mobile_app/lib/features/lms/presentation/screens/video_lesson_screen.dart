@@ -3,12 +3,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:video_player/video_player.dart';
 
+import '../../../../app/theme/app_theme.dart';
 import '../../application/lms_providers.dart';
 import '../../domain/entities/lesson.dart';
-
-const _kBg = Color(0xFF12082E);
-const _kAccent = Color(0xFF8B5CF6);
-const _kTextSec = Color(0xFFB0A8CC);
 
 class VideoLessonScreen extends ConsumerStatefulWidget {
   final Lesson lesson;
@@ -53,8 +50,8 @@ class _VideoLessonScreenState extends ConsumerState<VideoLessonScreen> {
           looping: false,
           allowPlaybackSpeedChanging: true,
           materialProgressColors: ChewieProgressColors(
-            playedColor: _kAccent,
-            handleColor: _kAccent,
+            playedColor: AppTheme.sage,
+            handleColor: AppTheme.sage,
             backgroundColor: Colors.white24,
             bufferedColor: Colors.white38,
           ),
@@ -77,15 +74,15 @@ class _VideoLessonScreenState extends ConsumerState<VideoLessonScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: _kBg,
+      backgroundColor: const Color(0xFF141B18),
       body: SafeArea(
         child: Column(children: [
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
             child: Row(children: [
               IconButton(
-                icon: const Icon(Icons.arrow_back_ios,
-                    color: Colors.white, size: 18),
+                icon: const Icon(Icons.arrow_back_rounded,
+                    color: Colors.white, size: 20),
                 onPressed: () => Navigator.of(context).pop(),
               ),
               Expanded(
@@ -110,11 +107,11 @@ class _VideoLessonScreenState extends ConsumerState<VideoLessonScreen> {
       return Padding(
         padding: const EdgeInsets.all(32),
         child: Column(mainAxisSize: MainAxisSize.min, children: [
-          const Icon(Icons.error_outline, color: _kTextSec, size: 40),
+          const Icon(Icons.error_outline, color: Colors.white70, size: 40),
           const SizedBox(height: 12),
           Text(_error!,
               textAlign: TextAlign.center,
-              style: const TextStyle(color: _kTextSec, height: 1.5)),
+              style: const TextStyle(color: Colors.white70, height: 1.5)),
           const SizedBox(height: 16),
           FilledButton(
             onPressed: () {
@@ -128,7 +125,7 @@ class _VideoLessonScreenState extends ConsumerState<VideoLessonScreen> {
     }
 
     if (_chewie == null) {
-      return const CircularProgressIndicator(color: _kAccent, strokeWidth: 2);
+      return const CircularProgressIndicator(color: Colors.white70, strokeWidth: 2);
     }
 
     return AspectRatio(

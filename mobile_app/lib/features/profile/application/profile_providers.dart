@@ -44,7 +44,10 @@ final currentDeviceFingerprintProvider =
 });
 
 /// Global theme mode — toggled from the Settings sheet in ProfileScreen.
-final themeModeProvider = StateProvider<ThemeMode>((ref) => ThemeMode.dark);
+// The app ships a single light visual language now; AppTheme.dark()
+// resolves to the same thing, so this just stops a stale 'dark'
+// preference from meaning anything different.
+final themeModeProvider = StateProvider<ThemeMode>((ref) => ThemeMode.light);
 
 /// Count of fully-downloaded (playable offline) items, reactive to the
 /// same download stream the Downloads screen uses.

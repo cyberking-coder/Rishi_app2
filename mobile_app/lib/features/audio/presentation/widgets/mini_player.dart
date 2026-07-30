@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../../app/theme/app_theme.dart';
 import '../../application/audio_providers.dart';
 
 /// Persistent bottom bar shown whenever a track is loaded, regardless of
@@ -30,15 +31,15 @@ class MiniPlayer extends ConsumerWidget {
             return GestureDetector(
               onTap: () => context.push('/now-playing'),
               child: Material(
-                color: const Color(0xFF1C1040),
+                color: AppTheme.sageDark,
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     LinearProgressIndicator(
                       value: progress,
                       minHeight: 2,
-                      backgroundColor: Colors.white12,
-                      color: const Color(0xFF8B5CF6),
+                      backgroundColor: Colors.white24,
+                      color: AppTheme.sand,
                     ),
                     SizedBox(
                       height: 56,
@@ -80,7 +81,7 @@ class MiniPlayer extends ConsumerWidget {
                                     maxLines: 1,
                                     overflow: TextOverflow.ellipsis,
                                     style: const TextStyle(
-                                      color: Color(0xFFB0A8CC),
+                                      color: Color(0xCCFFFFFF),
                                       fontSize: 12,
                                     ),
                                   ),

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../../app/theme/app_theme.dart';
 import '../../../access/application/access_providers.dart';
 import '../../../audio/application/audio_providers.dart';
 import '../../../audio/domain/entities/audio_track.dart';
@@ -9,10 +10,10 @@ import '../../application/home_providers.dart';
 import '../../domain/entities/audio_summary.dart';
 import '../widgets/premium_lock.dart';
 
-const _kBg = Color(0xFF12082E);
-const _kSurface = Color(0xFF1C1040);
-const _kAccent = Color(0xFF8B5CF6);
-const _kTextSec = Color(0xFFB0A8CC);
+const _kBg = AppTheme.background;
+const _kSurface = AppTheme.surface;
+const _kAccent = AppTheme.sage;
+const _kTextSec = AppTheme.textSecondary;
 
 class BrowseScreen extends ConsumerStatefulWidget {
   final String? categoryId;
@@ -79,7 +80,7 @@ class _BrowseScreenState extends ConsumerState<BrowseScreen> {
             child: Row(children: [
               IconButton(
                 icon: const Icon(Icons.arrow_back_ios,
-                    color: Colors.white, size: 18),
+                    color: AppTheme.textPrimary, size: 20),
                 onPressed: () => Navigator.of(context).pop(),
               ),
               Expanded(
@@ -87,7 +88,7 @@ class _BrowseScreenState extends ConsumerState<BrowseScreen> {
                     style: const TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.w600,
-                        color: Colors.white)),
+                        color: AppTheme.textPrimary)),
               ),
             ]),
           ),
@@ -96,15 +97,14 @@ class _BrowseScreenState extends ConsumerState<BrowseScreen> {
               padding: const EdgeInsets.fromLTRB(20, 4, 20, 8),
               child: Container(
                 decoration: BoxDecoration(
-                  color: const Color(0xFF1A0F38),
+                  color: AppTheme.surface,
                   borderRadius: BorderRadius.circular(14),
-                  border: Border.all(
-                      color: Colors.white.withValues(alpha: 0.08)),
+                  border: Border.all(color: AppTheme.border),
                 ),
                 child: TextField(
                   controller: _controller,
                   autofocus: true,
-                  style: const TextStyle(color: Colors.white),
+                  style: const TextStyle(color: AppTheme.textPrimary),
                   decoration: const InputDecoration(
                     hintText: 'Search meditation, music, etc...',
                     hintStyle: TextStyle(color: _kTextSec),
@@ -175,8 +175,7 @@ class _AudioRow extends ConsumerWidget {
         decoration: BoxDecoration(
           color: _kSurface,
           borderRadius: BorderRadius.circular(14),
-          border: Border.all(
-              color: Colors.white.withValues(alpha: 0.08), width: 1),
+          border: Border.all(color: AppTheme.border, width: 1),
         ),
         child: Row(children: [
           SizedBox(
@@ -186,8 +185,7 @@ class _AudioRow extends ConsumerWidget {
               Container(
                 decoration: BoxDecoration(
                   borderRadius: BorderRadius.circular(12),
-                  gradient: const LinearGradient(
-                      colors: [Color(0xFF8B5CF6), Color(0xFFEC4899)]),
+                  gradient: AppTheme.sageGradient,
                 ),
                 child: audio.coverArtUrl != null
                     ? ClipRRect(
@@ -211,7 +209,7 @@ class _AudioRow extends ConsumerWidget {
                     style: const TextStyle(
                         fontSize: 13,
                         fontWeight: FontWeight.w600,
-                        color: Colors.white)),
+                        color: AppTheme.textPrimary)),
                 if (audio.artist != null)
                   Text(audio.artist!,
                       maxLines: 1,

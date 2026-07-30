@@ -1,9 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../../../../app/theme/app_theme.dart';
 import '../../domain/entities/lesson.dart';
-
-const _kBg = Color(0xFF12082E);
-const _kTextSec = Color(0xFFB0A8CC);
 
 /// Renders a text lesson's body.
 ///
@@ -23,15 +21,15 @@ class TextLessonScreen extends StatelessWidget {
     final blocks = _parse(lesson.bodyMarkdown ?? '');
 
     return Scaffold(
-      backgroundColor: _kBg,
+      backgroundColor: AppTheme.background,
       body: SafeArea(
         child: Column(children: [
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
             child: Row(children: [
               IconButton(
-                icon: const Icon(Icons.arrow_back_ios,
-                    color: Colors.white, size: 18),
+                icon: const Icon(Icons.arrow_back_rounded,
+                    color: AppTheme.textPrimary, size: 20),
                 onPressed: () => Navigator.of(context).pop(),
               ),
               Expanded(
@@ -40,8 +38,8 @@ class TextLessonScreen extends StatelessWidget {
                     overflow: TextOverflow.ellipsis,
                     style: const TextStyle(
                         fontSize: 16,
-                        fontWeight: FontWeight.w600,
-                        color: Colors.white)),
+                        fontWeight: FontWeight.w700,
+                        color: AppTheme.textPrimary)),
               ),
             ]),
           ),
@@ -82,11 +80,11 @@ class TextLessonScreen extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 const Text('•  ',
-                    style: TextStyle(fontSize: 14, color: _kTextSec)),
+                    style: TextStyle(fontSize: 14, color: AppTheme.textSecondary)),
                 Expanded(
                   child: Text(line.trimLeft().substring(2),
                       style: const TextStyle(
-                          fontSize: 14, color: _kTextSec, height: 1.6)),
+                          fontSize: 14, color: AppTheme.textSecondary, height: 1.6)),
                 ),
               ],
             ),
@@ -98,7 +96,7 @@ class TextLessonScreen extends StatelessWidget {
             padding: const EdgeInsets.only(bottom: 6),
             child: Text(line,
                 style: const TextStyle(
-                    fontSize: 14, color: _kTextSec, height: 1.6)),
+                    fontSize: 14, color: AppTheme.textSecondary, height: 1.6)),
           ),
         );
       }
@@ -113,7 +111,7 @@ class TextLessonScreen extends StatelessWidget {
             style: TextStyle(
                 fontSize: size,
                 fontWeight: FontWeight.w700,
-                color: Colors.white,
+                color: AppTheme.textPrimary,
                 height: 1.4)),
       );
 }
