@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import Script from "next/script";
 import { Button } from "@/components/ui/button";
 
@@ -31,7 +31,7 @@ export function CheckoutClient({
   const [error, setError] = useState<string | null>(null);
   const [scriptReady, setScriptReady] = useState(false);
 
-  async function startCheckout() {
+  const startCheckout = useCallback(async () => {
     setStatus("loading");
     setError(null);
     try {
@@ -59,7 +59,18 @@ export function CheckoutClient({
       setStatus("error");
       setError(e instanceof Error ? e.message : "Something went wrong");
     }
-  }
+  }, [token, planName]);
+
+  // Open the payment sheet as soon as the page is ready, so the user lands
+  // straight on payment options rather than a page with one button on it.
+  // The button below stays as the way back in if they dismiss the sheet.
+  const autoStarted = useRef(false);
+  useEffect(() => {
+    if (scriptReady && !autoStarted.current) {
+      autoStarted.current = true;
+      void startCheckout();
+    }
+  }, [scriptReady, startCheckout]);
 
   if (status === "done") {
     return (
@@ -84,7 +95,9 @@ export function CheckoutClient({
         disabled={!scriptReady || status === "loading" || status === "processing"}
         onClick={startCheckout}
       >
-        {status === "loading" ? "Starting checkout…" : "Pay now"}
+        {status === "loading" || status === "processing"
+            ? "Opening payment…"
+            : "Pay now"}
       </Button>
       {error && <p className="mt-3 text-sm text-destructive">{error}</p>}
     </div>
