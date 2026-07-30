@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { requireAdmin } from "@/lib/auth";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { buildObjectKey, presignGet, presignUpload } from "@/lib/r2";
+import { buildObjectKey, deleteObject, presignGet, presignUpload } from "@/lib/r2";
 import { createBunnyVideo, fetchBunnyVideo, getBunnyStatus } from "@/lib/bunny";
 import { slugify } from "@/lib/utils";
 import type { ContentKind, ContentStatus } from "@/lib/types";
@@ -161,9 +161,9 @@ export async function refreshBunnyStatus(
 
   const { data: video } = await db
     .from("videos")
-    .select("bunny_video_id")
+    .select("bunny_video_id, r2_path")
     .eq("id", videoId)
-    .maybeSingle<{ bunny_video_id: string | null }>();
+    .maybeSingle<{ bunny_video_id: string | null; r2_path: string | null }>();
 
   if (!video?.bunny_video_id) {
     return { ok: false, error: "This video isn't on Bunny Stream." };
@@ -175,6 +175,21 @@ export async function refreshBunnyStatus(
       .from("videos")
       .update({ bunny_status: status })
       .eq("id", videoId);
+
+    // Once Bunny confirms the video is ready, playback is served
+    // entirely from Bunny (issue-playback-license never reads r2_path
+    // for a Bunny-backed video) — the R2 copy was only ever staging for
+    // Bunny's pull, so drop it rather than paying to store it twice.
+    if (status === "ready" && video.r2_path) {
+      try {
+        await deleteObject(video.r2_path);
+        await db.from("videos").update({ r2_path: null }).eq("id", videoId);
+      } catch (e) {
+        // Non-fatal: playback already works off Bunny either way. Leave
+        // r2_path set so the next status refresh retries the cleanup.
+        console.error("R2 cleanup failed:", e);
+      }
+    }
   } catch (e) {
     return {
       ok: false,

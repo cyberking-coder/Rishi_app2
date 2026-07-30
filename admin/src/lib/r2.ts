@@ -60,6 +60,28 @@ export async function presignGet(
   return signed.url;
 }
 
+/**
+ * Deletes an object from R2. Used to clear the staging copy of a video
+ * once Bunny Stream has confirmed it has the file and it's playable —
+ * from that point on playback never reads r2_path for a Bunny-backed
+ * video, so keeping the R2 copy around is pure storage cost.
+ */
+export async function deleteObject(objectKey: string): Promise<void> {
+  const r2 = env.r2();
+  const client = new AwsClient({
+    accessKeyId: r2.accessKeyId,
+    secretAccessKey: r2.secretAccessKey,
+    service: "s3",
+    region: "auto",
+  });
+
+  const endpoint = `https://${r2.accountId}.r2.cloudflarestorage.com/${r2.bucket}/${objectKey}`;
+  const res = await client.fetch(endpoint, { method: "DELETE" });
+  if (!res.ok && res.status !== 404) {
+    throw new Error(`R2 delete failed (${res.status})`);
+  }
+}
+
 /** Builds the storage key used for an uploaded content file. */
 export function buildObjectKey(
   kind: "video" | "audio",
