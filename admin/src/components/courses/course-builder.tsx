@@ -274,6 +274,7 @@ export function CourseBuilder({
               <AddLessonDialog
                 courseId={course.id}
                 moduleId={module.id}
+                coursePremium={course.is_premium}
                 audioLibrary={audioLibrary}
                 videoLibrary={videoLibrary}
               />
