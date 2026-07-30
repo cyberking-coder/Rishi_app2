@@ -13,10 +13,11 @@
 //
 // Deployed with: supabase functions deploy razorpay-webhook
 // Register in Razorpay Dashboard -> Settings -> Webhooks, active events:
-// "payment.captured", pointing at this function's URL.
+// "payment.captured" AND "payment.failed", pointing at this function's URL.
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { handlePreflight, jsonResponse } from "../_shared/cors.ts";
+import { notifyN8n } from "../_shared/n8n.ts";
 import {
   fetchRazorpayOrderNotes,
   verifyRazorpayWebhookSignature,
@@ -33,7 +34,9 @@ interface RazorpayPaymentEntity {
   order_id: string;
   amount: number; // paise
   currency: string;
+  contact?: string; // phone number entered at checkout, e.g. "+919876543210"
   notes?: Record<string, string>;
+  error_description?: string; // only present on payment.failed
 }
 
 Deno.serve(async (req) => {
@@ -60,15 +63,16 @@ Deno.serve(async (req) => {
     return jsonResponse({ error: "Invalid JSON body" }, 400);
   }
 
-  // We only act on payment.captured; acknowledge everything else with 200
-  // so Razorpay doesn't retry events we deliberately ignore.
-  if (event.event !== "payment.captured") {
-    return jsonResponse({ ok: true, ignored: event.event ?? "unknown" });
+  const eventType = event.event;
+  if (eventType !== "payment.captured" && eventType !== "payment.failed") {
+    // Acknowledge everything else with 200 so Razorpay doesn't retry
+    // events we deliberately ignore.
+    return jsonResponse({ ok: true, ignored: eventType ?? "unknown" });
   }
 
   const payment = event.payload?.payment?.entity;
   if (!payment?.id) {
-    return jsonResponse({ error: "Malformed payment.captured payload" }, 400);
+    return jsonResponse({ error: "Malformed payload" }, 400);
   }
 
   const supabase = createClient(
@@ -76,9 +80,9 @@ Deno.serve(async (req) => {
     Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
   );
 
-  // Idempotency: a redelivered webhook for a payment we've already
-  // processed is a no-op, not a second grant.
-  const eventKey = `payment.captured:${payment.id}`;
+  // Idempotency: a redelivered webhook for an event we've already
+  // processed is a no-op, not a second grant/notification.
+  const eventKey = `${eventType}:${payment.id}`;
   const { error: dedupeError } = await supabase
     .from("webhook_events")
     .insert({ provider: "razorpay", event_key: eventKey });
@@ -114,23 +118,68 @@ Deno.serve(async (req) => {
 
   const { data: plan, error: planError } = await supabase
     .from("subscription_plans")
-    .select("id, billing_interval")
+    .select("id, name, billing_interval")
     .eq("id", planId)
-    .maybeSingle<{ id: string; billing_interval: string }>();
+    .maybeSingle<{ id: string; name: string; billing_interval: string }>();
 
   if (planError || !plan) {
     return jsonResponse({ error: "Unknown plan on payment notes" }, 404);
   }
 
+  // Look up who to notify - best-effort, missing details just mean a
+  // sparser WhatsApp message, never a blocked payment.
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("display_name, access_started_at")
+    .eq("id", userId)
+    .maybeSingle<{ display_name: string | null; access_started_at: string | null }>();
+
+  let email: string | null = null;
+  try {
+    const { data: authUser } = await supabase.auth.admin.getUserById(userId);
+    email = authUser.user?.email ?? null;
+  } catch {
+    // non-fatal
+  }
+
+  if (eventType === "payment.failed") {
+    // Record the failed attempt for admin visibility, then notify - no
+    // access is granted here.
+    await supabase.from("payments").upsert(
+      {
+        user_id: userId,
+        amount: payment.amount / 100,
+        currency: payment.currency ?? "INR",
+        provider: "razorpay",
+        provider_payment_id: payment.id,
+        status: "failed",
+      },
+      { onConflict: "provider,provider_payment_id", ignoreDuplicates: true },
+    );
+
+    try {
+      await notifyN8n({
+        event: "payment_failed",
+        user_id: userId,
+        email,
+        name: profile?.display_name ?? null,
+        phone: payment.contact ?? null,
+        plan_name: plan.name,
+        amount: payment.amount / 100,
+        currency: payment.currency ?? "INR",
+        reason: payment.error_description ?? "Payment failed",
+      });
+    } catch (e) {
+      console.error("n8n payment_failed notification failed:", e);
+    }
+
+    return jsonResponse({ ok: true });
+  }
+
+  // payment.captured — grant access.
   const days = PLAN_INTERVAL_DAYS[plan.billing_interval] ?? 30;
   const now = new Date();
   const periodEnd = new Date(now.getTime() + days * 24 * 60 * 60 * 1000);
-
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("access_started_at")
-    .eq("id", userId)
-    .maybeSingle<{ access_started_at: string | null }>();
 
   const { error: profileError } = await supabase
     .from("profiles")
@@ -202,6 +251,21 @@ Deno.serve(async (req) => {
 
   if (paymentError) {
     return jsonResponse({ error: paymentError.message }, 500);
+  }
+
+  try {
+    await notifyN8n({
+      event: "payment_success",
+      user_id: userId,
+      email,
+      name: profile?.display_name ?? null,
+      phone: payment.contact ?? null,
+      plan_name: plan.name,
+      amount: payment.amount / 100,
+      currency: payment.currency ?? "INR",
+    });
+  } catch (e) {
+    console.error("n8n payment_success notification failed:", e);
   }
 
   return jsonResponse({ ok: true });
