@@ -15,6 +15,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { NativeOption, NativeSelect } from "@/components/ui/native-select";
 import { createCourse } from "@/app/actions/courses";
 import type { Category } from "@/lib/types";
 
@@ -102,20 +103,19 @@ export function CreateCourseDialog({ categories }: { categories: Category[] }) {
 
           <div>
             <Label htmlFor="cc-category">Category</Label>
-            <select
+            <NativeSelect
               id="cc-category"
               value={categoryId}
               onChange={(e) => setCategoryId(e.target.value)}
               disabled={busy}
-              className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
             >
-              <option value="">No category</option>
+              <NativeOption value="">No category</NativeOption>
               {categories.map((c) => (
-                <option key={c.id} value={c.id}>
+                <NativeOption key={c.id} value={c.id}>
                   {c.name}
-                </option>
+                </NativeOption>
               ))}
-            </select>
+            </NativeSelect>
           </div>
 
           <div className="flex items-center gap-2">

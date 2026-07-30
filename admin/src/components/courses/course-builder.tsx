@@ -24,7 +24,13 @@ import {
   moveModule,
 } from "@/app/actions/courses";
 import { AddLessonDialog } from "./add-lesson-dialog";
-import type { Audio, Course, CourseModule, LessonWithMedia } from "@/lib/types";
+import type {
+  Audio,
+  Course,
+  CourseModule,
+  LessonWithMedia,
+  Video,
+} from "@/lib/types";
 
 interface ModuleWithLessons extends CourseModule {
   lessons: LessonWithMedia[];
@@ -40,10 +46,12 @@ export function CourseBuilder({
   course,
   modules,
   audioLibrary,
+  videoLibrary,
 }: {
   course: Course;
   modules: ModuleWithLessons[];
   audioLibrary: Audio[];
+  videoLibrary: Video[];
 }) {
   const router = useRouter();
   const [newModuleTitle, setNewModuleTitle] = useState("");
@@ -267,6 +275,7 @@ export function CourseBuilder({
                 courseId={course.id}
                 moduleId={module.id}
                 audioLibrary={audioLibrary}
+                videoLibrary={videoLibrary}
               />
             </div>
           </CardContent>

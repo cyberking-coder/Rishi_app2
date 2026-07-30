@@ -16,17 +16,20 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { NativeOption, NativeSelect } from "@/components/ui/native-select";
 import { createLesson } from "@/app/actions/courses";
-import type { Audio, LessonType } from "@/lib/types";
+import type { Audio, LessonType, Video } from "@/lib/types";
 
 export function AddLessonDialog({
   courseId,
   moduleId,
   audioLibrary,
+  videoLibrary,
 }: {
   courseId: string;
   moduleId: string;
   audioLibrary: Audio[];
+  videoLibrary: Video[];
 }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
@@ -35,12 +38,14 @@ export function AddLessonDialog({
   const [title, setTitle] = useState("");
   const [lessonType, setLessonType] = useState<LessonType>("audio");
   const [audioId, setAudioId] = useState("");
+  const [videoId, setVideoId] = useState("");
   const [bodyMarkdown, setBodyMarkdown] = useState("");
 
   function reset() {
     setTitle("");
     setLessonType("audio");
     setAudioId("");
+    setVideoId("");
     setBodyMarkdown("");
   }
 
@@ -56,6 +61,7 @@ export function AddLessonDialog({
         title: title.trim(),
         lessonType,
         audioId: lessonType === "audio" ? audioId : undefined,
+        videoId: lessonType === "video" ? videoId : undefined,
         bodyMarkdown: lessonType === "text" ? bodyMarkdown : undefined,
       });
       if (!result.ok) throw new Error(result.error);
@@ -104,40 +110,64 @@ export function AddLessonDialog({
 
           <div>
             <Label htmlFor="al-type">Type</Label>
-            <select
+            <NativeSelect
               id="al-type"
               value={lessonType}
               onChange={(e) => setLessonType(e.target.value as LessonType)}
               disabled={busy}
-              className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
             >
-              <option value="audio">Audio</option>
-              <option value="text">Text</option>
-            </select>
+              <NativeOption value="audio">Audio</NativeOption>
+              <NativeOption value="video">Video</NativeOption>
+              <NativeOption value="text">Text</NativeOption>
+            </NativeSelect>
           </div>
 
           {lessonType === "audio" && (
             <div>
               <Label htmlFor="al-audio">Audio</Label>
-              <select
+              <NativeSelect
                 id="al-audio"
                 value={audioId}
                 onChange={(e) => setAudioId(e.target.value)}
                 disabled={busy}
-                className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
               >
-                <option value="">Select from your library…</option>
+                <NativeOption value="">Select from your library…</NativeOption>
                 {audioLibrary.map((a) => (
-                  <option key={a.id} value={a.id}>
+                  <NativeOption key={a.id} value={a.id}>
                     {a.title}
                     {a.is_premium ? " (premium)" : " (free)"}
-                  </option>
+                  </NativeOption>
                 ))}
-              </select>
+              </NativeSelect>
               <p className="mt-1 text-xs text-muted-foreground">
                 {audioLibrary.length === 0
                   ? "No published audio yet — upload one in the Audios tab first."
                   : "Only published audio is listed. To add something new, upload it in the Audios tab, then attach it here."}
+              </p>
+            </div>
+          )}
+
+          {lessonType === "video" && (
+            <div>
+              <Label htmlFor="al-video">Video</Label>
+              <NativeSelect
+                id="al-video"
+                value={videoId}
+                onChange={(e) => setVideoId(e.target.value)}
+                disabled={busy}
+              >
+                <NativeOption value="">Select from your library…</NativeOption>
+                {videoLibrary.map((v) => (
+                  <NativeOption key={v.id} value={v.id}>
+                    {v.title}
+                    {v.is_premium ? " (premium)" : " (free)"}
+                  </NativeOption>
+                ))}
+              </NativeSelect>
+              <p className="mt-1 text-xs text-muted-foreground">
+                {videoLibrary.length === 0
+                  ? "No published video yet — upload one in the Videos tab first."
+                  : "Heads up: the mobile app has no video player yet, so video lessons will show as coming soon until that ships."}
               </p>
             </div>
           )}

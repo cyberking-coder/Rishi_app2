@@ -5,7 +5,13 @@ import { createClient } from "@/lib/supabase/server";
 import { PageHeader } from "@/components/page-header";
 import { CourseBuilder } from "@/components/courses/course-builder";
 import { Badge } from "@/components/ui/badge";
-import type { Audio, Course, CourseModule, LessonWithMedia } from "@/lib/types";
+import type {
+  Audio,
+  Course,
+  CourseModule,
+  LessonWithMedia,
+  Video,
+} from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
@@ -29,7 +35,7 @@ export default async function CourseBuilderPage({
 
   if (!course) notFound();
 
-  const [{ data: modules }, { data: audios }] = await Promise.all([
+  const [{ data: modules }, { data: audios }, { data: videos }] = await Promise.all([
     supabase
       .from("course_modules")
       .select(
@@ -48,6 +54,12 @@ export default async function CourseBuilderPage({
       .eq("status", "published")
       .order("created_at", { ascending: false })
       .returns<Audio[]>(),
+    supabase
+      .from("videos")
+      .select("*")
+      .eq("status", "published")
+      .order("created_at", { ascending: false })
+      .returns<Video[]>(),
   ]);
 
   // Lessons come back nested but unordered; sort them here so the builder
@@ -88,6 +100,7 @@ export default async function CourseBuilderPage({
         course={course}
         modules={orderedModules}
         audioLibrary={audios ?? []}
+        videoLibrary={videos ?? []}
       />
     </div>
   );

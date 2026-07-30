@@ -5,6 +5,7 @@ import Script from "next/script";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { NativeOption, NativeSelect } from "@/components/ui/native-select";
 
 // This component collects billing details, then hands off to Razorpay's
 // own hosted checkout and shows a friendly "we've got it" message
@@ -174,20 +175,19 @@ export function CheckoutClient({
 
         <div>
           <Label htmlFor="co-state">State</Label>
-          <select
+          <NativeSelect
             id="co-state"
             value={state}
             onChange={(e) => setState(e.target.value)}
             disabled={busy}
-            className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
           >
-            <option value="">Select your state</option>
+            <NativeOption value="">Select your state</NativeOption>
             {INDIAN_STATES.map((s) => (
-              <option key={s} value={s}>
+              <NativeOption key={s} value={s}>
                 {s}
-              </option>
+              </NativeOption>
             ))}
-          </select>
+          </NativeSelect>
         </div>
       </div>
 
