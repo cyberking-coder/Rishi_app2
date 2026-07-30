@@ -274,7 +274,7 @@ Video content itself was left untouched — there's still no video playback UI a
 | Checkout page asked for a **Vercel** login (not the app's own login) | Vercel's own "Deployment Protection" setting puts preview deployments behind a Vercel-account login wall by default. Turned off in Vercel → Settings → Deployment Protection. |
 | Checkout URL kept breaking across pushes | The Vercel preview URL used during testing (`rishi-app2-<hash>-...vercel.app`) is tied to one specific deployment and changes on every push. `mobile_app/lib/core/config/checkout_config.dart` needs updating each time, until this branch is merged to `main` (or set as the Vercel production branch) so the stable production domain can be used instead. |
 
-**Status at last check (end of this session)**: the full flow — tap "Get Access Now" → external browser opens the checkout page → Razorpay test payment completes → "Payment received" shown → return to app — worked, **except the content did not actually unlock afterward**. Not yet debugged. See Section 10.
+**Bug found and fixed after further testing**: the full flow — tap "Get Access Now" → checkout page → Razorpay test payment completes → "Payment received" shown → return to app — worked, except the content did not actually unlock. Root cause: `razorpay-webhook` read `user_id`/`plan_id` off `payment.notes`, but those notes were only ever set on the Razorpay **order** at creation time (`admin/src/lib/razorpay.ts`) — Checkout.js never re-passes `notes` when opening the payment modal, so `payment.notes` arrived empty and the webhook 400'd silently (from the user's perspective — the payment itself still showed as successful, since that part is genuinely independent of the webhook). Fixed by having the webhook fetch the order directly from Razorpay's API (`fetchRazorpayOrderNotes` in `_shared/razorpay.ts`) using `payment.order_id`, with `payment.notes` kept only as a fallback. **This requires `RAZORPAY_KEY_ID` to now also be set as a Supabase Edge Function secret** (previously only needed by the admin app) — see Section 8.
 
 **Required external setup** (all done during this session, but written here so a fresh environment can be reconstructed):
 - Razorpay: test-mode API key ID + secret; a registered webhook (`payment.captured` event) pointing at the deployed `razorpay-webhook` function, with its own webhook secret.
@@ -292,7 +292,7 @@ None of these are committed to the repo (correctly). Listed here so a fresh setu
 | Secret | Used by | Purpose |
 |---|---|---|
 | `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_ACCOUNT_ID`, `R2_BUCKET` | `issue-audio-license`, `issue-playback-license`, `issue-upload-url` | Cloudflare R2 signing (pre-existing, not part of this session's work) |
-| `RAZORPAY_KEY_SECRET` | `razorpay-webhook` (not directly, but same project secret store) | Not actually read server-side in edge functions today — key secret is only used by the admin app to create orders. Kept here for completeness/parity. |
+| `RAZORPAY_KEY_ID`, `RAZORPAY_KEY_SECRET` | `razorpay-webhook` | Used to fetch the Razorpay order directly (Basic Auth to `GET /v1/orders/{id}`) — the authoritative source for which user/plan a payment belongs to. Same credential pair as the admin app's, just also needed here now. |
 | `RAZORPAY_WEBHOOK_SECRET` | `razorpay-webhook` | Verifies the webhook signature Razorpay sends |
 | `CHECKOUT_TOKEN_SECRET` | `mint-checkout-token` | Signs the short-lived checkout token |
 
@@ -427,7 +427,7 @@ The admin app doesn't use this layering — it's a much thinner app, and Next.js
 
 As of the end of this session, in priority order:
 
-1. **Unresolved bug**: after a successful Razorpay test payment, the app does not unlock the content. The payment itself completes ("Payment received" shown on the checkout page), but something after that point isn't working. Not yet diagnosed — first things to check next session:
+1. ~~**Unresolved bug**: content not unlocking after payment~~ — **Fixed** (see Phase 3a above): the webhook now fetches order notes directly from Razorpay's API instead of trusting `payment.notes`. **Not yet re-tested end-to-end after this fix** — next session should redeploy `razorpay-webhook`, set `RAZORPAY_KEY_ID` as an Edge Function secret, and run one more full test payment to confirm. If it's still broken after that:
    - Did `razorpay-webhook` actually get called? (Supabase Dashboard → Edge Functions → razorpay-webhook → Logs)
    - Did Razorpay actually deliver the webhook? (Razorpay Dashboard → Settings → Webhooks → click the webhook → delivery log/attempts)
    - Is the webhook signature verifying correctly? (would show as a 400 "Invalid signature" in the function logs)

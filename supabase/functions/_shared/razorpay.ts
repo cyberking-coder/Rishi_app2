@@ -41,3 +41,27 @@ export async function verifyRazorpayWebhookSignature(
   }
   return diff === 0;
 }
+
+/** Fetches an order's `notes` directly from Razorpay's API, rather than
+ *  trusting that the resulting payment's own `notes` field mirrors them.
+ *  admin/src/lib/razorpay.ts sets notes on the ORDER at creation time, not
+ *  on the payment itself (Checkout.js never re-passes them) - fetching the
+ *  order is the one unambiguous way to read that metadata back. */
+export async function fetchRazorpayOrderNotes(
+  orderId: string,
+): Promise<Record<string, string>> {
+  const keyId = Deno.env.get("RAZORPAY_KEY_ID")!;
+  const keySecret = Deno.env.get("RAZORPAY_KEY_SECRET")!;
+  const auth = btoa(`${keyId}:${keySecret}`);
+
+  const res = await fetch(`https://api.razorpay.com/v1/orders/${orderId}`, {
+    headers: { Authorization: `Basic ${auth}` },
+  });
+
+  if (!res.ok) {
+    throw new Error(`Could not fetch Razorpay order ${orderId}: ${res.status}`);
+  }
+
+  const order = await res.json();
+  return (order.notes as Record<string, string>) ?? {};
+}

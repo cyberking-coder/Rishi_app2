@@ -17,7 +17,10 @@
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { handlePreflight, jsonResponse } from "../_shared/cors.ts";
-import { verifyRazorpayWebhookSignature } from "../_shared/razorpay.ts";
+import {
+  fetchRazorpayOrderNotes,
+  verifyRazorpayWebhookSignature,
+} from "../_shared/razorpay.ts";
 
 const PLAN_INTERVAL_DAYS: Record<string, number> = {
   weekly: 7,
@@ -27,6 +30,7 @@ const PLAN_INTERVAL_DAYS: Record<string, number> = {
 
 interface RazorpayPaymentEntity {
   id: string;
+  order_id: string;
   amount: number; // paise
   currency: string;
   notes?: Record<string, string>;
@@ -88,8 +92,22 @@ Deno.serve(async (req) => {
     return jsonResponse({ error: dedupeError.message }, 500);
   }
 
-  const userId = payment.notes?.user_id;
-  const planId = payment.notes?.plan_id;
+  // The order's notes (set at creation time by admin/src/lib/razorpay.ts)
+  // are the authoritative source - Checkout.js never re-passes notes when
+  // opening the payment modal, so payment.notes below is only a fallback
+  // in case Razorpay does mirror them (kept for defense in depth).
+  let notes: Record<string, string>;
+  try {
+    notes = await fetchRazorpayOrderNotes(payment.order_id);
+  } catch {
+    notes = payment.notes ?? {};
+  }
+  if (!notes.user_id || !notes.plan_id) {
+    notes = payment.notes ?? {};
+  }
+
+  const userId = notes.user_id;
+  const planId = notes.plan_id;
   if (!userId || !planId) {
     return jsonResponse({ error: "Payment missing user_id/plan_id notes" }, 400);
   }
