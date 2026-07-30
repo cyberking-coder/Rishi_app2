@@ -47,6 +47,24 @@ export default async function CheckoutPage({
     return <ErrorCard message="This plan is no longer available." />;
   }
 
+  // Prefill what we already know about this user so they type as little as
+  // possible. Best-effort - a failed lookup just means an empty form.
+  let defaultName = "";
+  let defaultEmail = "";
+  try {
+    const { data: profile } = await db
+      .from("profiles")
+      .select("display_name")
+      .eq("id", payload.uid)
+      .maybeSingle<{ display_name: string | null }>();
+    defaultName = profile?.display_name ?? "";
+
+    const { data: authUser } = await db.auth.admin.getUserById(payload.uid);
+    defaultEmail = authUser.user?.email ?? "";
+  } catch {
+    // non-fatal
+  }
+
   return (
     <div className="flex min-h-screen items-center justify-center bg-background p-4">
       <Card className="w-full max-w-md">
@@ -64,7 +82,12 @@ export default async function CheckoutPage({
               / {plan.billing_interval.replace("ly", "")}
             </span>
           </p>
-          <CheckoutClient token={token} planName={plan.name} />
+          <CheckoutClient
+            token={token}
+            planName={plan.name}
+            defaultName={defaultName}
+            defaultEmail={defaultEmail}
+          />
         </CardContent>
       </Card>
     </div>

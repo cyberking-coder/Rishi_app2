@@ -8,7 +8,9 @@ export interface PaymentNotification {
   user_id: string;
   email: string | null;
   name: string | null;
-  phone: string | null; // E.164-ish, from Razorpay's own contact field
+  /** Collected on our own checkout form; falls back to Razorpay's contact. */
+  phone: string | null;
+  state: string | null;
   plan_name: string;
   amount: number; // rupees, not paise
   currency: string;

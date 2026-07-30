@@ -171,13 +171,23 @@ Deno.serve(async (req) => {
     .eq("id", userId)
     .maybeSingle<{ display_name: string | null; access_started_at: string | null }>();
 
-  let email: string | null = null;
-  try {
-    const { data: authUser } = await supabase.auth.admin.getUserById(userId);
-    email = authUser.user?.email ?? null;
-  } catch {
-    // non-fatal
+  // Billing details collected on our own checkout form (see
+  // admin/src/app/checkout) are the most reliable source - they're what
+  // the user actually typed. Fall back to the account's own details, then
+  // to whatever Razorpay captured, so a notification still goes out even
+  // if the form data is missing for some reason.
+  let email: string | null = notes.billing_email ?? null;
+  if (!email) {
+    try {
+      const { data: authUser } = await supabase.auth.admin.getUserById(userId);
+      email = authUser.user?.email ?? null;
+    } catch {
+      // non-fatal
+    }
   }
+  const name = notes.billing_name ?? profile?.display_name ?? null;
+  const phone = notes.billing_phone ?? payment.contact ?? null;
+  const state = notes.billing_state ?? null;
 
   if (eventType === "payment.failed") {
     // Record the failed attempt for admin visibility, then notify - no
@@ -199,8 +209,9 @@ Deno.serve(async (req) => {
         event: "payment_failed",
         user_id: userId,
         email,
-        name: profile?.display_name ?? null,
-        phone: payment.contact ?? null,
+        name,
+        phone,
+        state,
         plan_name: plan.name,
         amount: payment.amount / 100,
         currency: payment.currency ?? "INR",
@@ -300,8 +311,9 @@ Deno.serve(async (req) => {
       event: "payment_success",
       user_id: userId,
       email,
-      name: profile?.display_name ?? null,
-      phone: payment.contact ?? null,
+      name,
+      phone,
+      state,
       plan_name: plan.name,
       amount: payment.amount / 100,
       currency: payment.currency ?? "INR",
