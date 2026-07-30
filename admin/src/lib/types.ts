@@ -79,3 +79,57 @@ export interface Category {
 }
 
 export type ContentKind = "video" | "audio";
+
+// ── LMS ──────────────────────────────────────────────────────────────────
+// Courses have their own status set (no 'processing' — a course has no
+// media of its own to transcode; its lessons reference content rows that
+// carry that state themselves).
+export type CourseStatus = "draft" | "published" | "archived";
+export type LessonType = "audio" | "video" | "text";
+
+export interface Course {
+  id: string;
+  title: string;
+  slug: string;
+  description: string | null;
+  cover_image_url: string | null;
+  category_id: string | null;
+  is_premium: boolean;
+  status: CourseStatus;
+  sort_order: number;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface CourseModule {
+  id: string;
+  course_id: string;
+  title: string;
+  description: string | null;
+  position: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface Lesson {
+  id: string;
+  module_id: string;
+  title: string;
+  description: string | null;
+  lesson_type: LessonType;
+  audio_id: string | null;
+  video_id: string | null;
+  body_markdown: string | null;
+  position: number;
+  created_at: string;
+  updated_at: string;
+}
+
+/** A lesson plus the media row it points at, for the builder's UI — lets
+ *  it surface the attached title and warn when the media's is_premium
+ *  disagrees with its course's. */
+export interface LessonWithMedia extends Lesson {
+  audios: { id: string; title: string; is_premium: boolean } | null;
+  videos: { id: string; title: string; is_premium: boolean } | null;
+}
