@@ -95,7 +95,9 @@ export default async function UsersPage() {
                     <TableCell>
                       <Badge variant="outline">{u.role}</Badge>
                     </TableCell>
-                    <TableCell className="capitalize">{u.subscription_tier}</TableCell>
+                    <TableCell>
+                      <TierCell profile={u} />
+                    </TableCell>
                     <TableCell>
                       <UserStatusBadge status={u.status} />
                     </TableCell>
@@ -117,6 +119,21 @@ export default async function UsersPage() {
       </Card>
     </div>
   );
+}
+
+/** Derived from the access window rather than the denormalized
+ *  `subscription_tier` column, so ending a user's access immediately shows
+ *  them as Free. The column alone would keep reading "premium" until
+ *  something happened to rewrite it. */
+function TierCell({ profile }: { profile: Profile }) {
+  const tier = resolveTier(profile);
+  if (tier === "admin") {
+    return <Badge variant="outline">Staff</Badge>;
+  }
+  if (tier === "retreat") {
+    return <Badge>Premium</Badge>;
+  }
+  return <Badge variant="outline">Free</Badge>;
 }
 
 /** Shows the user's resolved tier / remaining access window as a badge. */

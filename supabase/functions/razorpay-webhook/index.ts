@@ -1,0 +1,326 @@
+// Edge Function: razorpay-webhook
+//
+// Called directly by Razorpay's servers (no user session) whenever a
+// payment event happens. This is the ONLY place access is actually
+// granted for a paid purchase — the checkout page's client-side "success"
+// callback is purely cosmetic (shows a friendly message) and must never be
+// trusted to grant anything itself, since it runs in the payer's own
+// browser and could be spoofed.
+//
+// Uses the service-role key (not a forwarded user JWT — there isn't one)
+// because granting access means writing profiles/subscriptions/payments,
+// which RLS deliberately blocks for anyone but an admin or service_role.
+//
+// Deployed with: supabase functions deploy razorpay-webhook
+// Register in Razorpay Dashboard -> Settings -> Webhooks, active events:
+// "payment.captured" AND "payment.failed", pointing at this function's URL.
+
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { handlePreflight, jsonResponse } from "../_shared/cors.ts";
+import { notifyN8n } from "../_shared/n8n.ts";
+import {
+  fetchRazorpayOrderNotes,
+  verifyRazorpayWebhookSignature,
+} from "../_shared/razorpay.ts";
+
+const PLAN_INTERVAL_DAYS: Record<string, number> = {
+  weekly: 7,
+  monthly: 30,
+  yearly: 365,
+};
+
+interface RazorpayPaymentEntity {
+  id: string;
+  order_id: string;
+  amount: number; // paise
+  currency: string;
+  contact?: string; // phone number entered at checkout, e.g. "+919876543210"
+  notes?: Record<string, string>;
+  error_description?: string; // only present on payment.failed
+}
+
+Deno.serve(async (req) => {
+  // Deliberately verbose logging throughout: this function is called by
+  // Razorpay's servers, not by us, so a silent failure here is invisible
+  // (the payment still succeeds on Razorpay's side either way). Every
+  // early-exit path logs why, so the Supabase function logs alone are
+  // enough to diagnose a non-unlocking payment.
+  console.log("[razorpay-webhook] invoked", {
+    method: req.method,
+    hasSignature: !!req.headers.get("X-Razorpay-Signature"),
+  });
+
+  const preflight = handlePreflight(req);
+  if (preflight) return preflight;
+
+  if (req.method !== "POST") {
+    console.log("[razorpay-webhook] rejected: not POST");
+    return jsonResponse({ error: "Method not allowed" }, 405);
+  }
+
+  // Signature is computed over the exact raw body — read as text before
+  // any JSON parsing.
+  const rawBody = await req.text();
+  const signature = req.headers.get("X-Razorpay-Signature");
+  const secretConfigured = !!Deno.env.get("RAZORPAY_WEBHOOK_SECRET");
+  const validSignature = await verifyRazorpayWebhookSignature(rawBody, signature);
+  if (!validSignature) {
+    // Most common causes: RAZORPAY_WEBHOOK_SECRET unset/empty, or set to a
+    // different value than the one entered in Razorpay's webhook config.
+    console.error("[razorpay-webhook] signature verification FAILED", {
+      secretConfigured,
+      signaturePresent: !!signature,
+      bodyLength: rawBody.length,
+    });
+    return jsonResponse({ error: "Invalid signature" }, 400);
+  }
+
+  let event: { event?: string; payload?: { payment?: { entity?: RazorpayPaymentEntity } } };
+  try {
+    event = JSON.parse(rawBody);
+  } catch {
+    console.error("[razorpay-webhook] body was not valid JSON");
+    return jsonResponse({ error: "Invalid JSON body" }, 400);
+  }
+
+  const eventType = event.event;
+  console.log("[razorpay-webhook] event received:", eventType);
+
+  if (eventType !== "payment.captured" && eventType !== "payment.failed") {
+    // Acknowledge everything else with 200 so Razorpay doesn't retry
+    // events we deliberately ignore.
+    console.log("[razorpay-webhook] ignoring unhandled event type");
+    return jsonResponse({ ok: true, ignored: eventType ?? "unknown" });
+  }
+
+  const payment = event.payload?.payment?.entity;
+  if (!payment?.id) {
+    console.error("[razorpay-webhook] payload had no payment entity");
+    return jsonResponse({ error: "Malformed payload" }, 400);
+  }
+
+  const supabase = createClient(
+    Deno.env.get("SUPABASE_URL")!,
+    Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
+  );
+
+  // Idempotency: a redelivered webhook for an event we've already
+  // processed is a no-op, not a second grant/notification.
+  const eventKey = `${eventType}:${payment.id}`;
+  const { error: dedupeError } = await supabase
+    .from("webhook_events")
+    .insert({ provider: "razorpay", event_key: eventKey });
+
+  if (dedupeError) {
+    // Unique violation == already processed. Any other error is a real
+    // failure — return non-200 so Razorpay retries.
+    if (dedupeError.code === "23505") {
+      console.log("[razorpay-webhook] already processed, skipping:", eventKey);
+      return jsonResponse({ ok: true, alreadyProcessed: true });
+    }
+    console.error("[razorpay-webhook] dedupe insert failed:", dedupeError.message);
+    return jsonResponse({ error: dedupeError.message }, 500);
+  }
+
+  // The order's notes (set at creation time by admin/src/lib/razorpay.ts)
+  // are the authoritative source - Checkout.js never re-passes notes when
+  // opening the payment modal, so payment.notes below is only a fallback
+  // in case Razorpay does mirror them (kept for defense in depth).
+  let notes: Record<string, string>;
+  try {
+    notes = await fetchRazorpayOrderNotes(payment.order_id);
+    console.log("[razorpay-webhook] fetched order notes", {
+      orderId: payment.order_id,
+      keys: Object.keys(notes),
+    });
+  } catch (e) {
+    console.error("[razorpay-webhook] order fetch failed, falling back to payment.notes:", e);
+    notes = payment.notes ?? {};
+  }
+  if (!notes.user_id || !notes.plan_id) {
+    console.log("[razorpay-webhook] order notes incomplete, trying payment.notes");
+    notes = payment.notes ?? {};
+  }
+
+  const userId = notes.user_id;
+  const planId = notes.plan_id;
+  if (!userId || !planId) {
+    console.error("[razorpay-webhook] no user_id/plan_id anywhere", {
+      orderNoteKeys: Object.keys(notes),
+      paymentNoteKeys: Object.keys(payment.notes ?? {}),
+    });
+    return jsonResponse({ error: "Payment missing user_id/plan_id notes" }, 400);
+  }
+  console.log("[razorpay-webhook] resolved", { userId, planId });
+
+  const { data: plan, error: planError } = await supabase
+    .from("subscription_plans")
+    .select("id, name, billing_interval")
+    .eq("id", planId)
+    .maybeSingle<{ id: string; name: string; billing_interval: string }>();
+
+  if (planError || !plan) {
+    return jsonResponse({ error: "Unknown plan on payment notes" }, 404);
+  }
+
+  // Look up who to notify - best-effort, missing details just mean a
+  // sparser WhatsApp message, never a blocked payment.
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("display_name, access_started_at")
+    .eq("id", userId)
+    .maybeSingle<{ display_name: string | null; access_started_at: string | null }>();
+
+  // Billing details collected on our own checkout form (see
+  // admin/src/app/checkout) are the most reliable source - they're what
+  // the user actually typed. Fall back to the account's own details, then
+  // to whatever Razorpay captured, so a notification still goes out even
+  // if the form data is missing for some reason.
+  let email: string | null = notes.billing_email ?? null;
+  if (!email) {
+    try {
+      const { data: authUser } = await supabase.auth.admin.getUserById(userId);
+      email = authUser.user?.email ?? null;
+    } catch {
+      // non-fatal
+    }
+  }
+  const name = notes.billing_name ?? profile?.display_name ?? null;
+  const phone = notes.billing_phone ?? payment.contact ?? null;
+  const state = notes.billing_state ?? null;
+
+  if (eventType === "payment.failed") {
+    // Record the failed attempt for admin visibility, then notify - no
+    // access is granted here.
+    await supabase.from("payments").upsert(
+      {
+        user_id: userId,
+        amount: payment.amount / 100,
+        currency: payment.currency ?? "INR",
+        provider: "razorpay",
+        provider_payment_id: payment.id,
+        status: "failed",
+      },
+      { onConflict: "provider,provider_payment_id", ignoreDuplicates: true },
+    );
+
+    try {
+      await notifyN8n({
+        event: "payment_failed",
+        user_id: userId,
+        email,
+        name,
+        phone,
+        state,
+        plan_name: plan.name,
+        amount: payment.amount / 100,
+        currency: payment.currency ?? "INR",
+        reason: payment.error_description ?? "Payment failed",
+      });
+    } catch (e) {
+      console.error("n8n payment_failed notification failed:", e);
+    }
+
+    return jsonResponse({ ok: true });
+  }
+
+  // payment.captured — grant access.
+  const days = PLAN_INTERVAL_DAYS[plan.billing_interval] ?? 30;
+  const now = new Date();
+  const periodEnd = new Date(now.getTime() + days * 24 * 60 * 60 * 1000);
+
+  const { error: profileError } = await supabase
+    .from("profiles")
+    .update({
+      access_expires_at: periodEnd.toISOString(),
+      access_started_at: profile?.access_started_at ?? now.toISOString(),
+      subscription_tier: "premium",
+    })
+    .eq("id", userId);
+
+  if (profileError) {
+    console.error("[razorpay-webhook] GRANT FAILED:", profileError.message);
+    return jsonResponse({ error: profileError.message }, 500);
+  }
+  console.log("[razorpay-webhook] access granted", {
+    userId,
+    accessExpiresAt: periodEnd.toISOString(),
+  });
+
+  const { data: existingSub } = await supabase
+    .from("subscriptions")
+    .select("id")
+    .eq("user_id", userId)
+    .eq("plan_id", plan.id)
+    .in("status", ["trialing", "active"])
+    .maybeSingle<{ id: string }>();
+
+  let subscriptionId: string | null = existingSub?.id ?? null;
+
+  if (subscriptionId) {
+    await supabase
+      .from("subscriptions")
+      .update({
+        status: "active",
+        current_period_start: now.toISOString(),
+        current_period_end: periodEnd.toISOString(),
+      })
+      .eq("id", subscriptionId);
+  } else {
+    const { data: newSub, error: subError } = await supabase
+      .from("subscriptions")
+      .insert({
+        user_id: userId,
+        plan_id: plan.id,
+        status: "active",
+        payment_provider: "razorpay",
+        current_period_start: now.toISOString(),
+        current_period_end: periodEnd.toISOString(),
+      })
+      .select("id")
+      .single<{ id: string }>();
+
+    if (subError) {
+      return jsonResponse({ error: subError.message }, 500);
+    }
+    subscriptionId = newSub.id;
+  }
+
+  const { error: paymentError } = await supabase
+    .from("payments")
+    .upsert(
+      {
+        subscription_id: subscriptionId,
+        user_id: userId,
+        amount: payment.amount / 100,
+        currency: payment.currency ?? "INR",
+        provider: "razorpay",
+        provider_payment_id: payment.id,
+        status: "succeeded",
+        paid_at: now.toISOString(),
+      },
+      { onConflict: "provider,provider_payment_id", ignoreDuplicates: true },
+    );
+
+  if (paymentError) {
+    return jsonResponse({ error: paymentError.message }, 500);
+  }
+
+  try {
+    await notifyN8n({
+      event: "payment_success",
+      user_id: userId,
+      email,
+      name,
+      phone,
+      state,
+      plan_name: plan.name,
+      amount: payment.amount / 100,
+      currency: payment.currency ?? "INR",
+    });
+  } catch (e) {
+    console.error("n8n payment_success notification failed:", e);
+  }
+
+  return jsonResponse({ ok: true });
+});

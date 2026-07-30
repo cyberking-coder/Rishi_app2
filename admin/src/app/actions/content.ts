@@ -172,6 +172,25 @@ export async function updateContentStatus(args: {
   return { ok: true };
 }
 
+export async function setContentPremium(args: {
+  kind: ContentKind;
+  contentId: string;
+  isPremium: boolean;
+}): Promise<ActionResult> {
+  await requireAdmin();
+  const db = createAdminClient();
+  const table = args.kind === "video" ? "videos" : "audios";
+
+  const { error } = await db
+    .from(table)
+    .update({ is_premium: args.isPremium })
+    .eq("id", args.contentId);
+
+  if (error) return { ok: false, error: error.message };
+  revalidatePath(args.kind === "video" ? "/videos" : "/audios");
+  return { ok: true };
+}
+
 export async function deleteContent(args: {
   kind: ContentKind;
   contentId: string;

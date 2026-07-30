@@ -2,6 +2,8 @@
 
 Complete record of everything built, fixed, and configured across the mobile app, admin dashboard, and Supabase backend.
 
+**If you are an AI picking up this project**: read this whole file before touching code. Section 7 explains the LMS/payments work added on top of the original app (also described in `README.md`, which is the forward-looking roadmap this log tracks progress against). Section 9 explains the folder structure in plain language. Section 10 lists exactly what's unfinished right now.
+
 ---
 
 ## 1. Foundation & Architecture
@@ -19,6 +21,8 @@ Complete record of everything built, fixed, and configured across the mobile app
 - **`issue-playback-license`** — same for video (quality ladder)
 - **`issue-upload-url`** — signs a presigned PUT URL for admin audio uploads to R2
 
+(Three more edge functions were added later for payments — see Section 7.)
+
 ### Cloudflare R2
 - Private bucket for all audio files
 - AES-256-CTR encryption for offline downloaded files
@@ -35,6 +39,7 @@ Complete record of everything built, fixed, and configured across the mobile app
 - Device lock: if account already active on a different device, login is rejected with a clear error message
 - Show/hide password toggle on the login screen (eye icon)
 - Forgot password flow (sends Supabase reset email)
+- **(Added later)** Self-service email/password signup, Google Sign-In — see Section 7, Phase 1
 
 ### Home Screen
 - Greeting with time-of-day (Good Morning / Afternoon / Evening)
@@ -44,6 +49,7 @@ Complete record of everything built, fixed, and configured across the mobile app
 - Continue Listening horizontal scroll (resumes from last position)
 - Access expiry banner if ≤7 days remain
 - Navigates to `/now-playing` on any audio tap
+- **(Added later)** Per-item premium lock badges + "Get Access Now" checkout flow for free-tier users — see Section 7, Phases 2-3
 
 ### Now Playing Screen
 - Background audio via `audio_service` + `just_audio`
@@ -70,11 +76,12 @@ Complete record of everything built, fixed, and configured across the mobile app
 - Registered device(s) — green dot on current device
 - Downloads count (linked to downloads screen)
 - Logout with confirmation dialog
+- **(Fixed later)** Plan label used to always hardcode "Premium Member" for every user — now correctly shows Free / Premium / Staff based on real tier, see Section 7, Phase 2
 
 ### Access Window System
 - `access_expires_at` on each user's profile row
 - `has_active_access()` checked server-side in every edge function — device clock changes cannot bypass it
-- In-app access expiry screen shown when window lapses
+- In-app access expiry screen shown when window lapses **(removed later — replaced by per-item locking, see Phase 2)**
 - Next Event popup — configurable timed popup with image, title, body (admin-controlled)
 - Popup image: scrollable, full image shown with `BoxFit.contain`, max 320px height
 
@@ -102,13 +109,15 @@ Complete record of everything built, fixed, and configured across the mobile app
   - End access now
   - Activate / Suspend / Ban
 - **Reset All Devices** button in page header — bulk-resets every active device across all users (used after shipping a new build)
+- **(Fixed later)** Access column now shows "Free" instead of "Unlimited" for accounts that were never actually granted anything — see Section 7, Phase 0
 
-### Audios Table
-- Lists all audios with cover thumbnail, title, artist, duration, status
+### Audios / Videos Tables
+- Lists all audios/videos with cover thumbnail, title, artist, duration, status
 - Upload audio: file picker → presigned R2 PUT URL → upload with live progress bar
 - Per-audio cover image upload
 - Set `direct_url` for test-mode (bypasses R2 signing pipeline)
 - Publish / unpublish audio
+- **(Added later)** "Mark free/premium" toggle — previously `is_premium` could only be set once at upload time, see Section 7, Phase 2
 
 ### Categories
 - Create and manage categories
@@ -128,9 +137,12 @@ Complete record of everything built, fixed, and configured across the mobile app
 ### Analytics
 - Basic usage stats (placeholder for future metrics)
 
+### Checkout (added later)
+- Public `/checkout/[planId]` page — NOT part of the admin dashboard proper, no login required. This is where end users (free-tier app users) land after tapping "Get Access Now" in the mobile app, to pay via Razorpay. See Section 7, Phase 3.
+
 ---
 
-## 4. Bug Fixes Chronology
+## 4. Bug Fixes Chronology (original app, pre-LMS work)
 
 | Fix | What was broken |
 |-----|----------------|
@@ -148,6 +160,8 @@ Complete record of everything built, fixed, and configured across the mobile app
 | AGP/Gradle/Kotlin version bump | Bumped to AGP 8.9.1, Gradle 8.12, Kotlin 2.1.0 for Flutter SDK 36 compatibility |
 | Kotlin incremental cache crash on Windows | Project on `D:` drive, pub cache on `C:` drive → Kotlin cross-drive path error; fixed with `kotlin.incremental=false` in `gradle.properties` |
 | `_flushProgress` crashing offline | Network error on progress save was propagating; wrapped in try-catch (best-effort) |
+
+See Section 7 for the bug-fix chronology of the LMS/payments work (Phases 0-3a).
 
 ---
 
@@ -169,8 +183,9 @@ Complete record of everything built, fixed, and configured across the mobile app
 
 ### Extending / revoking access
 - Admin panel → Users → `•••` → Grant days / End access now
-- `access_expires_at = null` means unlimited (staff/admin accounts)
-- `access_expires_at` past → app shows expired screen AND edge functions block audio/downloads
+- `access_expires_at = null` **and** `access_started_at` set means unlimited (staff/admin accounts, or a manually-granted lifetime user)
+- `access_expires_at = null` **and** `access_started_at` also null means the account was never granted anything — a genuine free-tier user (see Phase 0 below for why this distinction matters)
+- `access_expires_at` past → free-tier behavior kicks in (locked content shows a lock badge; audio/video edge functions block premium plays) — see Phase 2
 
 ---
 
@@ -183,36 +198,247 @@ Complete record of everything built, fixed, and configured across the mobile app
 
 ---
 
-## 7. Repository Structure
+## 7. LMS Integration — Phases 0 through 3a
 
-```
-Rishi_app2/
-├── mobile_app/              Flutter app (Dart)
-│   ├── lib/
-│   │   ├── app/             Theme, router, shell widgets
-│   │   ├── core/            Device info, network, errors, utils
-│   │   └── features/
-│   │       ├── auth/        Login, forgot password, device registration
-│   │       ├── home/        Home screen, categories, search
-│   │       ├── audio/       Streaming, background playback, now playing
-│   │       ├── downloads/   Encrypted offline downloads, offline player
-│   │       ├── profile/     Profile, subscription, devices
-│   │       └── access/      Access window, expiry screen, popup
-│   └── android/             Android build config, keystore setup
-├── admin/                   Next.js admin dashboard
-│   └── src/
-│       ├── app/
-│       │   ├── actions/     Server actions (users, devices, content)
-│       │   └── (dashboard)/ Admin pages (users, audios, categories, etc.)
-│       └── components/      UI components (tables, forms, buttons)
-└── supabase/
-    ├── migrations/          All SQL schema migrations (numbered, ordered)
-    └── functions/           Deno edge functions
-        ├── issue-audio-license/
-        ├── issue-playback-license/
-        └── issue-upload-url/
-```
+This is the work described in `README.md` (the LMS/payments roadmap). Everything below was built in one extended session, phase by phase, each one tested on a real device before moving to the next. All of it lives on the git branch `claude/repo-structure-overview-vt36iu` — **check whether this has been merged to `main` yet** before assuming it's live in production.
+
+### Phase 0 — Free / Retreat / Admin role resolution (no schema change)
+
+**The problem**: before this phase, *every* user was admin-created, and admin-creation always explicitly set an access window. `has_active_access()` treated a `null` `access_expires_at` as "unlimited access" for anyone. That was safe only because nothing ever produced a `null` expiry except a deliberate admin choice. Once self-signup was going to exist (Phase 1), a brand-new free user's profile would *also* get `null` expiry from the database's default trigger — which, under the old logic, would have silently granted them unlimited premium access.
+
+**The fix**: `access_started_at` (a column that already existed) is only ever set by an actual admin grant action. A `null` `access_expires_at` now only means "unlimited" if `access_started_at` is also set; otherwise it means "never granted anything" → free tier. This is implemented in two SQL functions:
+- `has_active_access(user_id)` — boolean check, used by the edge functions
+- `resolve_user_tier(user_id)` — returns `'admin' | 'retreat' | 'free'`, the full tri-state
+
+Both were mirrored in application code so the UI agrees with the server:
+- Mobile: `AccessState.tier` (in `features/access/domain/access_state.dart`)
+- Admin: `resolveTier()` (in `admin/src/lib/access.ts`)
+
+**Migration**: `supabase/migrations/20260729000001_fix_has_active_access_role_resolution.sql`
+
+**A real bug found mid-rollout**: the first version of this fix required `access_started_at` to be set for *any* active access — but the admin's "Grant N days" button only ever touches `access_expires_at`, never `access_started_at`. This would have wrongly downgraded real paying/granted users to "free." Fixed by trusting `access_expires_at` directly whenever it's non-null, and only falling back to `access_started_at` when `access_expires_at` is null (the one genuinely ambiguous case). 18 legacy accounts with both columns null were manually confirmed as real admin-granted-unlimited users and backfilled with `access_started_at = created_at`.
+
+### Phase 1 — Self-service signup + Google Sign-In
+
+- New `/signup` screen (`features/auth/presentation/screens/signup_screen.dart`), reusing the existing login screen's widgets and the forgot-password screen's "show a success state" pattern. Handles both possible Supabase configurations (email confirmation required vs. immediate session).
+- **Google Sign-In** via the native `google_sign_in` package + Supabase's `signInWithIdToken` (not a browser redirect — avoids needing to build deep-link handling, which didn't exist in this app). Available on both login and signup screens (same action either way).
+- Removed the old "How to get access" contact-us dialog from the login screen; replaced with the signup link and Google button.
+- Real email regex validation (previously just checked for `@`); new-password validation requires 8+ characters with a letter, a number, and a symbol (existing passwords under looser rules aren't retroactively invalidated).
+- **No database changes needed** — the `handle_new_user` trigger already defaulted new rows to `role='user'`, `subscription_tier='free'`, which (thanks to Phase 0) now correctly resolves to free tier automatically.
+
+**Bugs found and fixed during this phase**:
+| Bug | Fix |
+|---|---|
+| Signing up with an email that already has an account (e.g. created via Google) silently sent no email and showed a misleading "check your email" screen | Supabase returns an empty `identities` array in this case — now detected and surfaced as a proper "already registered" error |
+| Logging out only cleared the Supabase session, never the cached Google account — user could never switch Google accounts after logout | `signOut()` now also calls `GoogleSignIn().signOut()` |
+| `ApiException: 10` (DEVELOPER_ERROR) on Google Sign-In | Debug builds use package name `com.knowthyself.app.debug` (via `applicationIdSuffix`) and are signed with the local machine's debug keystore — both differ from the release config. Needed a **second** Android OAuth client in Google Cloud Console registered specifically for the debug package name + debug keystore SHA-1. |
+
+**External setup required** (see the config placeholder files for exact instructions): `mobile_app/lib/core/config/google_auth_config.dart` (Web + iOS client IDs), `mobile_app/ios/Runner/Info.plist` (`GIDClientID` + URL scheme), Google Cloud Console (Web/Android/iOS OAuth clients), Supabase Dashboard → Authentication → Providers → Google.
+
+### Phase 2 — Content gating for free-tier users
+
+**The problem**: `home_screen.dart` had a full-screen "your access has ended" block that fired whenever `access.isExpired` was true. That check meant "no active window" — which, before Phase 1, only ever meant a lapsed retreat grant. After Phase 1, it also matched every legitimate free-tier user, who would see **zero content at all**, not even free-marked items.
+
+**The fix**: replaced the full-screen block with per-item gating.
+- Every content card checks `audio.isPremium && !access.hasAccess` → if locked, shows a small lock badge (`PremiumLockBadge` widget) instead of hiding the item.
+- Tapping a locked item shows a dialog instead of attempting playback (later extended into the real "Get Access Now" checkout flow in Phase 3).
+- Applied consistently across the home screen (daily card, featured row) and the browse/search screen (previously had no gating awareness at all).
+- The "N days left" pill now only shows for an active retreat window, not forever for a free user whose old expiry is in the past.
+- Admin dashboard: added a "Mark free/premium" toggle to the audios/videos row menu — `is_premium` could previously only be set once, at upload time.
+- **Fixed a hardcoded bug found by testing**: the profile screen's "Premium Member" label and Subscription row always showed "Premium" for literally every user, because it fell back to a hardcoded string whenever the (entirely unpopulated) `subscriptions` table had no row for that user — which was always. Now derives the label from the real access tier.
+
+**A second, more serious bug found by testing**: even after the client-side fix above, a free user still got "Your access period has ended" (403) when trying to play *free* content. The two license edge functions (`issue-audio-license`, `issue-playback-license`) ran the `has_active_access` check **unconditionally, before even looking at whether the content was premium** — a leftover from the old world where all content was effectively premium. Fixed by moving that check inside the existing `if (audio.is_premium)` block, so free content only ever requires being logged in + not device-locked.
+
+Video content itself was left untouched — there's still no video playback UI anywhere in the app (that's a future phase), so there was nothing to gate.
+
+### Phase 3a — Razorpay payments core
+
+**Scope decision, made explicitly rather than assumed**: this pass ships **blanket-subscription purchases only**, not per-item content purchases — individual audios/videos have no `price` column, only `subscription_plans` does. The `entitlements` table (for future per-item purchases) is untouched, nothing is foreclosed. Also: what's called a "subscription" here is a **manually-renewed grant**, not true Razorpay Subscriptions/autopay (a much bigger integration with mandates) — a successful payment grants N days of access (N = the plan's billing interval), same mechanism the admin's "Grant N days" button already uses, and the user pays again when it lapses.
+
+**The seeded plan**: "Rishi Mode", ₹199/month, in `supabase/migrations/20260730000001_payments_phase3.sql`.
+
+**New pieces**:
+- `webhook_events` table — replay-protection for the payment webhook (a redelivered event is a no-op, not a second grant).
+- `_shared/checkout_token.ts` (edge functions) — mints a short-lived (15 min) HMAC-signed token identifying `{user, plan}` to the external checkout page. Nothing like this existed before; the app had no way to identify a user to a web page without a second login.
+- `mint-checkout-token` (edge function) — the mobile app calls this to get a checkout link.
+- `razorpay-webhook` (edge function) — **the only place access is ever actually granted**. Verifies the Razorpay signature (HMAC-SHA256 over the raw body, constant-time compare), checks `webhook_events` for a replay, then on `payment.captured` sets `profiles.access_expires_at` (same field every other grant mechanism uses) and records `subscriptions`/`payments` rows. Uses the Supabase **service-role key** — the first function in this codebase to need it, since Razorpay's server has no user JWT to forward and RLS blocks these table writes from anyone but an admin or service_role.
+- Admin app: new public `/checkout/[planId]` page + `/api/checkout/create-order` route. Protected by the checkout token, not a Supabase login — deliberately exempted from the admin app's blanket "redirect anyone unauthenticated to /login" middleware, since the checkout page's whole audience is anonymous mobile app users, not admin staff. The client-side Razorpay success callback is purely cosmetic (shows "Payment received"); it never grants anything itself — only the webhook does, since a client-side callback runs in the payer's own browser and can't be trusted.
+- Mobile: `url_launcher` opens the checkout link in an **external browser** (never in-app), matching Apple/Google's requirement to route digital-content payments outside their in-app purchase systems if you don't want to give them a cut. The premium-lock dialog's "Get Access Now" button now performs this flow, with a text fallback (the old contact-us message) if anything fails. Home screen now also re-checks access when the app resumes from background (not just on screen mount), so a completed payment unlocks promptly when the user returns from the browser.
+
+**Bugs found and fixed while wiring this up end-to-end on a real device**:
+| Bug | Fix |
+|---|---|
+| "Get Access Now" silently failed | Android 11+ restricts which apps' intents you can see by default (package visibility). `url_launcher` couldn't find any browser to hand the URL to. Added a `<queries>` block to `AndroidManifest.xml`. |
+| `DataError: Key length is zero` in `mint-checkout-token` | `CHECKOUT_TOKEN_SECRET` was set to an empty value in Supabase's function secrets — re-set it to the actual generated secret. |
+| Checkout page redirected to the admin `/login` screen | The admin app's Vercel deployment hadn't actually picked up the latest code — clicking "Redeploy" on an old deployment card rebuilds that same old commit, it doesn't pull the latest git commit. Needed to check the Deployments tab for a fresh build of the current commit. |
+| Checkout page asked for a **Vercel** login (not the app's own login) | Vercel's own "Deployment Protection" setting puts preview deployments behind a Vercel-account login wall by default. Turned off in Vercel → Settings → Deployment Protection. |
+| Checkout URL kept breaking across pushes | The Vercel preview URL used during testing (`rishi-app2-<hash>-...vercel.app`) is tied to one specific deployment and changes on every push. `mobile_app/lib/core/config/checkout_config.dart` needs updating each time, until this branch is merged to `main` (or set as the Vercel production branch) so the stable production domain can be used instead. |
+
+**Bug found and fixed after further testing**: the full flow — tap "Get Access Now" → checkout page → Razorpay test payment completes → "Payment received" shown → return to app — worked, except the content did not actually unlock. Root cause: `razorpay-webhook` read `user_id`/`plan_id` off `payment.notes`, but those notes were only ever set on the Razorpay **order** at creation time (`admin/src/lib/razorpay.ts`) — Checkout.js never re-passes `notes` when opening the payment modal, so `payment.notes` arrived empty and the webhook 400'd silently (from the user's perspective — the payment itself still showed as successful, since that part is genuinely independent of the webhook). Fixed by having the webhook fetch the order directly from Razorpay's API (`fetchRazorpayOrderNotes` in `_shared/razorpay.ts`) using `payment.order_id`, with `payment.notes` kept only as a fallback. **This requires `RAZORPAY_KEY_ID` to now also be set as a Supabase Edge Function secret** (previously only needed by the admin app) — see Section 8.
+
+**Required external setup** (all done during this session, but written here so a fresh environment can be reconstructed):
+- Razorpay: test-mode API key ID + secret; a registered webhook (`payment.captured` event) pointing at the deployed `razorpay-webhook` function, with its own webhook secret.
+- Supabase Edge Function secrets: `RAZORPAY_KEY_SECRET`, `RAZORPAY_WEBHOOK_SECRET`, `CHECKOUT_TOKEN_SECRET`.
+- Admin app (Vercel) environment variables: `RAZORPAY_KEY_ID`, `RAZORPAY_KEY_SECRET`, `CHECKOUT_TOKEN_SECRET`.
+- `mobile_app/lib/core/config/checkout_config.dart` — the admin app's public URL.
 
 ---
 
-*Last updated: June 2026*
+## 8. Environment Variables & Secrets Reference
+
+None of these are committed to the repo (correctly). Listed here so a fresh setup knows exactly what to provision.
+
+### Supabase Edge Function secrets (`supabase secrets set ...` or Dashboard → Edge Functions → Secrets)
+| Secret | Used by | Purpose |
+|---|---|---|
+| `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_ACCOUNT_ID`, `R2_BUCKET` | `issue-audio-license`, `issue-playback-license`, `issue-upload-url` | Cloudflare R2 signing (pre-existing, not part of this session's work) |
+| `RAZORPAY_KEY_ID`, `RAZORPAY_KEY_SECRET` | `razorpay-webhook` | Used to fetch the Razorpay order directly (Basic Auth to `GET /v1/orders/{id}`) — the authoritative source for which user/plan a payment belongs to. Same credential pair as the admin app's, just also needed here now. |
+| `RAZORPAY_WEBHOOK_SECRET` | `razorpay-webhook` | Verifies the webhook signature Razorpay sends |
+| `CHECKOUT_TOKEN_SECRET` | `mint-checkout-token` | Signs the short-lived checkout token |
+
+### Admin app (Vercel) environment variables
+| Variable | Purpose |
+|---|---|
+| `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY` | Pre-existing Supabase client setup |
+| `R2_*` | Pre-existing, cover image uploads |
+| `RAZORPAY_KEY_ID` | Public-safe, used client-side in the Checkout.js embed |
+| `RAZORPAY_KEY_SECRET` | Used server-side to create Razorpay orders |
+| `CHECKOUT_TOKEN_SECRET` | Verifies the token minted by `mint-checkout-token` — **must be the exact same value** as the Supabase secret of the same name |
+
+### Mobile app config files (Dart constants, not env vars — Flutter has no runtime env var mechanism for this)
+| File | What to set |
+|---|---|
+| `lib/core/config/google_auth_config.dart` | Google OAuth Web Client ID |
+| `lib/core/config/checkout_config.dart` | The admin app's public URL |
+| `ios/Runner/Info.plist` | `GIDClientID` + `CFBundleURLSchemes` (Google OAuth iOS client) |
+
+---
+
+## 9. Repository Structure
+
+```
+Rishi_app2/
+├── mobile_app/                    Flutter app (Dart) — what users install on their phone
+│   ├── lib/
+│   │   ├── app/                   App-wide plumbing: go_router setup, theme, the persistent
+│   │   │                          bottom-nav shell widget
+│   │   ├── core/                  Cross-feature utilities that don't belong to one feature:
+│   │   │   ├── config/            Plain Dart constants for things that would be env vars in
+│   │   │   │                      a backend app (Google OAuth client ID, checkout base URL) —
+│   │   │   │                      Flutter has no runtime env var mechanism, so these are
+│   │   │   │                      literal source files with a placeholder to replace
+│   │   │   ├── device/            Device fingerprinting (for the one-device-per-account lock)
+│   │   │   ├── errors/            AuthFailure — the app's typed error model, shared by every
+│   │   │   │                      auth-adjacent feature so the UI can switch on error *type*
+│   │   │   │                      instead of parsing message strings
+│   │   │   └── network/           Supabase client provider
+│   │   └── features/              One folder per user-facing feature. Each follows the same
+│   │       │                      internal layering (see "Feature layering" note below):
+│   │       ├── auth/              Login, signup, forgot password, Google Sign-In, device
+│   │       │                      registration
+│   │       ├── access/            Resolves what tier a user is in (admin/retreat/free) and
+│   │       │                      whether they should see the "N days left" banner or a
+│   │       │                      next-event popup. Also owns the checkout-link-minting
+│   │       │                      datasource (added in Phase 3) even though the actual
+│   │       │                      "locked item" UI lives in home/
+│   │       ├── home/              Home screen, browse/search screen, and the shared
+│   │       │                      premium-lock dialog widget used by both
+│   │       ├── audio/             Streaming, background playback, the Now Playing screen
+│   │       ├── downloads/         Encrypted offline downloads, offline player
+│   │       └── profile/           Profile screen, subscription display, device list
+│   ├── android/                   Android build config, keystore setup, AndroidManifest.xml
+│   │                              (permissions, deep links, package-visibility <queries>)
+│   └── ios/                       iOS build config, Info.plist (permissions, OAuth URL
+│                                  schemes)
+│
+├── admin/                         Next.js admin dashboard — internal tool for staff, PLUS
+│   │                              (since Phase 3) the public checkout page for end users
+│   └── src/
+│       ├── app/
+│       │   ├── (dashboard)/       Admin-only pages (users, audios, videos, categories,
+│       │   │                      devices, settings). Every page here is gated by
+│       │   │                      requireAdmin() via the shared (dashboard)/layout.tsx.
+│       │   ├── actions/           Server Actions — the only place that's allowed to write
+│       │   │                      to the database from the admin UI. Convention: every
+│       │   │                      action calls requireAdmin() first, uses the service-role
+│       │   │                      client, returns {ok: true} | {ok: false, error: string}.
+│       │   ├── api/checkout/      Route Handler for creating a Razorpay order. Public
+│       │   │                      (no admin login) — protected by the checkout token
+│       │   │                      instead, since callers are anonymous mobile app users.
+│       │   ├── checkout/          The public checkout page itself (/checkout/[planId]).
+│       │   │                      Also public, also token-protected, also NOT part of the
+│       │   │                      admin dashboard despite living in this app.
+│       │   └── login/             Admin staff login page
+│       ├── components/            Shared UI (shadcn-based: Button, Card, Dialog, Table, ...)
+│       │                          plus feature-specific components (content upload dialog,
+│       │                          user actions menu, etc.)
+│       ├── lib/                   Same role as mobile's core/: env.ts (centralized env var
+│       │                          access with clear errors), supabase/ (client factories —
+│       │                          one for the logged-in user's session, one service-role
+│       │                          "admin" client that bypasses RLS), access.ts (tier
+│       │                          resolution, mirrors the mobile/SQL logic), razorpay.ts +
+│       │                          checkout-token.ts (Phase 3)
+│       └── middleware.ts          Runs on every request. Redirects anyone unauthenticated
+│                                  to /login — EXCEPT /checkout and /api/checkout, which are
+│                                  deliberately public.
+│
+└── supabase/
+    ├── migrations/                All SQL schema migrations, in chronological order by
+    │                              filename timestamp. This is the single source of truth
+    │                              for the database schema — never edit a table by hand in
+    │                              the dashboard without also writing a migration for it.
+    └── functions/                 Deno edge functions — server-side code that runs outside
+        │                          the Next.js/Flutter apps, callable via HTTPS. Used for
+        │                          anything that needs a secret the client can't hold
+        │                          (signing R2 URLs, verifying webhook signatures) or that
+        │                          must run with elevated database privileges.
+        ├── _shared/                Code shared between multiple functions (NOT auto-bundled
+        │                          when a function is deployed by pasting into the Supabase
+        │                          Dashboard's single-file editor — only the CLI's
+        │                          `supabase functions deploy` command picks these up
+        │                          correctly. If deploying via Dashboard, inline the shared
+        │                          code into the one file instead.)
+        │   ├── cors.ts             CORS headers + a jsonResponse() helper, used by every fn
+        │   ├── r2.ts                Cloudflare R2 presigned-URL signing
+        │   ├── razorpay.ts          Webhook signature verification (Phase 3)
+        │   └── checkout_token.ts    Mints the signed user+plan token (Phase 3)
+        ├── issue-audio-license/    Signs a playback URL for one audio track
+        ├── issue-playback-license/ Signs playback URLs for a video (multiple qualities)
+        ├── issue-upload-url/       Admin-only: signs an upload URL for new content
+        ├── mint-checkout-token/    Phase 3: mobile app calls this to start a purchase
+        └── razorpay-webhook/       Phase 3: Razorpay calls this directly (not the app) —
+                                   the only place a purchase actually grants access
+```
+
+### Feature layering (mobile app)
+
+Every folder under `mobile_app/lib/features/<name>/` follows the same four-layer split. When adding something to an existing feature, put new code in the matching layer rather than improvising a new structure:
+
+- **`domain/`** — plain Dart classes with no dependency on Supabase or Flutter widgets: entities (e.g. `AudioSummary`, `AccessState`), repository *interfaces* (abstract contracts), and use cases (a single public method wrapping one repository call — mostly there for testability, not because the logic is complex).
+- **`data/`** — the real implementation: a `*RemoteDataSource` class that actually talks to Supabase (queries, RPC calls, edge function invocations), and a `*RepositoryImpl` that implements the domain interface by calling the datasource and translating errors into the app's typed `AuthFailure`/exception model.
+- **`application/`** — Riverpod wiring: `*_providers.dart` builds the dependency graph (datasource → repository → usecase), and for features with real state machines (auth), a `*Controller` (a Riverpod `Notifier`) holding a sealed `*State` type the UI watches.
+- **`presentation/`** — everything Flutter-widget-shaped: `screens/` (one file per route) and `widgets/` (small reusable pieces used by more than one screen in the same feature, or that are complex enough to deserve their own file).
+
+The admin app doesn't use this layering — it's a much thinner app, and Next.js Server Actions already give a similar separation (`actions/` = data layer, page components = presentation, no separate domain/application layers because there's no complex client-side state to manage).
+
+---
+
+## 10. Known Issues / Next Steps
+
+As of the end of this session, in priority order:
+
+1. ~~**Unresolved bug**: content not unlocking after payment~~ — **Fixed** (see Phase 3a above): the webhook now fetches order notes directly from Razorpay's API instead of trusting `payment.notes`. **Not yet re-tested end-to-end after this fix** — next session should redeploy `razorpay-webhook`, set `RAZORPAY_KEY_ID` as an Edge Function secret, and run one more full test payment to confirm. If it's still broken after that:
+   - Did `razorpay-webhook` actually get called? (Supabase Dashboard → Edge Functions → razorpay-webhook → Logs)
+   - Did Razorpay actually deliver the webhook? (Razorpay Dashboard → Settings → Webhooks → click the webhook → delivery log/attempts)
+   - Is the webhook signature verifying correctly? (would show as a 400 "Invalid signature" in the function logs)
+   - Did `profiles.access_expires_at` actually get updated for the test user? (check directly in the `profiles` table)
+   - Does the mobile app's access-recheck-on-resume actually fire? (added in Phase 3, via a `WidgetsBindingObserver` in `home_screen.dart`)
+2. **The checkout URL is unstable.** `checkout_config.dart` currently points at a Vercel *preview* deployment URL, which changes on every push to this branch. Before this is genuinely done, either merge this branch to `main` (letting the stable production domain take over) or set this branch as the Vercel production branch, then update `checkout_config.dart` to the stable URL.
+3. **This whole branch (`claude/repo-structure-overview-vt36iu`) has not been merged to `main`.** Nothing in Section 7 is live for real users until that happens.
+4. **Phases 3b and 3c were never started**: an admin "Billing" page (payment history, refund button), and the account-deletion flow the original roadmap flagged as in-scope for the payments phase due to rising compliance stakes.
+5. **Per-item content purchases** (buying a single audio/video, not just the blanket subscription) were deliberately deferred — see Phase 3a's scope note above. The `entitlements` table is ready for this whenever it's picked up.
+6. Phases 4 onward (full LMS: courses/modules/lessons, quizzes, certificates, scaling work) haven't been started — see `README.md` for that roadmap.
+
+---
+
+*Last updated: 30 July 2026, after Phase 3a (Razorpay payments core).*

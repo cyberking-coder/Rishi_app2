@@ -1,10 +1,12 @@
 # Know Thyself — LMS Integration & Scale-Up Plan
 
-**Status: planning document only. No code has been written yet.** This file is the
-single source of truth for how we take the existing meditation/audio app and turn
-it into a full Learning Management System (LMS) with free and premium tiers,
-self-service signup, Razorpay + Stripe payments, and infrastructure that holds up
-at ~10 lakh (1,000,000) users — **without breaking anything that already works.**
+**Status: Phases 0-3a are built and under test (branch `claude/repo-structure-overview-vt36iu`,
+not yet merged to `main`). See `PROJECT_LOG.md` Section 7 for exactly what shipped, what
+bugs were found and fixed, and Section 10 for what's still unresolved/unstarted.** This
+file remains the single source of truth for the *plan* — how we take the existing
+meditation/audio app and turn it into a full Learning Management System (LMS) with free
+and premium tiers, self-service signup, Razorpay + Stripe payments, and infrastructure
+that holds up at ~10 lakh (1,000,000) users — **without breaking anything that already works.**
 
 Every phase below gets its own detailed file-by-file implementation plan (files
 changed, why, testing steps) submitted for approval *before* any code is written,
@@ -325,16 +327,18 @@ close to free and go in early too. Background jobs go in with payments
 Each phase ships independently and leaves the app fully working. Detailed
 file-by-file plans are written and approved before coding starts on each one.
 
-| Phase | Scope | Depends on |
-|---|---|---|
-| **0** | Land the Free/Retreat(Premium)/Admin role-resolution work already planned in the prior task (no DB change, pure derivation layer) | — |
-| **1** | Self-service signup (mobile signup screen, `handle_new_user` default tweak, email verification flow) | Phase 0 |
-| **2** | Content gating pass — confirm `is_premium` is consistently enforced across audio/video for the new free-signup population (it already is via `has_active_access`, this phase is verification + admin UI to mark content free/premium per item if not already exposed) | Phase 1 |
-| **3** | Payments: external web checkout portal, `payments`/`subscriptions`/`entitlements` wiring, Razorpay + Stripe, webhooks, background job queue, email + WhatsApp confirmation, admin Billing page, account-deletion flow | Phase 1 |
-| **4** | LMS core: courses/modules/lessons schema, admin course builder, mobile course catalog + lesson player (including finally building video playback UI), lesson progress | Phase 2 |
-| **5** | Quizzes + certificates | Phase 4 |
-| **6** | Scaling hardening: connection pooling, read replicas, Redis caching, CDN tuning, monitoring/error tracking wired up | Can start in parallel with Phase 3 onward, tuned continuously |
-| **7** | Load testing at simulated 10-lakh-user scale, fix bottlenecks found, go-live checklist | After Phase 5 and 6 |
+| Phase | Scope | Depends on | Status |
+|---|---|---|---|
+| **0** | Land the Free/Retreat(Premium)/Admin role-resolution work already planned in the prior task (no DB change, pure derivation layer) | — | ✅ Done |
+| **1** | Self-service signup (mobile signup screen, `handle_new_user` default tweak, email verification flow) | Phase 0 | ✅ Done (email/password + Google Sign-In) |
+| **2** | Content gating pass — confirm `is_premium` is consistently enforced across audio/video for the new free-signup population (it already is via `has_active_access`, this phase is verification + admin UI to mark content free/premium per item if not already exposed) | Phase 1 | ✅ Done |
+| **3** | Payments: external web checkout portal, `payments`/`subscriptions`/`entitlements` wiring, Razorpay + Stripe, webhooks, background job queue, email + WhatsApp confirmation, admin Billing page, account-deletion flow | Phase 1 | 🟡 Partial (3a done: Razorpay blanket-subscription checkout + webhook. 3b/3c not started: Stripe, per-item purchases, admin Billing page, notifications, account deletion. **One known bug**: content isn't unlocking after a successful payment — see `PROJECT_LOG.md` §10.) |
+| **4** | LMS core: courses/modules/lessons schema, admin course builder, mobile course catalog + lesson player (including finally building video playback UI), lesson progress | Phase 2 | Not started |
+| **5** | Quizzes + certificates | Phase 4 | Not started |
+| **6** | Scaling hardening: connection pooling, read replicas, Redis caching, CDN tuning, monitoring/error tracking wired up | Can start in parallel with Phase 3 onward, tuned continuously | Not started |
+| **7** | Load testing at simulated 10-lakh-user scale, fix bottlenecks found, go-live checklist | After Phase 5 and 6 | Not started |
+
+**Also unresolved**: this work lives on git branch `claude/repo-structure-overview-vt36iu`, not yet merged to `main` — see `PROJECT_LOG.md` §7 and §10 for the full detail on everything above.
 
 ---
 
@@ -370,6 +374,6 @@ relevant phase's file-level plan is written:
 
 ---
 
-*This is a living planning document — it will be updated as each phase's
-detailed implementation plan is approved and merged. Nothing in this file
-changes existing app behavior; it describes work not yet started.*
+*This is a living planning document. As of Phase 3a, this no longer describes
+purely future work — see `PROJECT_LOG.md` for the record of what's actually been
+built, tested, and what bugs were found along the way.*

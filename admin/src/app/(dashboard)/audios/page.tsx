@@ -94,6 +94,7 @@ export default async function AudiosPage() {
                         kind="audio"
                         contentId={a.id}
                         status={a.status}
+                        isPremium={a.is_premium}
                       />
                     </TableCell>
                   </TableRow>

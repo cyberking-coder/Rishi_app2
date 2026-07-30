@@ -2,10 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../access/application/access_providers.dart';
 import '../../../audio/application/audio_providers.dart';
 import '../../../audio/domain/entities/audio_track.dart';
 import '../../application/home_providers.dart';
 import '../../domain/entities/audio_summary.dart';
+import '../widgets/premium_lock.dart';
 
 const _kBg = Color(0xFF12082E);
 const _kSurface = Color(0xFF1C1040);
@@ -37,6 +39,11 @@ class _BrowseScreenState extends ConsumerState<BrowseScreen> {
 
   Future<void> _play(AudioSummary a) async {
     if (_starting) return; // guard against a double-tap opening twice
+    final access = ref.read(accessStateProvider).valueOrNull;
+    if (a.isPremium && access?.hasAccess != true) {
+      showPremiumLockedMessage(context, ref);
+      return;
+    }
     _starting = true;
     try {
       await ref.read(audioHandlerProvider).playSingleTrack(AudioTrack(
@@ -152,13 +159,15 @@ class _BrowseScreenState extends ConsumerState<BrowseScreen> {
   }
 }
 
-class _AudioRow extends StatelessWidget {
+class _AudioRow extends ConsumerWidget {
   final AudioSummary audio;
   final VoidCallback onTap;
   const _AudioRow({required this.audio, required this.onTap});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final access = ref.watch(accessStateProvider).valueOrNull;
+    final locked = audio.isPremium && access?.hasAccess != true;
     return GestureDetector(
       onTap: onTap,
       child: Container(
@@ -170,21 +179,26 @@ class _AudioRow extends StatelessWidget {
               color: Colors.white.withValues(alpha: 0.08), width: 1),
         ),
         child: Row(children: [
-          Container(
+          SizedBox(
             width: 50,
             height: 50,
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(12),
-              gradient: const LinearGradient(
-                  colors: [Color(0xFF8B5CF6), Color(0xFFEC4899)]),
-            ),
-            child: audio.coverArtUrl != null
-                ? ClipRRect(
-                    borderRadius: BorderRadius.circular(12),
-                    child: Image.network(audio.coverArtUrl!,
-                        fit: BoxFit.cover))
-                : const Icon(Icons.headphones,
-                    color: Colors.white, size: 24),
+            child: Stack(children: [
+              Container(
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(12),
+                  gradient: const LinearGradient(
+                      colors: [Color(0xFF8B5CF6), Color(0xFFEC4899)]),
+                ),
+                child: audio.coverArtUrl != null
+                    ? ClipRRect(
+                        borderRadius: BorderRadius.circular(12),
+                        child: Image.network(audio.coverArtUrl!,
+                            fit: BoxFit.cover))
+                    : const Icon(Icons.headphones,
+                        color: Colors.white, size: 24),
+              ),
+              if (locked) const PremiumLockBadge(),
+            ]),
           ),
           const SizedBox(width: 12),
           Expanded(
@@ -214,7 +228,7 @@ class _AudioRow extends StatelessWidget {
               shape: BoxShape.circle,
               color: _kAccent,
             ),
-            child: const Icon(Icons.play_arrow,
+            child: Icon(locked ? Icons.lock : Icons.play_arrow,
                 color: Colors.white, size: 18),
           ),
         ]),

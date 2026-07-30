@@ -4,7 +4,6 @@ import 'package:go_router/go_router.dart';
 
 import '../../../access/application/access_providers.dart';
 import '../../../access/domain/access_state.dart';
-import '../../../access/presentation/access_expired_view.dart';
 import '../../../access/presentation/next_event_popup.dart';
 import '../../../audio/application/audio_providers.dart';
 import '../../../audio/domain/entities/audio_track.dart';
@@ -14,6 +13,7 @@ import '../../application/home_providers.dart';
 import '../../domain/entities/audio_summary.dart';
 import '../../domain/entities/category_summary.dart';
 import '../../domain/entities/continue_listening_item.dart';
+import '../widgets/premium_lock.dart';
 
 // ── Design tokens ─────────────────────────────────────────────────────────────
 const _kBg         = Color(0xFF12082E);
@@ -31,9 +31,33 @@ class HomeScreen extends ConsumerStatefulWidget {
   ConsumerState<HomeScreen> createState() => _HomeScreenState();
 }
 
-class _HomeScreenState extends ConsumerState<HomeScreen> {
+class _HomeScreenState extends ConsumerState<HomeScreen>
+    with WidgetsBindingObserver {
   bool _popupShown = false;
   bool _purged = false;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    // Re-check access when the app comes back to the foreground - this is
+    // what makes a purchase feel like it unlocks immediately when the user
+    // returns from the external checkout browser, without needing to
+    // force-quit or manually re-navigate.
+    if (state == AppLifecycleState.resumed) {
+      ref.invalidate(accessStateProvider);
+    }
+  }
 
   void _onAccess(AccessState access) {
     if (access.isExpired && !_purged) {
@@ -53,6 +77,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
   Future<void> _playAudio(AudioSummary audio) async {
     if (_starting) return; // guard against a double-tap opening twice
+    final access = ref.read(accessStateProvider).valueOrNull;
+    if (audio.isPremium && access?.hasAccess != true) {
+      showPremiumLockedMessage(context, ref);
+      return;
+    }
     _starting = true;
     try {
       await ref.read(audioHandlerProvider).playSingleTrack(AudioTrack(
@@ -78,14 +107,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     final accessAsync = ref.watch(accessStateProvider);
     final access = accessAsync.valueOrNull;
     if (access != null) _onAccess(access);
-    final expired = access?.isExpired ?? false;
-
-    if (expired) {
-      return Scaffold(
-        backgroundColor: _kBg,
-        body: SafeArea(child: AccessExpiredView(access: access!)),
-      );
-    }
+    // Only a real (possibly unlimited) retreat window shows a countdown —
+    // a free-tier user was never granted one, so there's nothing to count
+    // down to zero forever.
+    final daysLeft =
+        access?.tier == UserTier.retreat ? access?.daysLeft : null;
 
     // Real display name from profile
     final profile = ref.watch(userProfileProvider).valueOrNull;
@@ -106,7 +132,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
             _Header(
               username: username,
               greeting: greeting,
-              daysLeft: access?.daysLeft,
+              daysLeft: daysLeft,
               onProfile: () => context.push('/profile'),
               onDownloads: () => context.push('/downloads'),
             ),
@@ -331,12 +357,14 @@ class _DailyCard extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final async = ref.watch(featuredAudiosProvider);
+    final access = ref.watch(accessStateProvider).valueOrNull;
     return async.when(
       loading: () => const SizedBox.shrink(),
       error: (_, __) => const SizedBox.shrink(),
       data: (audios) {
         if (audios.isEmpty) return const SizedBox.shrink();
         final audio = audios.first;
+        final locked = audio.isPremium && access?.hasAccess != true;
         final mins = audio.durationSeconds != null
             ? '${(audio.durationSeconds! ~/ 60)} min'
             : '';
@@ -355,24 +383,29 @@ class _DailyCard extends ConsumerWidget {
           ),
           child: Row(children: [
             // Thumbnail
-            Container(
+            SizedBox(
               width: 72,
               height: 72,
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(16),
-                gradient: const LinearGradient(
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                  colors: [_kPink, _kAccent],
-                ),
-              ),
-              child: audio.coverArtUrl != null
-                  ? ClipRRect(
-                      borderRadius: BorderRadius.circular(16),
-                      child: Image.network(audio.coverArtUrl!,
-                          fit: BoxFit.cover))
-                  : const Icon(Icons.self_improvement,
+              child: Stack(children: [
+                Container(
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(16),
+                    gradient: const LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: [_kPink, _kAccent],
+                    ),
+                  ),
+                  child: audio.coverArtUrl != null
+                      ? ClipRRect(
+                          borderRadius: BorderRadius.circular(16),
+                          child: Image.network(audio.coverArtUrl!,
+                              fit: BoxFit.cover))
+                      : const Icon(Icons.self_improvement,
                       color: Colors.white, size: 36),
+                ),
+                if (locked) const PremiumLockBadge(),
+              ]),
             ),
             const SizedBox(width: 14),
             Expanded(
@@ -414,8 +447,8 @@ class _DailyCard extends ConsumerWidget {
                           ),
                         ],
                       ),
-                      child: const Text('Play Now',
-                          style: TextStyle(
+                      child: Text(locked ? 'Locked' : 'Play Now',
+                          style: const TextStyle(
                               color: Colors.white,
                               fontSize: 12,
                               fontWeight: FontWeight.w600)),
@@ -480,6 +513,7 @@ class _FeaturedRow extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final async = ref.watch(featuredAudiosProvider);
+    final access = ref.watch(accessStateProvider).valueOrNull;
     return async.when(
       loading: () => const SizedBox(
           height: 120,
@@ -498,6 +532,7 @@ class _FeaturedRow extends ConsumerWidget {
             itemCount: audios.length,
             itemBuilder: (context, i) {
               final audio = audios[i];
+              final locked = audio.isPremium && access?.hasAccess != true;
               final grad = _gradients[i % _gradients.length];
               return GestureDetector(
                 onTap: () => onPlay(audio),
@@ -548,6 +583,7 @@ class _FeaturedRow extends ConsumerWidget {
                               fontWeight: FontWeight.w700,
                               height: 1.3)),
                     ),
+                    if (locked) const PremiumLockBadge(),
                   ]),
                 ),
               );

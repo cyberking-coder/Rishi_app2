@@ -38,8 +38,15 @@ export async function middleware(request: NextRequest) {
   } = await supabase.auth.getUser();
 
   const isLoginRoute = request.nextUrl.pathname.startsWith("/login");
+  // The checkout page and its API route are a public, end-user-facing
+  // surface (opened from the mobile app by anonymous browser tabs, not
+  // logged-in admin staff) — protected by the signed checkout token
+  // instead of a Supabase session. Never gate these behind /login.
+  const isPublicCheckoutRoute =
+    request.nextUrl.pathname.startsWith("/checkout") ||
+    request.nextUrl.pathname.startsWith("/api/checkout");
 
-  if (!user && !isLoginRoute) {
+  if (!user && !isLoginRoute && !isPublicCheckoutRoute) {
     const url = request.nextUrl.clone();
     url.pathname = "/login";
     return NextResponse.redirect(url);

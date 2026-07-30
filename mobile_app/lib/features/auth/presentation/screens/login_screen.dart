@@ -125,6 +125,38 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                         isLoading ? null : () => context.push('/signup'),
                     child: const Text('New here? Create a free account'),
                   ),
+                  const SizedBox(height: 8),
+                  // Sets expectations up front for the one-device-per-account
+                  // lock, so a user hitting it later understands why rather
+                  // than reading it as a bug.
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Icon(
+                        Icons.phonelink_lock_outlined,
+                        size: 15,
+                        color: Theme.of(context)
+                            .textTheme
+                            .bodySmall
+                            ?.color
+                            ?.withValues(alpha: 0.75),
+                      ),
+                      const SizedBox(width: 6),
+                      Flexible(
+                        child: Text(
+                          'One account can be used on one device only. '
+                          'Logging in on a new device will not work until '
+                          'the previous one is released.',
+                          textAlign: TextAlign.center,
+                          style: Theme.of(context)
+                              .textTheme
+                              .bodySmall
+                              ?.copyWith(height: 1.4),
+                        ),
+                      ),
+                    ],
+                  ),
                 ],
               ),
             ),

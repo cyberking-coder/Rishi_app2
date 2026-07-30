@@ -80,9 +80,23 @@ export async function setUserAccessDays(
       ? new Date(Date.now() + days * 24 * 60 * 60 * 1000).toISOString()
       : null;
 
+  // A null expiry only reads as "unlimited" if access_started_at is set
+  // (see resolve_user_tier), so stamp it for accounts that were never
+  // granted anything - but preserve it where it exists, since it records
+  // when the user's access originally began.
+  const { data: existing } = await admin
+    .from("profiles")
+    .select("access_started_at")
+    .eq("id", userId)
+    .maybeSingle<{ access_started_at: string | null }>();
+
   const { error } = await admin
     .from("profiles")
-    .update({ access_expires_at: expiresAt })
+    .update({
+      access_expires_at: expiresAt,
+      access_started_at: existing?.access_started_at ?? new Date().toISOString(),
+      subscription_tier: "premium",
+    })
     .eq("id", userId);
 
   if (error) return { ok: false, error: error.message };
@@ -111,15 +125,21 @@ export async function setUserAccessMinutes(
   return { ok: true };
 }
 
-/** Immediately ends a user's access (sets expiry to now). Their audio
- *  disappears and downloads are purged on next app open. */
+/** Immediately ends a user's access (sets expiry to now). Their premium
+ *  content re-locks and downloads are purged on next app open. */
 export async function revokeUserAccess(userId: string): Promise<ActionResult> {
   await requireAdmin();
   const admin = createAdminClient();
 
   const { error } = await admin
     .from("profiles")
-    .update({ access_expires_at: new Date().toISOString() })
+    .update({
+      access_expires_at: new Date().toISOString(),
+      // Keep the denormalized tier column in step with the access window.
+      // The payment webhook sets this to 'premium'; without resetting it
+      // here it would keep claiming premium after access was revoked.
+      subscription_tier: "free",
+    })
     .eq("id", userId);
 
   if (error) return { ok: false, error: error.message };

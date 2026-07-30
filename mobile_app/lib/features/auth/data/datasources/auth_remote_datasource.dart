@@ -73,6 +73,14 @@ class AuthRemoteDataSource {
     }
 
     if (response.session == null) {
+      // Supabase doesn't error when the email already belongs to an
+      // account (avoids leaking which emails are registered) - it silently
+      // sends no email and returns a user with an empty `identities` list
+      // instead. That's the only way to tell "no email was sent because
+      // this account already exists" apart from a real new signup.
+      if (response.user?.identities?.isEmpty ?? false) {
+        throw AuthFailure.emailAlreadyRegistered();
+      }
       // Email confirmation required — no session until the user verifies.
       return null;
     }
@@ -138,7 +146,11 @@ class AuthRemoteDataSource {
     try {
       await _registerDevice();
     } on DeviceLockedException {
-      await _client.auth.signOut();
+      // Also clear the cached Google account here (not just Supabase),
+      // otherwise a device-locked rejection would leave the next
+      // "Continue with Google" attempt silently reusing the same blocked
+      // account instead of letting the user pick a different one.
+      await signOut();
       throw AuthFailure.deviceLocked();
     }
 
@@ -162,7 +174,15 @@ class AuthRemoteDataSource {
     }
   }
 
-  Future<void> signOut() => _client.auth.signOut();
+  Future<void> signOut() async {
+    await _client.auth.signOut();
+    // Also clear the cached Google account, otherwise google_sign_in
+    // silently re-signs the user into the same account on the next
+    // "Continue with Google" tap instead of showing the account picker.
+    if (isGoogleSignInConfigured) {
+      await GoogleSignIn(serverClientId: googleWebClientId).signOut();
+    }
+  }
 
   Future<void> sendPasswordResetEmail(String email) async {
     try {

@@ -30,4 +30,13 @@ export const env = {
     bucket: required("R2_BUCKET", process.env.R2_BUCKET),
     publicBaseUrl: process.env.R2_PUBLIC_BASE_URL ?? "",
   }),
+  checkoutTokenSecret: () =>
+    required("CHECKOUT_TOKEN_SECRET", process.env.CHECKOUT_TOKEN_SECRET),
+  razorpay: () => ({
+    keyId: required("RAZORPAY_KEY_ID", process.env.RAZORPAY_KEY_ID),
+    keySecret: required(
+      "RAZORPAY_KEY_SECRET",
+      process.env.RAZORPAY_KEY_SECRET,
+    ),
+  }),
 };

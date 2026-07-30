@@ -39,6 +39,9 @@ class AudioRemoteDataSource {
         }
         throw AuthFailure.deviceLocked();
       }
+      if (response.status == 402) {
+        throw AuthFailure.premiumRequired();
+      }
       throw AuthFailure.unknown(error);
     }
 
