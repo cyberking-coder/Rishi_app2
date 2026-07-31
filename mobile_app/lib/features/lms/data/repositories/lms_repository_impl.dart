@@ -12,6 +12,7 @@ class LmsRepositoryImpl implements LmsRepository {
   Future<List<CourseSummary>> getCourses() async {
     final rows = await _remote.getCourses();
     final completed = await _remote.getCompletedLessonIds();
+    final purchased = await _remote.getPurchasedCourseIds();
 
     return rows.map((row) {
       // Lesson ids arrive nested two levels deep (course -> modules ->
@@ -28,6 +29,7 @@ class LmsRepositoryImpl implements LmsRepository {
         lessonCount: lessonIds.length,
         completedLessonCount:
             lessonIds.where((id) => completed.contains(id)).length,
+        owned: purchased.contains(row['id'] as String?),
       );
     }).toList();
   }
@@ -41,6 +43,7 @@ class LmsRepositoryImpl implements LmsRepository {
 
     final moduleRows = await _remote.getModules(courseId);
     final completed = await _remote.getCompletedLessonIds();
+    final purchased = await _remote.getPurchasedCourseIds();
 
     final modules = moduleRows.map((row) {
       final lessonRows =
@@ -64,7 +67,10 @@ class LmsRepositoryImpl implements LmsRepository {
     }).toList();
 
     return CourseDetail(
-      course: CourseSummaryRef.fromMap(courseRow),
+      course: CourseSummaryRef.fromMap(
+        courseRow,
+        owned: purchased.contains(courseId),
+      ),
       modules: modules,
     );
   }

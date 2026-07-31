@@ -3,7 +3,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../../app/theme/app_theme.dart';
-import '../../../access/application/access_providers.dart';
 import '../../application/lms_providers.dart';
 import '../../domain/entities/course_summary.dart';
 
@@ -36,7 +35,6 @@ class _CoursesScreenState extends ConsumerState<CoursesScreen> {
   @override
   Widget build(BuildContext context) {
     final async = ref.watch(coursesProvider);
-    final access = ref.watch(accessStateProvider).valueOrNull;
 
     return SafeArea(
       bottom: false,
@@ -107,11 +105,7 @@ class _CoursesScreenState extends ConsumerState<CoursesScreen> {
                     padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
                     itemCount: visible.length,
                     separatorBuilder: (_, __) => const SizedBox(height: 14),
-                    itemBuilder: (_, i) => CourseCard(
-                      course: visible[i],
-                      locked:
-                          visible[i].isPremium && access?.hasAccess != true,
-                    ),
+                    itemBuilder: (_, i) => CourseCard(course: visible[i]),
                   ),
                 );
               },
@@ -232,9 +226,8 @@ class _EmptyState extends StatelessWidget {
 /// its own layout self-contained rather than depending on page padding.
 class CourseCard extends StatelessWidget {
   final CourseSummary course;
-  final bool locked;
 
-  const CourseCard({super.key, required this.course, required this.locked});
+  const CourseCard({super.key, required this.course});
 
   @override
   Widget build(BuildContext context) {
@@ -259,36 +252,48 @@ class CourseCard extends StatelessWidget {
               aspectRatio: 16 / 9,
               child: Stack(fit: StackFit.expand, children: [
                 _CourseCover(url: course.coverImageUrl),
-                if (locked)
-                  Positioned(
-                    top: 10,
-                    right: 10,
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 10, vertical: 5),
-                      decoration: BoxDecoration(
-                        color: Colors.white.withValues(alpha: 0.94),
-                        borderRadius:
-                            BorderRadius.circular(AppTheme.radiusPill),
-                      ),
-                      child: const Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(Icons.lock_rounded,
-                              size: 12, color: AppTheme.clay),
-                          SizedBox(width: 4),
-                          Text(
-                            'Premium',
-                            style: TextStyle(
-                              fontSize: 10.5,
-                              fontWeight: FontWeight.w700,
-                              color: AppTheme.clay,
-                            ),
+                // Price is the headline on a locked course; an owned one
+                // says so instead, since the number is no longer a
+                // decision the user has to make.
+                Positioned(
+                  top: 10,
+                  right: 10,
+                  child: Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.94),
+                      borderRadius: BorderRadius.circular(AppTheme.radiusPill),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          course.owned
+                              ? Icons.check_circle_rounded
+                              : course.isFree
+                                  ? Icons.lock_open_rounded
+                                  : Icons.lock_rounded,
+                          size: 12,
+                          color: course.owned || course.isFree
+                              ? AppTheme.sage
+                              : AppTheme.clay,
+                        ),
+                        const SizedBox(width: 4),
+                        Text(
+                          course.owned ? 'Enrolled' : course.priceLabel,
+                          style: TextStyle(
+                            fontSize: 10.5,
+                            fontWeight: FontWeight.w800,
+                            color: course.owned || course.isFree
+                                ? AppTheme.sage
+                                : AppTheme.clay,
                           ),
-                        ],
-                      ),
+                        ),
+                      ],
                     ),
                   ),
+                ),
               ]),
             ),
             Padding(

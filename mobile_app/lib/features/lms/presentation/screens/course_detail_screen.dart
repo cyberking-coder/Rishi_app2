@@ -2,13 +2,14 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import 'package:url_launcher/url_launcher.dart';
+
 import '../../../../app/theme/app_theme.dart';
-import '../../../access/application/access_providers.dart';
 import '../../../audio/application/audio_providers.dart';
 import '../../../audio/domain/entities/audio_track.dart';
-import '../../../home/presentation/widgets/premium_lock.dart';
 import '../../application/lms_providers.dart';
 import '../../domain/entities/lesson.dart';
+import '../widgets/course_purchase_sheet.dart';
 
 class CourseDetailScreen extends ConsumerStatefulWidget {
   final String courseId;
@@ -27,9 +28,29 @@ class CourseDetailScreen extends ConsumerStatefulWidget {
 class _CourseDetailScreenState extends ConsumerState<CourseDetailScreen> {
   bool _starting = false;
 
+  /// The course being viewed, once loaded — needed to price the purchase
+  /// sheet from anywhere in this screen.
+  CourseSummaryRef? _course;
+
+  Future<void> _promptPurchase() async {
+    final course = _course;
+    if (course == null) return;
+    await showCoursePurchaseSheet(
+      context,
+      ref,
+      courseId: course.id,
+      courseTitle: course.title,
+      priceLabel: course.priceLabel,
+    );
+    // Coming back from checkout, re-read ownership so a completed
+    // purchase unlocks without a manual refresh.
+    ref.invalidate(courseDetailProvider(widget.courseId));
+    ref.invalidate(coursesProvider);
+  }
+
   Future<void> _openLesson(Lesson lesson, bool locked) async {
     if (locked) {
-      showPremiumLockedMessage(context, ref);
+      await _promptPurchase();
       return;
     }
 
@@ -47,6 +68,26 @@ class _CourseDetailScreenState extends ConsumerState<CourseDetailScreen> {
         context.push('/lesson-text/${lesson.id}', extra: lesson);
         // Reading is the whole interaction for a text lesson, so opening
         // it counts as completing it.
+        await _markComplete(lesson);
+        return;
+
+      case LessonType.pdf:
+      case LessonType.image:
+      case LessonType.file:
+      case LessonType.link:
+        // Handouts and links open outside the app: there's no in-app
+        // viewer for arbitrary file types, and the browser already
+        // handles PDFs, images and embedded pages well.
+        final uri = Uri.tryParse(lesson.resourceUrl!);
+        if (uri == null) return;
+        final opened =
+            await launchUrl(uri, mode: LaunchMode.externalApplication);
+        if (!opened && mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Could not open this lesson.')),
+          );
+          return;
+        }
         await _markComplete(lesson);
         return;
 
@@ -103,7 +144,6 @@ class _CourseDetailScreenState extends ConsumerState<CourseDetailScreen> {
   @override
   Widget build(BuildContext context) {
     final async = ref.watch(courseDetailProvider(widget.courseId));
-    final access = ref.watch(accessStateProvider).valueOrNull;
 
     return Scaffold(
       backgroundColor: AppTheme.background,
@@ -131,7 +171,8 @@ class _CourseDetailScreenState extends ConsumerState<CourseDetailScreen> {
           ]),
         ),
         data: (detail) {
-          final locked = detail.course.isPremium && access?.hasAccess != true;
+          _course = detail.course;
+          final locked = detail.course.isLocked;
           final next = detail.nextLesson;
 
           // Lessons are numbered 1..n across the whole course rather than
@@ -163,9 +204,10 @@ class _CourseDetailScreenState extends ConsumerState<CourseDetailScreen> {
                       progress: detail.progressFraction,
                       locked: locked,
                       nextLessonTitle: next?.title,
+                      priceLabel: detail.course.priceLabel,
                       onPrimary: () {
                         if (locked) {
-                          showPremiumLockedMessage(context, ref);
+                          _promptPurchase();
                         } else if (next != null) {
                           _openLesson(next, false);
                         }
@@ -347,6 +389,7 @@ class _MetaCard extends StatelessWidget {
   final int completed;
   final double progress;
   final bool locked;
+  final String priceLabel;
   final String? nextLessonTitle;
   final VoidCallback onPrimary;
 
@@ -356,6 +399,7 @@ class _MetaCard extends StatelessWidget {
     required this.completed,
     required this.progress,
     required this.locked,
+    required this.priceLabel,
     required this.onPrimary,
     this.description,
     this.nextLessonTitle,
@@ -414,12 +458,12 @@ class _MetaCard extends StatelessWidget {
                 color: AppTheme.sandSoft,
                 borderRadius: BorderRadius.circular(AppTheme.radiusPill),
               ),
-              child: const Row(mainAxisSize: MainAxisSize.min, children: [
-                Icon(Icons.lock_rounded, size: 11, color: AppTheme.clay),
-                SizedBox(width: 4),
+              child: Row(mainAxisSize: MainAxisSize.min, children: [
+                const Icon(Icons.lock_rounded, size: 11, color: AppTheme.clay),
+                const SizedBox(width: 4),
                 Text(
-                  'Members only',
-                  style: TextStyle(
+                  priceLabel,
+                  style: const TextStyle(
                     fontSize: 10.5,
                     fontWeight: FontWeight.w700,
                     color: AppTheme.clay,
@@ -464,7 +508,7 @@ class _MetaCard extends StatelessWidget {
               onPressed: onPrimary,
               child: Text(
                 locked
-                    ? 'Unlock this course'
+                    ? 'Get access · $priceLabel'
                     : started
                         ? 'Continue learning'
                         : 'Start course',
@@ -500,6 +544,14 @@ class _LessonTile extends StatelessWidget {
         return Icons.play_arrow_rounded;
       case LessonType.text:
         return Icons.article_rounded;
+      case LessonType.pdf:
+        return Icons.picture_as_pdf_rounded;
+      case LessonType.image:
+        return Icons.image_rounded;
+      case LessonType.file:
+        return Icons.download_rounded;
+      case LessonType.link:
+        return Icons.open_in_new_rounded;
     }
   }
 
@@ -514,6 +566,14 @@ class _LessonTile extends StatelessWidget {
         return 'Video';
       case LessonType.text:
         return 'Reading';
+      case LessonType.pdf:
+        return 'PDF';
+      case LessonType.image:
+        return 'Image';
+      case LessonType.file:
+        return lesson.resourceName ?? 'Download';
+      case LessonType.link:
+        return 'Link';
     }
   }
 

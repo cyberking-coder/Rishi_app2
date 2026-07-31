@@ -1,4 +1,4 @@
-enum LessonType { audio, video, text }
+enum LessonType { audio, video, text, pdf, image, file, link }
 
 LessonType lessonTypeFromString(String? value) {
   switch (value) {
@@ -6,6 +6,14 @@ LessonType lessonTypeFromString(String? value) {
       return LessonType.video;
     case 'text':
       return LessonType.text;
+    case 'pdf':
+      return LessonType.pdf;
+    case 'image':
+      return LessonType.image;
+    case 'file':
+      return LessonType.file;
+    case 'link':
+      return LessonType.link;
     default:
       return LessonType.audio;
   }
@@ -32,6 +40,10 @@ class Lesson {
   final String? videoId;
   final String? videoTitle;
 
+  /// Payload for pdf/image/file/link lessons: a public URL.
+  final String? resourceUrl;
+  final String? resourceName;
+
   const Lesson({
     required this.id,
     required this.title,
@@ -46,6 +58,8 @@ class Lesson {
     this.audioDurationSeconds,
     this.videoId,
     this.videoTitle,
+    this.resourceUrl,
+    this.resourceName,
   });
 
   /// True when the lesson claims a media type but the row it pointed at is
@@ -58,6 +72,11 @@ class Lesson {
         return videoId != null;
       case LessonType.text:
         return bodyMarkdown != null;
+      case LessonType.pdf:
+      case LessonType.image:
+      case LessonType.file:
+      case LessonType.link:
+        return resourceUrl != null && resourceUrl!.isNotEmpty;
     }
   }
 
@@ -78,6 +97,8 @@ class Lesson {
       audioDurationSeconds: audio?['duration_seconds'] as int?,
       videoId: video?['id'] as String?,
       videoTitle: video?['title'] as String?,
+      resourceUrl: map['resource_url'] as String?,
+      resourceName: map['resource_name'] as String?,
     );
   }
 }
@@ -123,6 +144,8 @@ class CourseSummaryRef {
   final String? description;
   final String? coverImageUrl;
   final bool isPremium;
+  final int priceAmount;
+  final bool owned;
 
   const CourseSummaryRef({
     required this.id,
@@ -130,14 +153,32 @@ class CourseSummaryRef {
     required this.isPremium,
     this.description,
     this.coverImageUrl,
+    this.priceAmount = 0,
+    this.owned = false,
   });
 
-  factory CourseSummaryRef.fromMap(Map<String, dynamic> map) =>
+  bool get isFree => priceAmount == 0;
+  bool get isLocked => !isFree && !owned;
+
+  String get priceLabel {
+    if (isFree) return 'Free';
+    final rupees = priceAmount / 100;
+    return rupees == rupees.roundToDouble()
+        ? '₹${rupees.round()}'
+        : '₹${rupees.toStringAsFixed(2)}';
+  }
+
+  factory CourseSummaryRef.fromMap(
+    Map<String, dynamic> map, {
+    bool owned = false,
+  }) =>
       CourseSummaryRef(
         id: map['id'] as String? ?? '',
         title: map['title'] as String? ?? 'Untitled',
         description: map['description'] as String?,
         coverImageUrl: map['cover_image_url'] as String?,
         isPremium: map['is_premium'] as bool? ?? true,
+        priceAmount: (map['price_amount'] as num?)?.toInt() ?? 0,
+        owned: owned,
       );
 }

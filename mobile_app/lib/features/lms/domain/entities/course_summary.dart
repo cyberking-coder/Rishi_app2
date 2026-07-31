@@ -7,6 +7,12 @@ class CourseSummary {
   final int lessonCount;
   final int completedLessonCount;
 
+  /// Minor units (paise). 0 means free.
+  final int priceAmount;
+
+  /// True when this user has already bought (or been granted) the course.
+  final bool owned;
+
   const CourseSummary({
     required this.id,
     required this.title,
@@ -15,7 +21,25 @@ class CourseSummary {
     this.coverImageUrl,
     this.lessonCount = 0,
     this.completedLessonCount = 0,
+    this.priceAmount = 0,
+    this.owned = false,
   });
+
+  bool get isFree => priceAmount == 0;
+
+  /// Whether the catalog should show a lock. A free course is open to
+  /// everyone, and an owned one is unlocked regardless of price.
+  bool get isLocked => !isFree && !owned;
+
+  /// Rupees, without trailing decimals when it's a whole number — which
+  /// it almost always is for course pricing.
+  String get priceLabel {
+    if (isFree) return 'Free';
+    final rupees = priceAmount / 100;
+    return rupees == rupees.roundToDouble()
+        ? '₹${rupees.round()}'
+        : '₹${rupees.toStringAsFixed(2)}';
+  }
 
   double get progressFraction =>
       lessonCount == 0 ? 0 : completedLessonCount / lessonCount;
@@ -26,6 +50,7 @@ class CourseSummary {
     Map<String, dynamic> map, {
     int lessonCount = 0,
     int completedLessonCount = 0,
+    bool owned = false,
   }) =>
       CourseSummary(
         id: map['id'] as String? ?? '',
@@ -37,5 +62,7 @@ class CourseSummary {
         isPremium: map['is_premium'] as bool? ?? true,
         lessonCount: lessonCount,
         completedLessonCount: completedLessonCount,
+        priceAmount: (map['price_amount'] as num?)?.toInt() ?? 0,
+        owned: owned,
       );
 }

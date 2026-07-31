@@ -543,7 +543,6 @@ class _CoursesRow extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final async = ref.watch(coursesProvider);
-    final access = ref.watch(accessStateProvider).valueOrNull;
 
     return async.maybeWhen(
       orElse: () => const SizedBox(height: 190),
@@ -566,11 +565,7 @@ class _CoursesRow extends ConsumerWidget {
             itemCount: courses.length,
             separatorBuilder: (_, __) => const SizedBox(width: 14),
             itemBuilder: (_, i) {
-              final course = courses[i];
-              return _CourseMiniCard(
-                course: course,
-                locked: course.isPremium && access?.hasAccess != true,
-              );
+              return _CourseMiniCard(course: courses[i]);
             },
           ),
         );
@@ -581,9 +576,8 @@ class _CoursesRow extends ConsumerWidget {
 
 class _CourseMiniCard extends StatelessWidget {
   final CourseSummary course;
-  final bool locked;
 
-  const _CourseMiniCard({required this.course, required this.locked});
+  const _CourseMiniCard({required this.course});
 
   @override
   Widget build(BuildContext context) {
@@ -613,20 +607,28 @@ class _CourseMiniCard extends StatelessWidget {
                   )
                 else
                   const _MiniCover(),
-                if (locked)
-                  Positioned(
-                    top: 8,
-                    right: 8,
-                    child: Container(
-                      padding: const EdgeInsets.all(5),
-                      decoration: BoxDecoration(
-                        color: Colors.white.withValues(alpha: 0.92),
-                        shape: BoxShape.circle,
+                Positioned(
+                  top: 8,
+                  right: 8,
+                  child: Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.92),
+                      borderRadius: BorderRadius.circular(AppTheme.radiusPill),
+                    ),
+                    child: Text(
+                      course.owned ? 'Enrolled' : course.priceLabel,
+                      style: TextStyle(
+                        fontSize: 10,
+                        fontWeight: FontWeight.w800,
+                        color: course.owned || course.isFree
+                            ? AppTheme.sage
+                            : AppTheme.clay,
                       ),
-                      child: const Icon(Icons.lock_rounded,
-                          size: 12, color: AppTheme.clay),
                     ),
                   ),
+                ),
               ]),
             ),
             Expanded(
