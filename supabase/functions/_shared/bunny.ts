@@ -73,21 +73,34 @@ export async function signBunnyPlayback(
 /// state before refusing.
 ///
 /// Requires BUNNY_STREAM_API_KEY and BUNNY_STREAM_LIBRARY_ID. Returns
-/// "processing" when anything goes wrong — an unreachable Bunny is not a
-/// reason to claim the encode failed.
+/// "unknown" — never "processing" — when those aren't configured or the
+/// call fails, so callers can tell "Bunny says it isn't ready" apart from
+/// "we couldn't ask". Conflating the two turns a missing secret into a
+/// permanently unplayable video.
+export type BunnyStatus = "processing" | "ready" | "failed" | "unknown";
+
 export async function fetchBunnyStatus(
   bunnyVideoId: string,
-): Promise<"processing" | "ready" | "failed"> {
+): Promise<BunnyStatus> {
   const apiKey = Deno.env.get("BUNNY_STREAM_API_KEY");
   const libraryId = Deno.env.get("BUNNY_STREAM_LIBRARY_ID");
-  if (!apiKey || !libraryId) return "processing";
+  if (!apiKey || !libraryId) {
+    console.warn(
+      "BUNNY_STREAM_API_KEY / BUNNY_STREAM_LIBRARY_ID not set - cannot " +
+        "verify encode status.",
+    );
+    return "unknown";
+  }
 
   try {
     const res = await fetch(
       `https://video.bunnycdn.com/library/${libraryId}/videos/${bunnyVideoId}`,
       { headers: { AccessKey: apiKey, accept: "application/json" } },
     );
-    if (!res.ok) return "processing";
+    if (!res.ok) {
+      console.error(`Bunny status check returned ${res.status}`);
+      return "unknown";
+    }
 
     const video = (await res.json()) as { status?: number };
     const status = video.status ?? 0;
@@ -96,6 +109,6 @@ export async function fetchBunnyStatus(
     return "processing";
   } catch (e) {
     console.error("Bunny status check failed:", e);
-    return "processing";
+    return "unknown";
   }
 }

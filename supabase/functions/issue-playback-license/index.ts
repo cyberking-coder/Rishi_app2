@@ -149,14 +149,20 @@ Deno.serve(async (req) => {
       // behind an admin's manual action. Ask Bunny directly, and write the
       // answer back so the next viewer skips this round trip.
       const liveStatus = await fetchBunnyStatus(video.bunny_video_id);
-      if (liveStatus !== video.bunny_status) {
+      if (liveStatus !== "unknown" && liveStatus !== video.bunny_status) {
         await supabase
           .from("videos")
           .update({ bunny_status: liveStatus })
           .eq("id", videoId);
       }
 
-      if (liveStatus !== "ready") {
+      // "unknown" means we couldn't reach Bunny (or the API credentials
+      // aren't configured for this function), not that the video is
+      // unready. Refusing on that would make an unverifiable status
+      // permanently fatal. Let the request through instead — if the
+      // encode really hasn't finished, Bunny serves no manifest and the
+      // player reports it, which is recoverable; a 409 here is not.
+      if (liveStatus !== "ready" && liveStatus !== "unknown") {
         return jsonResponse(
           {
             error: liveStatus === "failed"
