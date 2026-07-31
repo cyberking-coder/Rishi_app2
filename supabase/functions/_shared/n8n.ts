@@ -11,10 +11,21 @@ export interface PaymentNotification {
   /** Collected on our own checkout form; falls back to Razorpay's contact. */
   phone: string | null;
   state: string | null;
+  /** Subscription plan name, or the course title for a course purchase. */
   plan_name: string;
   amount: number; // rupees, not paise
   currency: string;
   reason?: string; // only set for payment_failed
+  /** Lets the n8n workflow pick a different WhatsApp/email template for a
+   *  course purchase vs the recurring subscription — "you're in Rishi
+   *  Mode" reads wrong on a one-off course sale, and vice versa. */
+  content_type?: "subscription" | "course";
+  /** Only set for content_type: "course" — lets the message deep-link
+   *  straight to the course instead of the generic app link. */
+  course_id?: string;
+  /** Set when a coupon was applied, so the message can say what was saved. */
+  coupon_code?: string;
+  discount_amount?: number; // rupees
 }
 
 export async function notifyN8n(notification: PaymentNotification): Promise<void> {

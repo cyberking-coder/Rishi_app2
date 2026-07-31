@@ -4,6 +4,7 @@ import { verifyCheckoutToken } from "@/lib/checkout-token";
 import { createRazorpayOrder } from "@/lib/razorpay";
 import { env } from "@/lib/env";
 import { priceWithCoupon } from "@/lib/coupons";
+import { notifyN8n } from "@/lib/n8n";
 
 // Public route - protected by the checkout token, not Supabase auth (the
 // caller is an anonymous browser tab opened from the mobile app, not a
@@ -254,6 +255,35 @@ async function createCourseOrder(
 
     if (grantError) {
       return NextResponse.json({ error: grantError.message }, { status: 500 });
+    }
+
+    // Only path where access is granted without razorpay-webhook ever
+    // running — there's no payment for it to confirm — so this is the
+    // one place that must notify n8n itself, or a 100%-off enrollment
+    // would silently never get its confirmation message.
+    try {
+      let email: string | null = billing.email;
+      if (!email) {
+        const { data: authUser } = await db.auth.admin.getUserById(userId);
+        email = authUser.user?.email ?? null;
+      }
+      await notifyN8n({
+        event: "payment_success",
+        user_id: userId,
+        email,
+        name: billing.name,
+        phone: billing.phone,
+        state: billing.state,
+        plan_name: course.title,
+        content_type: "course",
+        course_id: course.id,
+        coupon_code: couponCode ?? undefined,
+        discount_amount: discountAmount ? discountAmount / 100 : undefined,
+        amount: 0,
+        currency: course.currency,
+      });
+    } catch (e) {
+      console.error("n8n free-course notification failed:", e);
     }
 
     return NextResponse.json({
