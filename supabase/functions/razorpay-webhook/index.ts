@@ -392,26 +392,50 @@ async function handleCoursePurchase(
   const amountRupees = payment.amount / 100;
   const status = eventType === "payment.failed" ? "failed" : "paid";
 
-  // Matched on the order id so a retried webhook updates the pending row
-  // created at checkout rather than inserting a duplicate.
-  const { error: purchaseError } = await supabase
-    .from("course_purchases")
-    .upsert(
-      {
-        user_id: userId,
-        course_id: courseId,
-        amount: payment.amount,
-        currency: payment.currency ?? "INR",
-        status,
-        razorpay_order_id: payment.order_id,
-        razorpay_payment_id: payment.id,
-      },
-      { onConflict: "razorpay_order_id" },
-    );
+  // Update-then-insert rather than an upsert. The unique index on
+  // razorpay_order_id is PARTIAL (... where razorpay_order_id is not
+  // null), and Postgres will not accept a partial index as an ON
+  // CONFLICT target unless the statement repeats the index predicate —
+  // which PostgREST's on_conflict parameter cannot express. An upsert
+  // here failed outright, so the payment was never recorded and the
+  // course stayed locked.
+  //
+  // Checkout always creates a pending row for the order, so the UPDATE
+  // is the normal path; the INSERT covers a payment whose checkout row
+  // is somehow missing, so money is never silently unaccounted for.
+  const purchasePatch = {
+    user_id: userId,
+    course_id: courseId,
+    amount: payment.amount,
+    currency: payment.currency ?? "INR",
+    status,
+    razorpay_order_id: payment.order_id,
+    razorpay_payment_id: payment.id,
+  };
 
-  if (purchaseError) {
-    console.error("[razorpay-webhook] COURSE GRANT FAILED:", purchaseError.message);
-    return jsonResponse({ error: purchaseError.message }, 500);
+  const { data: updated, error: updateError } = await supabase
+    .from("course_purchases")
+    .update(purchasePatch)
+    .eq("razorpay_order_id", payment.order_id)
+    .select("id");
+
+  if (updateError) {
+    console.error("[razorpay-webhook] COURSE GRANT FAILED:", updateError.message);
+    return jsonResponse({ error: updateError.message }, 500);
+  }
+
+  if (!updated || updated.length === 0) {
+    const { error: insertError } = await supabase
+      .from("course_purchases")
+      .insert(purchasePatch);
+
+    if (insertError) {
+      console.error(
+        "[razorpay-webhook] COURSE GRANT FAILED (insert):",
+        insertError.message,
+      );
+      return jsonResponse({ error: insertError.message }, 500);
+    }
   }
   console.log("[razorpay-webhook] course purchase recorded", {
     userId,

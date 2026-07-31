@@ -7,6 +7,8 @@ import '../../../../core/device/device_info_service.dart';
 import '../../../access/application/access_providers.dart';
 import '../../../access/domain/access_state.dart';
 import '../../../auth/application/auth_providers.dart';
+import '../../../lms/application/lms_providers.dart';
+import '../../../lms/domain/entities/course_summary.dart';
 import '../../application/profile_providers.dart';
 
 /// The membership label always comes from live access, never from the
@@ -43,6 +45,12 @@ class ProfileScreen extends ConsumerWidget {
     final profileAsync = ref.watch(userProfileProvider);
     final subAsync = ref.watch(subscriptionSummaryProvider);
     final access = ref.watch(accessStateProvider).valueOrNull;
+    // Courses are sold individually, so buying one makes someone a paying
+    // customer even with no subscription. Reading this here is what lets
+    // the header say "Premium Member" instead of "Free plan" for a buyer.
+    final enrolled = (ref.watch(coursesProvider).valueOrNull ?? const [])
+        .where((c) => c.owned)
+        .toList();
 
     return Scaffold(
       backgroundColor: _kBg,
@@ -64,7 +72,16 @@ class ProfileScreen extends ConsumerWidget {
                 ? (subAsync.valueOrNull?.planName ??
                     _planLabelFor(access?.tier))
                 : _planLabelFor(access?.tier);
-            final isFree = !hasMembership;
+            // "Free" describes someone who has paid for nothing at all —
+            // not someone who owns courses but no subscription. Treating
+            // a course buyer as free was showing them "Free plan" right
+            // next to the course they'd just paid for.
+            final isFree = !hasMembership && enrolled.isEmpty;
+            final memberLabel = hasMembership
+                ? '$subPlan Member'
+                : enrolled.isEmpty
+                    ? 'Free plan'
+                    : 'Premium Member';
 
             return ListView(
               padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
@@ -107,7 +124,7 @@ class ProfileScreen extends ConsumerWidget {
                             const Text('👑 ',
                                 style: TextStyle(fontSize: 14)),
                           Text(
-                            isFree ? 'Free plan' : '$subPlan Member',
+                            memberLabel,
                             style: TextStyle(
                               color: isFree ? _kSub : _kPink,
                               fontSize: 14,
@@ -176,15 +193,36 @@ class ProfileScreen extends ConsumerWidget {
                 ),
                 const SizedBox(height: 24),
 
+                // ── Enrolled courses ──
+                // Only rendered when there's something to show: an empty
+                // "My Courses" heading on a brand-new account reads as a
+                // failed load rather than as "you haven't bought any".
+                if (enrolled.isNotEmpty) ...[
+                  const Text(
+                    'My Courses',
+                    style: TextStyle(
+                      color: _kText,
+                      fontSize: 18,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+                  for (final course in enrolled) ...[
+                    _EnrolledCourseCard(course: course),
+                    const SizedBox(height: 10),
+                  ],
+                  const SizedBox(height: 14),
+                ],
+
                 // ── Subscription row ──
                 _ListRow(
                   icon: Icons.workspace_premium_rounded,
                   iconColor: _kPink,
                   title: 'Subscription',
-                  subtitle: subPlan,
+                  subtitle: hasMembership ? subPlan : 'No active subscription',
                   onTap: () => _showSubscriptionDetails(
                     context,
-                    subPlan,
+                    hasMembership ? subPlan : 'No active subscription',
                     // Never pass the raw subscription row for an account
                     // without live access — it records what was once
                     // bought and is never cleared on revoke, so a
@@ -192,7 +230,10 @@ class ProfileScreen extends ConsumerWidget {
                     // date. hasMembership is the only thing that decides
                     // whether this row is current.
                     hasMembership ? subAsync.valueOrNull : null,
-                    isFree,
+                    // This sheet is about the subscription specifically,
+                    // so owning courses doesn't make it "Active" — only
+                    // a live membership does.
+                    !hasMembership,
                   ),
                 ),
                 const SizedBox(height: 12),
@@ -313,6 +354,107 @@ class ProfileScreen extends ConsumerWidget {
           ],
         ),
       ),
+    );
+  }
+}
+
+/// A course this account has paid for, with how far through it they are.
+///
+/// Tapping opens the course rather than the catalog entry — someone
+/// looking at "My Courses" wants to carry on, not to be sold it again.
+class _EnrolledCourseCard extends StatelessWidget {
+  const _EnrolledCourseCard({required this.course});
+
+  final CourseSummary course;
+
+  @override
+  Widget build(BuildContext context) {
+    final done = course.completedLessonCount;
+    final total = course.lessonCount;
+
+    return InkWell(
+      borderRadius: BorderRadius.circular(16),
+      onTap: () => context.push('/course/${course.id}', extra: course.title),
+      child: Container(
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: _kSurface,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: AppTheme.border),
+        ),
+        child: Row(
+          children: [
+            ClipRRect(
+              borderRadius: BorderRadius.circular(10),
+              child: SizedBox(
+                width: 52,
+                height: 52,
+                child: course.coverImageUrl != null
+                    ? Image.network(
+                        course.coverImageUrl!,
+                        fit: BoxFit.cover,
+                        errorBuilder: (_, __, ___) => const _CourseThumbFallback(),
+                      )
+                    : const _CourseThumbFallback(),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    course.title,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      color: _kText,
+                      fontSize: 15,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  if (total > 0) ...[
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(3),
+                      child: LinearProgressIndicator(
+                        value: course.progressFraction,
+                        minHeight: 5,
+                        backgroundColor: AppTheme.border,
+                        valueColor:
+                            const AlwaysStoppedAnimation<Color>(_kAccent),
+                      ),
+                    ),
+                    const SizedBox(height: 5),
+                    Text(
+                      '$done of $total lessons complete',
+                      style: const TextStyle(color: _kSub, fontSize: 12),
+                    ),
+                  ] else
+                    const Text(
+                      'Enrolled',
+                      style: TextStyle(color: _kSub, fontSize: 12),
+                    ),
+                ],
+              ),
+            ),
+            const Icon(Icons.chevron_right_rounded, color: _kSub),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _CourseThumbFallback extends StatelessWidget {
+  const _CourseThumbFallback();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      color: AppTheme.sageSoft,
+      child: const Icon(Icons.menu_book_rounded, size: 24, color: _kAccent),
     );
   }
 }

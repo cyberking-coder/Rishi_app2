@@ -58,14 +58,15 @@ export default async function CheckoutPage({
   let priceAmount: number | undefined;
   let lessonCount = 0;
   // Opened once payment is confirmed so the buyer lands back in the app
-  // instead of being stranded on this page — see
-  // mobile_app/lib/core/deep_links/deep_link_listener.dart for the
-  // matching handler (registered as meditationapp:// on both platforms).
+  // instead of being stranded on this page. The destination must sit in
+  // the PATH, not the host — go_router routes on the path, so
+  // meditationapp://payment-success?... resolves to "/" and matches
+  // nothing. Handled by the /payment-success route in the mobile app.
   // Subscriptions don't have a "go straight to X" destination yet, so
   // only course checkout gets one.
   const returnUrl =
     payload.kind === "course"
-      ? `meditationapp://payment-success?course_id=${planId}`
+      ? `meditationapp://app/payment-success?course_id=${planId}`
       : undefined;
 
   if (payload.kind === "course") {

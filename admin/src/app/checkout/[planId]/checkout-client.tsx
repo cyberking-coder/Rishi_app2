@@ -40,6 +40,29 @@ function formatPaise(paise: number): string {
   return `₹${rupees % 1 === 0 ? rupees : rupees.toFixed(2)}`;
 }
 
+/**
+ * Rewrites `meditationapp://app/…` as `intent://app/…#Intent;…;end`.
+ *
+ * Chrome on Android interrupts a bare custom-scheme navigation with an
+ * "Open Know Thyself?" confirmation — an extra tap the buyer shouldn't
+ * have to make right after paying. An intent:// URI is the form Chrome
+ * resolves itself, so it hands off to the app directly.
+ *
+ * No `package=` component on purpose: the debug build installs under
+ * com.knowthyself.app.debug, so pinning the release id would break the
+ * hand-off on exactly the build being tested. Matching on scheme alone
+ * covers both. No browser_fallback_url either — the only page to fall
+ * back to is this one, and reloading it would drop the buyer back on an
+ * empty checkout form as if they hadn't just paid.
+ */
+function androidIntentUrl(url: string): string {
+  const separator = url.indexOf("://");
+  if (separator === -1) return url;
+  const scheme = url.slice(0, separator);
+  const rest = url.slice(separator + 3);
+  return `intent://${rest}#Intent;scheme=${scheme};end`;
+}
+
 export function CheckoutClient({
   token,
   planName,
@@ -85,18 +108,29 @@ export function CheckoutClient({
 
   const busy = status === "loading" || status === "processing";
 
+  // Resolved after mount, never during render: the Android variant
+  // depends on the user agent, and computing it inline would make the
+  // server and client markup disagree.
+  const [appUrl, setAppUrl] = useState(returnUrl);
+  useEffect(() => {
+    if (!returnUrl) return;
+    if (/Android/i.test(navigator.userAgent)) {
+      setAppUrl(androidIntentUrl(returnUrl));
+    }
+  }, [returnUrl]);
+
   // Best-effort automatic return to the app once payment is confirmed.
   // Not guaranteed to fire — some mobile browsers refuse a programmatic
   // navigation to a custom scheme without a fresh user gesture — which is
   // why the "done" state below also renders a tappable fallback link
   // pointing at the same URL.
   useEffect(() => {
-    if (status !== "done" || !returnUrl) return;
+    if (status !== "done" || !appUrl) return;
     const timer = setTimeout(() => {
-      window.location.href = returnUrl;
+      window.location.href = appUrl;
     }, 800);
     return () => clearTimeout(timer);
-  }, [status, returnUrl]);
+  }, [status, appUrl]);
   const payable = applied?.final ?? priceAmount;
 
   function validate(): string | null {
@@ -207,11 +241,11 @@ export function CheckoutClient({
             ? " You'll be taken back to the app automatically."
             : " Return to the app and it should unlock automatically."}
         </p>
-        {returnUrl && (
+        {appUrl && (
           <Button asChild className="mt-4 w-full" size="lg">
             {/* A real user tap here also satisfies browsers that block a
                 programmatic redirect to a custom scheme without one. */}
-            <a href={returnUrl}>Return to the app</a>
+            <a href={appUrl}>Return to the app</a>
           </Button>
         )}
       </div>

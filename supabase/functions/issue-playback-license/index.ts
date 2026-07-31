@@ -11,7 +11,7 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { handlePreflight, jsonResponse } from "../_shared/cors.ts";
 import { DEFAULT_DOWNLOAD_TTL_SECONDS, presignGet } from "../_shared/r2.ts";
-import { signBunnyPlayback } from "../_shared/bunny.ts";
+import { fetchBunnyStatus, signBunnyPlayback } from "../_shared/bunny.ts";
 
 const SIGNED_URL_TTL_SECONDS = DEFAULT_DOWNLOAD_TTL_SECONDS; // 10 minutes
 
@@ -142,10 +142,36 @@ Deno.serve(async (req) => {
   // already run, so authorization is identical either way.
   if (video.bunny_video_id) {
     if (video.bunny_status !== "ready") {
-      return jsonResponse(
-        { error: "This video is still processing. Please try again shortly." },
-        409,
-      );
+      // Our copy of the status is only as fresh as the last time an admin
+      // pressed Refresh on the Videos page — Bunny sends no webhook. So a
+      // video that finished encoding long ago still reads "processing"
+      // here, and refusing on that alone locks a perfectly playable video
+      // behind an admin's manual action. Ask Bunny directly, and write the
+      // answer back so the next viewer skips this round trip.
+      const liveStatus = await fetchBunnyStatus(video.bunny_video_id);
+      if (liveStatus !== "unknown" && liveStatus !== video.bunny_status) {
+        await supabase
+          .from("videos")
+          .update({ bunny_status: liveStatus })
+          .eq("id", videoId);
+      }
+
+      // "unknown" means we couldn't reach Bunny (or the API credentials
+      // aren't configured for this function), not that the video is
+      // unready. Refusing on that would make an unverifiable status
+      // permanently fatal. Let the request through instead — if the
+      // encode really hasn't finished, Bunny serves no manifest and the
+      // player reports it, which is recoverable; a 409 here is not.
+      if (liveStatus !== "ready" && liveStatus !== "unknown") {
+        return jsonResponse(
+          {
+            error: liveStatus === "failed"
+              ? "This video failed to process. Please contact support."
+              : "This video is still processing. Please try again shortly.",
+          },
+          409,
+        );
+      }
     }
 
     const playback = await signBunnyPlayback(
