@@ -195,7 +195,7 @@ class _CourseDetailScreenState extends ConsumerState<CourseDetailScreen>
               SliverToBoxAdapter(
                 child: _Hero(
                   coverUrl: detail.course.coverImageUrl,
-                  onBack: () => Navigator.of(context).pop(),
+                  onBack: () => _leaveCourse(context),
                 ),
               ),
 
@@ -814,6 +814,22 @@ class _ResourceRowState extends State<_ResourceRow> {
 
 // ── Shared ───────────────────────────────────────────────────────────
 
+/// Back out of the course, whatever route brought us here.
+///
+/// A plain pop() blanked the screen when there was nothing beneath: the
+/// payment deep link lands with go(), which replaces the stack rather
+/// than pushing onto it, so the course was the only route and popping it
+/// left the navigator empty. Fall back to the course list, which is
+/// where "back" means to go anyway.
+void _leaveCourse(BuildContext context) {
+  final navigator = Navigator.of(context);
+  if (navigator.canPop()) {
+    navigator.pop();
+  } else {
+    context.go('/courses');
+  }
+}
+
 class _BackBar extends StatelessWidget {
   final String title;
   const _BackBar({required this.title});
@@ -825,7 +841,7 @@ class _BackBar extends StatelessWidget {
       child: Row(children: [
         IconButton(
           icon: const Icon(Icons.arrow_back_rounded, size: 20),
-          onPressed: () => Navigator.of(context).pop(),
+          onPressed: () => _leaveCourse(context),
         ),
         Expanded(
           child: Text(
