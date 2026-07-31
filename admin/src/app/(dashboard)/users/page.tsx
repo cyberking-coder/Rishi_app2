@@ -40,6 +40,11 @@ export default async function UsersPage() {
       .from("course_purchases")
       .select("user_id, course_id")
       .eq("status", "paid")
+      // An enrolment revoked from the course page is dated in the past
+      // rather than deleted. Without this filter the user would go on
+      // reading as Premium after their access was taken away — which is
+      // exactly the disagreement between the two pages worth avoiding.
+      .or(`expires_at.is.null,expires_at.gt.${new Date().toISOString()}`)
       .returns<{ user_id: string; course_id: string }[]>(),
   ]);
 

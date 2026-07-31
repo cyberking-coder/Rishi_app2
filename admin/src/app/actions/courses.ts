@@ -507,3 +507,45 @@ export async function moveLesson(args: {
   revalidatePath(`/courses/${args.courseId}`);
   return { ok: true };
 }
+
+// ── Enrolment access ─────────────────────────────────────────────────────
+
+/**
+ * Revokes or restores one student's access to one course.
+ *
+ * Works by setting `expires_at`, not by changing `status`. A revoked
+ * enrolment is still a payment that was received — flipping it to
+ * 'refunded' would quietly remove it from the roster and the revenue
+ * total, which would then disagree with what Razorpay actually settled.
+ * has_course_access() already treats a past expires_at as no access, so
+ * this is the whole mechanism: the app relocks the course, the license
+ * functions refuse its lessons' media, and the sale stays on the books.
+ *
+ * Ending a user's subscription access does NOT do this. Courses are sold
+ * outright, so a lapsed subscription leaves a bought course open on
+ * purpose — this is the control for taking one back.
+ */
+export async function setCourseEnrolmentAccess(
+  userId: string,
+  courseId: string,
+  revoked: boolean,
+): Promise<ActionResult> {
+  await requireAdmin();
+  const db = createAdminClient();
+
+  const { error } = await db
+    .from("course_purchases")
+    .update({
+      expires_at: revoked ? new Date().toISOString() : null,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("user_id", userId)
+    .eq("course_id", courseId)
+    .eq("status", "paid");
+
+  if (error) return { ok: false, error: error.message };
+
+  revalidatePath(`/courses/${courseId}`);
+  revalidatePath("/users");
+  return { ok: true };
+}

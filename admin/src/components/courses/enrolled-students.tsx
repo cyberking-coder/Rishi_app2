@@ -11,6 +11,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { formatDate } from "@/lib/utils";
+import { EnrolmentAccessButton } from "./enrolment-access-button";
 
 interface PurchaseRow {
   user_id: string;
@@ -18,6 +19,8 @@ interface PurchaseRow {
   currency: string;
   discount_amount: number | null;
   created_at: string;
+  /** Past timestamp = access revoked. null = permanent. */
+  expires_at: string | null;
 }
 
 /**
@@ -32,7 +35,9 @@ export async function EnrolledStudents({ courseId }: { courseId: string }) {
 
   const { data: purchases } = await supabase
     .from("course_purchases")
-    .select("user_id, amount, currency, discount_amount, created_at")
+    .select(
+      "user_id, amount, currency, discount_amount, created_at, expires_at",
+    )
     .eq("course_id", courseId)
     .eq("status", "paid")
     .order("created_at", { ascending: false })
@@ -80,7 +85,11 @@ export async function EnrolledStudents({ courseId }: { courseId: string }) {
     }
   }
 
+  // Revenue counts revoked enrolments too — the money was received, and
+  // a total that silently shrank when access was withdrawn would stop
+  // matching what Razorpay settled.
   const revenue = unique.reduce((sum, r) => sum + r.amount, 0);
+  const active = unique.filter((r) => !isRevoked(r)).length;
 
   return (
     <Card className="mt-6">
@@ -88,8 +97,13 @@ export async function EnrolledStudents({ courseId }: { courseId: string }) {
         <CardTitle>Enrolled students</CardTitle>
         <div className="flex items-center gap-2">
           <Badge variant="outline">
-            {unique.length} {unique.length === 1 ? "student" : "students"}
+            {active} {active === 1 ? "student" : "students"}
           </Badge>
+          {active !== unique.length && (
+            <Badge variant="secondary">
+              {unique.length - active} revoked
+            </Badge>
+          )}
           {revenue > 0 && (
             <Badge variant="success">{formatMoney(revenue)} collected</Badge>
           )}
@@ -102,13 +116,15 @@ export async function EnrolledStudents({ courseId }: { courseId: string }) {
               <TableHead>Student</TableHead>
               <TableHead>Paid</TableHead>
               <TableHead>Enrolled</TableHead>
+              <TableHead>Access</TableHead>
+              <TableHead className="w-32" />
             </TableRow>
           </TableHeader>
           <TableBody>
             {unique.length === 0 ? (
               <TableRow>
                 <TableCell
-                  colSpan={3}
+                  colSpan={5}
                   className="py-8 text-center text-muted-foreground"
                 >
                   Nobody has bought this course yet.
@@ -134,6 +150,25 @@ export async function EnrolledStudents({ courseId }: { courseId: string }) {
                   <TableCell className="text-muted-foreground">
                     {formatDate(r.created_at)}
                   </TableCell>
+                  <TableCell>
+                    {isRevoked(r) ? (
+                      <Badge variant="destructive">Revoked</Badge>
+                    ) : (
+                      <Badge variant="success">Active</Badge>
+                    )}
+                  </TableCell>
+                  <TableCell className="text-right">
+                    <EnrolmentAccessButton
+                      userId={r.user_id}
+                      courseId={courseId}
+                      studentLabel={
+                        nameById.get(r.user_id) ??
+                        emailById.get(r.user_id) ??
+                        "this student"
+                      }
+                      revoked={isRevoked(r)}
+                    />
+                  </TableCell>
                 </TableRow>
               ))
             )}
@@ -142,6 +177,12 @@ export async function EnrolledStudents({ courseId }: { courseId: string }) {
       </CardContent>
     </Card>
   );
+}
+
+/** Access is withdrawn by dating `expires_at` in the past rather than
+ *  by changing `status`, so the sale stays on the books. */
+function isRevoked(row: PurchaseRow): boolean {
+  return row.expires_at !== null && new Date(row.expires_at) <= new Date();
 }
 
 /** Amounts are stored in paise, the unit Razorpay charges in. */
