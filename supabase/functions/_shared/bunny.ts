@@ -62,3 +62,40 @@ export async function signBunnyPlayback(
 
   return { hlsUrl: url, expiresAt: expires };
 }
+
+/// Asks Bunny what state a video is actually in.
+///
+/// Bunny has no webhook wired up, so `videos.bunny_status` only advances
+/// when someone opens the admin Videos page and hits Refresh. A video
+/// that finished encoding minutes after upload therefore stays
+/// "processing" in our database indefinitely, and playback 409s even
+/// though Bunny is serving it fine. Callers use this to check the real
+/// state before refusing.
+///
+/// Requires BUNNY_STREAM_API_KEY and BUNNY_STREAM_LIBRARY_ID. Returns
+/// "processing" when anything goes wrong — an unreachable Bunny is not a
+/// reason to claim the encode failed.
+export async function fetchBunnyStatus(
+  bunnyVideoId: string,
+): Promise<"processing" | "ready" | "failed"> {
+  const apiKey = Deno.env.get("BUNNY_STREAM_API_KEY");
+  const libraryId = Deno.env.get("BUNNY_STREAM_LIBRARY_ID");
+  if (!apiKey || !libraryId) return "processing";
+
+  try {
+    const res = await fetch(
+      `https://video.bunnycdn.com/library/${libraryId}/videos/${bunnyVideoId}`,
+      { headers: { AccessKey: apiKey, accept: "application/json" } },
+    );
+    if (!res.ok) return "processing";
+
+    const video = (await res.json()) as { status?: number };
+    const status = video.status ?? 0;
+    if (status === 4) return "ready";
+    if (status >= 5) return "failed";
+    return "processing";
+  } catch (e) {
+    console.error("Bunny status check failed:", e);
+    return "processing";
+  }
+}

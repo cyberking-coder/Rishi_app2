@@ -7,7 +7,6 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'app/router/app_router.dart';
 import 'app/theme/app_theme.dart';
-import 'core/deep_links/deep_link_listener.dart';
 import 'features/profile/application/profile_providers.dart';
 import 'core/config/app_config.dart';
 import 'features/audio/application/audio_player_handler.dart';
@@ -90,15 +89,15 @@ class MeditationApp extends ConsumerWidget {
     final router = ref.watch(goRouterProvider);
     final themeMode = ref.watch(themeModeProvider);
 
-    return DeepLinkListener(
-      child: MaterialApp.router(
-        title: AppConfig.appName,
-        debugShowCheckedModeBanner: false,
-        themeMode: themeMode,
-        theme: AppTheme.light(),
-        darkTheme: AppTheme.dark(),
-        routerConfig: router,
-      ),
+    // Deep links (meditationapp://app/...) are delivered straight to
+    // go_router by Flutter's Router API — no separate listener needed.
+    return MaterialApp.router(
+      title: AppConfig.appName,
+      debugShowCheckedModeBanner: false,
+      themeMode: themeMode,
+      theme: AppTheme.light(),
+      darkTheme: AppTheme.dark(),
+      routerConfig: router,
     );
   }
 }

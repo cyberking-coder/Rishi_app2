@@ -1,4 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
+import { getBunnyStatus } from "@/lib/bunny";
 import { PageHeader } from "@/components/page-header";
 import { UploadContentDialog } from "@/components/content/upload-content-dialog";
 import { ContentActions } from "@/components/content/content-actions";
@@ -39,6 +41,8 @@ export default async function VideosPage() {
   ]);
 
   const videosWithAsset = new Set((assets ?? []).map((a) => a.content_id));
+
+  await syncEncodingStatuses(videos ?? []);
 
   return (
     <div>
@@ -111,5 +115,40 @@ export default async function VideosPage() {
         </CardContent>
       </Card>
     </div>
+  );
+}
+
+/**
+ * Brings `bunny_status` up to date for anything still encoding.
+ *
+ * Bunny sends no webhook, so a row that was "processing" when the upload
+ * finished stays "processing" in our database until someone clicks
+ * Refresh — even after Bunny has been serving the video for days. That
+ * stale value is what the mobile app's playback license checks, so a
+ * finished video reads as unplayable. Syncing on page load means the
+ * badge is truthful without anyone having to press anything.
+ *
+ * Only unfinished rows are polled, so a library of ready videos costs
+ * nothing. Mutates the rows in place so this render shows the new state.
+ */
+async function syncEncodingStatuses(videos: Video[]): Promise<void> {
+  const pending = videos.filter(
+    (v) => v.bunny_video_id && v.bunny_status !== "ready" && v.bunny_status !== "failed",
+  );
+  if (pending.length === 0) return;
+
+  const db = createAdminClient();
+  await Promise.all(
+    pending.map(async (v) => {
+      try {
+        const status = await getBunnyStatus(v.bunny_video_id!);
+        if (status === v.bunny_status) return;
+        v.bunny_status = status;
+        await db.from("videos").update({ bunny_status: status }).eq("id", v.id);
+      } catch {
+        // Best-effort: a Bunny outage shouldn't take the page down. The
+        // row keeps its old status and the manual Refresh button remains.
+      }
+    }),
   );
 }

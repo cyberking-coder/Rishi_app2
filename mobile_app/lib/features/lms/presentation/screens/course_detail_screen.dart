@@ -1,7 +1,11 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-
+import 'package:http/http.dart' as http;
+import 'package:open_filex/open_filex.dart';
+import 'package:path_provider/path_provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../../../app/theme/app_theme.dart';
@@ -660,10 +664,19 @@ class _LessonTile extends StatelessWidget {
   }
 }
 
-class _ResourceRow extends StatelessWidget {
+class _ResourceRow extends StatefulWidget {
   final LessonResource resource;
 
   const _ResourceRow({required this.resource});
+
+  @override
+  State<_ResourceRow> createState() => _ResourceRowState();
+}
+
+class _ResourceRowState extends State<_ResourceRow> {
+  bool _opening = false;
+
+  LessonResource get resource => widget.resource;
 
   IconData get _icon {
     switch (resource.type) {
@@ -678,22 +691,91 @@ class _ResourceRow extends StatelessWidget {
     }
   }
 
+  /// Links go to the browser; files are downloaded and handed to the
+  /// system "open with" chooser.
+  ///
+  /// Sending a file URL to the browser instead just renders it inline in
+  /// whatever viewer the browser happens to have — a PDF came out looking
+  /// like a flat image with no page controls, and the user never got to
+  /// pick their own PDF app. Downloading first means the OS offers the
+  /// real chooser and the file can be kept.
+  Future<void> _open() async {
+    if (_opening) return;
+
+    final uri = Uri.tryParse(resource.url);
+    if (uri == null) return;
+
+    if (resource.type == ResourceType.link) {
+      final opened =
+          await launchUrl(uri, mode: LaunchMode.externalApplication);
+      if (!opened && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Could not open this link.')),
+        );
+      }
+      return;
+    }
+
+    setState(() => _opening = true);
+    try {
+      final response = await http.get(uri);
+      if (response.statusCode != 200) {
+        throw Exception('Download failed (${response.statusCode})');
+      }
+
+      // Named from the resource title so the chooser and any app the
+      // user picks show something meaningful, with the extension taken
+      // from the URL so the OS can match handlers.
+      final dir = await getTemporaryDirectory();
+      final extension = _extensionFor(uri);
+      final safeName =
+          resource.title.replaceAll(RegExp(r'[^A-Za-z0-9._-]'), '_');
+      final file = File('${dir.path}/$safeName$extension');
+      await file.writeAsBytes(response.bodyBytes);
+
+      final result = await OpenFilex.open(file.path);
+      if (result.type != ResultType.done && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              result.type == ResultType.noAppToOpen
+                  ? 'No app on this device can open that file.'
+                  : 'Could not open this file.',
+            ),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text('$e')));
+      }
+    } finally {
+      if (mounted) setState(() => _opening = false);
+    }
+  }
+
+  String _extensionFor(Uri uri) {
+    final last = uri.pathSegments.isEmpty ? '' : uri.pathSegments.last;
+    final dot = last.lastIndexOf('.');
+    if (dot != -1 && dot < last.length - 1) return last.substring(dot);
+    // Fall back to the declared type when the URL carries no extension —
+    // without one the OS has nothing to match a handler against.
+    switch (resource.type) {
+      case ResourceType.pdf:
+        return '.pdf';
+      case ResourceType.image:
+        return '.jpg';
+      case ResourceType.file:
+      case ResourceType.link:
+        return '';
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return InkWell(
-      onTap: () async {
-        final uri = Uri.tryParse(resource.url);
-        if (uri == null) return;
-        // Opened in the browser: there is no in-app viewer for arbitrary
-        // file types, and the browser already handles PDFs and images.
-        final opened =
-            await launchUrl(uri, mode: LaunchMode.externalApplication);
-        if (!opened && context.mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Could not open this resource.')),
-          );
-        }
-      },
+      onTap: _open,
       borderRadius: BorderRadius.circular(8),
       child: Padding(
         padding: const EdgeInsets.symmetric(vertical: 5, horizontal: 4),
@@ -712,8 +794,18 @@ class _ResourceRow extends StatelessWidget {
               ),
             ),
           ),
-          const Icon(Icons.open_in_new_rounded,
-              size: 12, color: AppTheme.textSecondary),
+          if (_opening)
+            const SizedBox(
+              width: 12,
+              height: 12,
+              child: CircularProgressIndicator(
+                strokeWidth: 1.5,
+                color: AppTheme.sage,
+              ),
+            )
+          else
+            const Icon(Icons.open_in_new_rounded,
+                size: 12, color: AppTheme.textSecondary),
         ]),
       ),
     );

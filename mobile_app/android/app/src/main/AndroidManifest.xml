@@ -45,7 +45,11 @@
                 <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.BROWSABLE" />
                 <data android:scheme="meditationapp" android:host="reset-password" />
-                <data android:scheme="meditationapp" android:host="payment-success" />
+                <!-- host "app" so the destination lives in the PATH
+                     (meditationapp://app/payment-success), which is what
+                     go_router actually routes on — a host-only link
+                     resolves to "/" and matches nothing. -->
+                <data android:scheme="meditationapp" android:host="app" />
             </intent-filter>
 
             <intent-filter>

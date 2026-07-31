@@ -15,6 +15,7 @@ import '../../features/home/presentation/screens/browse_screen.dart';
 import '../../features/lms/domain/entities/lesson.dart';
 import '../../features/lms/presentation/screens/course_detail_screen.dart';
 import '../../features/lms/presentation/screens/courses_screen.dart';
+import '../../features/lms/presentation/screens/payment_success_screen.dart';
 import '../../features/lms/presentation/screens/text_lesson_screen.dart';
 import '../../features/lms/presentation/screens/video_lesson_screen.dart';
 import '../../features/profile/presentation/screens/profile_screen.dart';
@@ -43,6 +44,20 @@ final goRouterProvider = Provider<GoRouter>((ref) {
     },
     routes: [
       GoRoute(path: '/splash', builder: (_, __) => const SplashScreen()),
+      // Deep link target: meditationapp://app/payment-success?course_id=…
+      // A custom-scheme link's HOST is not part of the path, so the
+      // destination has to live in the path ("app" is the host) — an
+      // earlier meditationapp://payment-success?... resolved to "/" and
+      // hit "no routes for location".
+      GoRoute(
+        path: '/payment-success',
+        builder: (_, state) => PaymentSuccessScreen(
+          courseId: state.uri.queryParameters['course_id'],
+        ),
+      ),
+      // Safety net for a bare meditationapp://app link, which lands here
+      // rather than on a real screen.
+      GoRoute(path: '/', redirect: (_, __) => '/home'),
       GoRoute(path: '/login', builder: (_, __) => const LoginScreen()),
       GoRoute(
         path: '/forgot-password',
