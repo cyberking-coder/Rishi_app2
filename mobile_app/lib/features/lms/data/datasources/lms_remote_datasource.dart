@@ -38,7 +38,7 @@ class LmsRemoteDataSource {
         .select(
           'id, title, position, '
           'lessons(id, title, description, lesson_type, body_markdown, '
-          'resource_url, resource_name, position, '
+          'position, lesson_resources(id, title, resource_type, url, position), '
           'audios(id, title, artist, cover_art_url, duration_seconds), '
           'videos(id, title))',
         )

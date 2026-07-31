@@ -12,6 +12,7 @@ import type {
   Category,
   Course,
   CourseModule,
+  LessonResource,
   LessonWithMedia,
   Video,
 } from "@/lib/types";
@@ -39,12 +40,16 @@ export default async function CourseBuilderPage({
   if (!course) notFound();
 
   const [
-    { data: modules },
+    { data: modules, error: modulesError },
     { data: audios },
     { data: videos },
     { data: categories },
     { data: assets },
   ] = await Promise.all([
+      // lesson_resources is fetched separately rather than embedded here.
+      // A single failing embed takes the WHOLE select down, which showed
+      // up as "no modules yet" on a course that plainly had modules —
+      // the module list must not depend on an optional child table.
       supabase
         .from("course_modules")
         .select(
@@ -84,6 +89,27 @@ export default async function CourseBuilderPage({
         .returns<{ content_id: string }[]>(),
     ]);
 
+  // Attach resources to their lessons. A failure here degrades to
+  // "no resources shown" rather than an empty curriculum.
+  const lessonIds = (modules ?? []).flatMap((m) =>
+    (m.lessons ?? []).map((l) => l.id),
+  );
+  const { data: resources } = lessonIds.length
+    ? await supabase
+        .from("lesson_resources")
+        .select("*")
+        .in("lesson_id", lessonIds)
+        .order("position", { ascending: true })
+        .returns<LessonResource[]>()
+    : { data: [] as LessonResource[] };
+
+  const resourcesByLesson = new Map<string, LessonResource[]>();
+  for (const r of resources ?? []) {
+    const list = resourcesByLesson.get(r.lesson_id) ?? [];
+    list.push(r);
+    resourcesByLesson.set(r.lesson_id, list);
+  }
+
   // A video with neither a Bunny id nor a ready R2 asset has no media
   // behind it — attaching it produces a lesson that 404s the moment
   // someone taps it. Keep those out of the picker entirely.
@@ -96,7 +122,9 @@ export default async function CourseBuilderPage({
   // component stays presentational.
   const orderedModules = (modules ?? []).map((m) => ({
     ...m,
-    lessons: [...(m.lessons ?? [])].sort((a, b) => a.position - b.position),
+    lessons: [...(m.lessons ?? [])]
+      .sort((a, b) => a.position - b.position)
+      .map((l) => ({ ...l, lesson_resources: resourcesByLesson.get(l.id) ?? [] })),
   }));
 
   return (
@@ -130,6 +158,12 @@ export default async function CourseBuilderPage({
           </div>
         }
       />
+
+      {modulesError && (
+        <div className="mb-4 rounded-lg border border-destructive/40 bg-destructive/10 p-4 text-sm text-destructive">
+          Could not load this course&apos;s modules: {modulesError.message}
+        </div>
+      )}
 
       <CourseBuilder
         course={course}

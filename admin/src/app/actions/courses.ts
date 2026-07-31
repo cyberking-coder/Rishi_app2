@@ -4,8 +4,7 @@ import { revalidatePath } from "next/cache";
 import { requireAdmin } from "@/lib/auth";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { slugify } from "@/lib/utils";
-import { RESOURCE_LESSON_TYPES } from "@/lib/types";
-import type { CourseStatus, LessonType } from "@/lib/types";
+import type { CourseStatus, LessonType, ResourceType } from "@/lib/types";
 import type { ActionResult } from "./users";
 
 // Same conventions as actions/content.ts: requireAdmin() first,
@@ -317,15 +316,11 @@ export interface CreateLessonInput {
   audioId?: string;
   videoId?: string;
   bodyMarkdown?: string;
-  /** For pdf/image/file lessons: the uploaded file's public URL. For a
-   *  link lesson: the URL the admin pasted. */
-  resourceUrl?: string;
-  resourceName?: string;
 }
 
 export async function createLesson(
   input: CreateLessonInput,
-): Promise<ActionResult> {
+): Promise<{ ok: true; id: string } | { ok: false; error: string }> {
   await requireAdmin();
   const db = createAdminClient();
 
@@ -338,20 +333,6 @@ export async function createLesson(
   if (input.lessonType === "video" && !input.videoId) {
     return { ok: false, error: "Pick a video for this lesson." };
   }
-  if (
-    RESOURCE_LESSON_TYPES.includes(
-      input.lessonType as (typeof RESOURCE_LESSON_TYPES)[number],
-    ) &&
-    !input.resourceUrl?.trim()
-  ) {
-    return {
-      ok: false,
-      error:
-        input.lessonType === "link"
-          ? "Paste the link for this lesson."
-          : "Choose a file to upload for this lesson.",
-    };
-  }
 
   const { data: last } = await db
     .from("lessons")
@@ -361,20 +342,79 @@ export async function createLesson(
     .limit(1)
     .maybeSingle<{ position: number }>();
 
-  const { error } = await db.from("lessons").insert({
-    module_id: input.moduleId,
-    title: input.title,
-    lesson_type: input.lessonType,
-    audio_id: input.lessonType === "audio" ? input.audioId : null,
-    video_id: input.lessonType === "video" ? input.videoId : null,
-    body_markdown: input.lessonType === "text" ? input.bodyMarkdown : null,
-    resource_url: input.resourceUrl?.trim() || null,
-    resource_name: input.resourceName?.trim() || null,
+  const { data, error } = await db
+    .from("lessons")
+    .insert({
+      module_id: input.moduleId,
+      title: input.title,
+      lesson_type: input.lessonType,
+      audio_id: input.lessonType === "audio" ? input.audioId : null,
+      video_id: input.lessonType === "video" ? input.videoId : null,
+      body_markdown: input.lessonType === "text" ? input.bodyMarkdown : null,
+      position: (last?.position ?? -1) + 1,
+    })
+    .select("id")
+    .single<{ id: string }>();
+
+  if (error || !data) {
+    return { ok: false, error: error?.message ?? "Could not create lesson" };
+  }
+  revalidatePath(`/courses/${input.courseId}`);
+  return { ok: true, id: data.id };
+}
+
+// ── Lesson resources ─────────────────────────────────────────────────
+// Handouts and links attached to a lesson. Separate from the lesson's
+// own media because a worksheet supports a lesson rather than being one.
+
+export async function addLessonResource(args: {
+  lessonId: string;
+  courseId: string;
+  title: string;
+  resourceType: ResourceType;
+  url: string;
+}): Promise<ActionResult> {
+  await requireAdmin();
+  const db = createAdminClient();
+
+  if (!args.title.trim()) return { ok: false, error: "Give the resource a name." };
+  if (!args.url.trim()) return { ok: false, error: "The resource has no URL." };
+
+  const { data: last } = await db
+    .from("lesson_resources")
+    .select("position")
+    .eq("lesson_id", args.lessonId)
+    .order("position", { ascending: false })
+    .limit(1)
+    .maybeSingle<{ position: number }>();
+
+  const { error } = await db.from("lesson_resources").insert({
+    lesson_id: args.lessonId,
+    title: args.title.trim(),
+    resource_type: args.resourceType,
+    url: args.url.trim(),
     position: (last?.position ?? -1) + 1,
   });
 
   if (error) return { ok: false, error: error.message };
-  revalidatePath(`/courses/${input.courseId}`);
+  revalidatePath(`/courses/${args.courseId}`);
+  return { ok: true };
+}
+
+export async function deleteLessonResource(args: {
+  resourceId: string;
+  courseId: string;
+}): Promise<ActionResult> {
+  await requireAdmin();
+  const db = createAdminClient();
+
+  const { error } = await db
+    .from("lesson_resources")
+    .delete()
+    .eq("id", args.resourceId);
+
+  if (error) return { ok: false, error: error.message };
+  revalidatePath(`/courses/${args.courseId}`);
   return { ok: true };
 }
 

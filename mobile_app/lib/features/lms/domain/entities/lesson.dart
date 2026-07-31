@@ -1,4 +1,4 @@
-enum LessonType { audio, video, text, pdf, image, file, link }
+enum LessonType { audio, video, text }
 
 LessonType lessonTypeFromString(String? value) {
   switch (value) {
@@ -6,17 +6,48 @@ LessonType lessonTypeFromString(String? value) {
       return LessonType.video;
     case 'text':
       return LessonType.text;
-    case 'pdf':
-      return LessonType.pdf;
-    case 'image':
-      return LessonType.image;
-    case 'file':
-      return LessonType.file;
-    case 'link':
-      return LessonType.link;
     default:
       return LessonType.audio;
   }
+}
+
+/// An attachment hanging off a lesson: a handout or a link. Not a
+/// teaching format of its own, so it never counts toward lesson totals
+/// or progress.
+enum ResourceType { pdf, image, file, link }
+
+ResourceType resourceTypeFromString(String? value) {
+  switch (value) {
+    case 'image':
+      return ResourceType.image;
+    case 'file':
+      return ResourceType.file;
+    case 'link':
+      return ResourceType.link;
+    default:
+      return ResourceType.pdf;
+  }
+}
+
+class LessonResource {
+  final String id;
+  final String title;
+  final ResourceType type;
+  final String url;
+
+  const LessonResource({
+    required this.id,
+    required this.title,
+    required this.type,
+    required this.url,
+  });
+
+  factory LessonResource.fromMap(Map<String, dynamic> map) => LessonResource(
+        id: map['id'] as String? ?? '',
+        title: map['title'] as String? ?? 'Resource',
+        type: resourceTypeFromString(map['resource_type'] as String?),
+        url: map['url'] as String? ?? '',
+      );
 }
 
 class Lesson {
@@ -40,9 +71,8 @@ class Lesson {
   final String? videoId;
   final String? videoTitle;
 
-  /// Payload for pdf/image/file/link lessons: a public URL.
-  final String? resourceUrl;
-  final String? resourceName;
+  /// Handouts and links attached to this lesson.
+  final List<LessonResource> resources;
 
   const Lesson({
     required this.id,
@@ -58,8 +88,7 @@ class Lesson {
     this.audioDurationSeconds,
     this.videoId,
     this.videoTitle,
-    this.resourceUrl,
-    this.resourceName,
+    this.resources = const [],
   });
 
   /// True when the lesson claims a media type but the row it pointed at is
@@ -72,11 +101,6 @@ class Lesson {
         return videoId != null;
       case LessonType.text:
         return bodyMarkdown != null;
-      case LessonType.pdf:
-      case LessonType.image:
-      case LessonType.file:
-      case LessonType.link:
-        return resourceUrl != null && resourceUrl!.isNotEmpty;
     }
   }
 
@@ -97,8 +121,10 @@ class Lesson {
       audioDurationSeconds: audio?['duration_seconds'] as int?,
       videoId: video?['id'] as String?,
       videoTitle: video?['title'] as String?,
-      resourceUrl: map['resource_url'] as String?,
-      resourceName: map['resource_name'] as String?,
+      resources: [
+        for (final r in (map['lesson_resources'] as List? ?? []))
+          LessonResource.fromMap(Map<String, dynamic>.from(r as Map)),
+      ],
     );
   }
 }

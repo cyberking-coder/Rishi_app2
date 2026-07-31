@@ -9,16 +9,19 @@ import '../../../access/domain/access_state.dart';
 import '../../../auth/application/auth_providers.dart';
 import '../../application/profile_providers.dart';
 
-/// Falls back to the real access tier when there's no `subscriptions` row
-/// (true for every account today - that table isn't populated by any code
-/// yet). Without this, the plan label always defaulted to the literal
-/// string 'Premium' for every user, free or not.
+/// The membership label always comes from live access, never from the
+/// `subscriptions` row.
+///
+/// That row records what was bought and is never cleared when an admin
+/// ends someone's access — so reading the plan name from it kept showing
+/// "Rishi Mode Member" to accounts that had been revoked. Access state is
+/// the only thing that knows whether the membership is currently real.
 String _planLabelFor(UserTier? tier) {
   switch (tier) {
     case UserTier.admin:
       return 'Staff';
     case UserTier.retreat:
-      return 'Premium';
+      return 'Rishi Mode';
     case UserTier.free:
     case null:
       return 'Free';
@@ -53,10 +56,15 @@ class ProfileScreen extends ConsumerWidget {
                 style: const TextStyle(color: _kSub)),
           ),
           data: (profile) {
-            final subPlan = subAsync.valueOrNull?.planName ??
-                _planLabelFor(access?.tier);
-            final isFree = subAsync.valueOrNull == null &&
-                access?.tier == UserTier.free;
+            final hasMembership = access?.tier == UserTier.retreat ||
+                access?.tier == UserTier.admin;
+            // The subscription row only names the plan; whether it counts
+            // at all is decided by access above.
+            final subPlan = hasMembership
+                ? (subAsync.valueOrNull?.planName ??
+                    _planLabelFor(access?.tier))
+                : _planLabelFor(access?.tier);
+            final isFree = !hasMembership;
 
             return ListView(
               padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
@@ -99,7 +107,7 @@ class ProfileScreen extends ConsumerWidget {
                             const Text('👑 ',
                                 style: TextStyle(fontSize: 14)),
                           Text(
-                            '$subPlan Member',
+                            isFree ? 'Free plan' : '$subPlan Member',
                             style: TextStyle(
                               color: isFree ? _kSub : _kPink,
                               fontSize: 14,
@@ -137,8 +145,18 @@ class ProfileScreen extends ConsumerWidget {
                       emoji: '💎',
                       color: AppTheme.clay,
                       label: 'Premium',
-                      onTap: () => _showAchievement(context, '💎', 'Premium',
-                          'You are a premium member with full access to all content.'),
+                      // Dimmed rather than hidden: the badge is something
+                      // to earn back, and a gap in the row would read as
+                      // a layout bug.
+                      earned: !isFree,
+                      onTap: () => _showAchievement(
+                        context,
+                        '💎',
+                        'Premium',
+                        isFree
+                            ? 'Unlock this by joining Rishi Mode for full access to all content.'
+                            : 'You are a premium member with full access to all content.',
+                      ),
                     ),
                     _Badge(
                       emoji: '🔥',
@@ -258,7 +276,7 @@ class ProfileScreen extends ConsumerWidget {
                 width: 40,
                 height: 4,
                 decoration: BoxDecoration(
-                  color: const Color(0x55FFFFFF),
+                  color: AppTheme.border,
                   borderRadius: BorderRadius.circular(2),
                 ),
               ),
@@ -325,11 +343,16 @@ class _Badge extends StatelessWidget {
     required this.color,
     required this.label,
     this.onTap,
+    this.earned = true,
   });
   final String emoji;
   final Color color;
   final String label;
   final VoidCallback? onTap;
+
+  /// Unearned badges render greyed out rather than being removed, so the
+  /// row keeps its shape and the badge reads as something to work toward.
+  final bool earned;
 
   @override
   Widget build(BuildContext context) {
@@ -342,12 +365,22 @@ class _Badge extends StatelessWidget {
             width: 60,
             height: 60,
             decoration: BoxDecoration(
-              color: color.withValues(alpha: 0.18),
+              color: earned
+                  ? color.withValues(alpha: 0.18)
+                  : _kSub.withValues(alpha: 0.10),
               shape: BoxShape.circle,
-              border: Border.all(color: color.withValues(alpha: 0.5), width: 2),
+              border: Border.all(
+                color: earned
+                    ? color.withValues(alpha: 0.5)
+                    : _kSub.withValues(alpha: 0.25),
+                width: 2,
+              ),
             ),
             child: Center(
-              child: Text(emoji, style: const TextStyle(fontSize: 26)),
+              child: Opacity(
+                opacity: earned ? 1 : 0.35,
+                child: Text(emoji, style: const TextStyle(fontSize: 26)),
+              ),
             ),
           ),
           const SizedBox(height: 6),
@@ -447,7 +480,7 @@ class _SettingsSheetState extends ConsumerState<_SettingsSheet> {
               width: 40,
               height: 4,
               decoration: BoxDecoration(
-                color: const Color(0x55FFFFFF),
+                color: AppTheme.border,
                 borderRadius: BorderRadius.circular(2),
               ),
             ),
@@ -461,7 +494,7 @@ class _SettingsSheetState extends ConsumerState<_SettingsSheet> {
           // ── Logout ──
           _SheetTile(
             icon: Icons.logout,
-            iconColor: Colors.redAccent,
+            iconColor: AppTheme.clay,
             title: 'Logout',
             onTap: () async {
               Navigator.pop(context);
@@ -507,7 +540,7 @@ class _SettingsSheetState extends ConsumerState<_SettingsSheet> {
               width: double.infinity,
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: const Color(0xFF120830),
+                color: AppTheme.surfaceCream,
                 borderRadius: BorderRadius.circular(10),
               ),
               child: Text(_deviceInfo!,
@@ -540,7 +573,7 @@ class _SheetTile extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
         decoration: BoxDecoration(
-          color: const Color(0xFF120830),
+          color: AppTheme.surfaceCream,
           borderRadius: BorderRadius.circular(14),
         ),
         child: Row(

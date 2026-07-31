@@ -27,13 +27,16 @@ import {
   moveModule,
 } from "@/app/actions/courses";
 import { AddLessonDialog } from "./add-lesson-dialog";
-import { RESOURCE_LESSON_TYPES } from "@/lib/types";
+import { AddResourceDialog } from "./add-resource-dialog";
+import { deleteLessonResource } from "@/app/actions/courses";
 import type {
   Audio,
   Course,
   CourseModule,
+  LessonResource,
   LessonType,
   LessonWithMedia,
+  ResourceType,
   Video,
 } from "@/lib/types";
 
@@ -45,6 +48,9 @@ const LESSON_ICON: Record<LessonType, typeof Headphones> = {
   audio: Headphones,
   video: VideoIcon,
   text: FileText,
+};
+
+const RESOURCE_ICON: Record<ResourceType, typeof Headphones> = {
   pdf: FileText,
   image: ImageIcon,
   file: FileDown,
@@ -188,8 +194,9 @@ export function CourseBuilder({
                 return (
                   <div
                     key={lesson.id}
-                    className="flex items-center gap-3 rounded-md border border-border/60 px-3 py-2"
+                    className="rounded-md border border-border/60"
                   >
+                  <div className="flex items-center gap-3 px-3 py-2">
                     <Icon className="h-4 w-4 shrink-0 text-muted-foreground" />
 
                     <div className="min-w-0 flex-1">
@@ -197,15 +204,9 @@ export function CourseBuilder({
                       <p className="truncate text-xs text-muted-foreground">
                         {lesson.lesson_type === "text"
                           ? "Text lesson"
-                          : lesson.lesson_type === "link"
-                            ? lesson.resource_url
-                            : RESOURCE_LESSON_TYPES.includes(
-                                  lesson.lesson_type as (typeof RESOURCE_LESSON_TYPES)[number],
-                                )
-                              ? (lesson.resource_name ?? "Attached file")
-                              : media
-                                ? media.title
-                                : "Media unavailable — it may have been deleted"}
+                          : media
+                            ? media.title
+                            : "Media unavailable — it may have been deleted"}
                       </p>
                     </div>
 
@@ -225,6 +226,10 @@ export function CourseBuilder({
                     )}
 
                     <div className="flex shrink-0 items-center gap-1">
+                      <AddResourceDialog
+                        lessonId={lesson.id}
+                        courseId={course.id}
+                      />
                       <Button
                         variant="ghost"
                         size="icon"
@@ -282,6 +287,49 @@ export function CourseBuilder({
                         <Trash2 className="h-4 w-4" />
                       </Button>
                     </div>
+                  </div>
+
+                  {(lesson.lesson_resources ?? []).length > 0 && (
+                    <div className="space-y-1 border-t border-border/60 bg-muted/30 px-3 py-2">
+                      {(lesson.lesson_resources ?? []).map((r) => {
+                        const ResIcon = RESOURCE_ICON[r.resource_type];
+                        return (
+                          <div
+                            key={r.id}
+                            className="flex items-center gap-2 text-xs"
+                          >
+                            <ResIcon className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+                            <a
+                              href={r.url}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="min-w-0 flex-1 truncate hover:underline"
+                            >
+                              {r.title}
+                            </a>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-6 w-6 text-destructive"
+                              disabled={busy}
+                              onClick={() =>
+                                run(
+                                  () =>
+                                    deleteLessonResource({
+                                      resourceId: r.id,
+                                      courseId: course.id,
+                                    }),
+                                  "Resource removed",
+                                )
+                              }
+                            >
+                              <Trash2 className="h-3 w-3" />
+                            </Button>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
                   </div>
                 );
               })}
