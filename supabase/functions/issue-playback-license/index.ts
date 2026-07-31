@@ -13,7 +13,7 @@ import { handlePreflight, jsonResponse } from "../_shared/cors.ts";
 import { DEFAULT_DOWNLOAD_TTL_SECONDS, presignGet } from "../_shared/r2.ts";
 import type { BunnyPlayback } from "../_shared/bunny.ts";
 import {
-  checkBunnyManifest,
+  inspectBunnyManifest,
   fetchBunnyStatus,
   signBunnyPlayback,
 } from "../_shared/bunny.ts";
@@ -198,13 +198,13 @@ Deno.serve(async (req) => {
     // wrong hostname, a rejected token, and an unfinished encode.
     // Checking here costs one small request and turns all three into
     // something the message actually names.
-    const manifestProblem = await checkBunnyManifest(
+    const manifest = await inspectBunnyManifest(
       playback.hlsUrl,
       playback.signed,
     );
-    if (manifestProblem) {
-      console.error(`${manifestProblem} (video ${videoId})`);
-      return jsonResponse({ error: manifestProblem }, 502);
+    if (manifest.problem) {
+      console.error(`${manifest.problem} (video ${videoId})`);
+      return jsonResponse({ error: manifest.problem }, 502);
     }
 
     const { data: bunnyHistory } = await supabase
@@ -216,10 +216,17 @@ Deno.serve(async (req) => {
 
     return jsonResponse({
       video_id: videoId,
-      // One adaptive stream rather than a quality list — the player picks
-      // a rendition per segment, so there is nothing for the client to
-      // choose between.
-      qualities: [{ label: "auto", bitrate: null, url: playback.hlsUrl }],
+      // Auto first — an adaptive stream is the right default, since the
+      // player switches rendition per segment as the connection moves.
+      // The fixed renditions follow so a viewer on a metered or flaky
+      // connection can pin one, which adaptive streaming alone gives
+      // them no way to do. Read from the master playlist rather than
+      // guessed from a URL pattern, so this stays correct whatever
+      // ladder Bunny encoded.
+      qualities: [
+        { label: "Auto", bitrate: null, url: playback.hlsUrl },
+        ...manifest.variants,
+      ],
       hls_url: playback.hlsUrl,
       resume_position_seconds: bunnyHistory?.progress_seconds ?? 0,
       expires_in_seconds: SIGNED_URL_TTL_SECONDS,

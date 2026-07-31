@@ -1,6 +1,7 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../../../core/errors/auth_failure.dart';
+import '../../domain/entities/playback_sources.dart';
 
 /// Requests a signed playback URL for a video lesson.
 ///
@@ -11,7 +12,7 @@ class VideoRemoteDataSource {
 
   VideoRemoteDataSource(this._client);
 
-  Future<String> issuePlaybackUrl(String videoId) async {
+  Future<PlaybackSources> issuePlaybackUrl(String videoId) async {
     final deviceId = await _getActiveDeviceId();
 
     final response = await _client.functions.invoke(
@@ -40,17 +41,31 @@ class VideoRemoteDataSource {
 
     final data = response.data as Map<String, dynamic>;
 
-    // Bunny returns a single adaptive HLS stream; the R2 path returns a
-    // quality list. Either way the first entry is what we play — with
-    // HLS the player picks the rendition itself per segment.
-    final hlsUrl = data['hls_url'] as String?;
-    if (hlsUrl != null) return hlsUrl;
+    // `qualities` is the full picture for both backends: Bunny returns
+    // Auto followed by each rendition off the master playlist, the R2
+    // path returns its own ladder. Playing qualities.first keeps the
+    // old behaviour — it is the adaptive stream where there is one.
+    final rows = (data['qualities'] as List?) ?? const [];
+    final options = [
+      for (final row in rows)
+        if (row is Map && row['url'] is String)
+          PlaybackQuality(
+            label: (row['label'] as String?) ?? 'Auto',
+            url: row['url'] as String,
+          ),
+    ];
 
-    final qualities = data['qualities'] as List?;
-    if (qualities == null || qualities.isEmpty) {
-      throw AuthFailure.unknown('No playable version of this video.');
+    if (options.isNotEmpty) return PlaybackSources(options: options);
+
+    // Older deployments of the function answered with hls_url only.
+    final hlsUrl = data['hls_url'] as String?;
+    if (hlsUrl != null) {
+      return PlaybackSources(
+        options: [PlaybackQuality(label: 'Auto', url: hlsUrl)],
+      );
     }
-    return (qualities.first as Map)['url'] as String;
+
+    throw AuthFailure.unknown('No playable version of this video.');
   }
 
   Future<String> _getActiveDeviceId() async {

@@ -132,7 +132,22 @@ export async function signBunnyPlayback(
 /// token the pull zone rejects, an encode that hasn't produced a
 /// playlist yet — reaches the phone as the same opaque ExoPlayer
 /// "Source error", which says nothing about which of those it was.
-/// Returns null when the manifest is fine, or a human-readable reason.
+/// `problem` is null when the manifest is fine, or a human-readable
+/// reason. `variants` are the individual renditions the master lists,
+/// which is where the player's quality menu comes from — parsed from
+/// the same response rather than fetched again, and never guessed from
+/// a URL pattern.
+export interface BunnyRendition {
+  label: string;
+  bitrate: number | null;
+  url: string;
+}
+
+export interface ManifestInspection {
+  problem: string | null;
+  variants: BunnyRendition[];
+}
+
 /// The first media URI in an HLS playlist — the line after a #EXT-X-
 /// tag that isn't itself a tag. Returns null for a playlist with no
 /// entries at all.
@@ -145,10 +160,50 @@ function firstPlaylistUri(body: string): string | null {
   return null;
 }
 
-export async function checkBunnyManifest(
+/// Reads the variant streams out of a master playlist.
+///
+/// Each is an #EXT-X-STREAM-INF line carrying RESOLUTION and BANDWIDTH,
+/// followed by the URI on the next non-comment line. Anything without a
+/// resolution is skipped — an audio-only or I-frame variant isn't a
+/// quality a viewer would pick.
+function parseVariants(body: string, baseUrl: string): BunnyRendition[] {
+  const lines = body.split("\n").map((l) => l.trim());
+  const variants: BunnyRendition[] = [];
+
+  for (let i = 0; i < lines.length; i++) {
+    if (!lines[i].startsWith("#EXT-X-STREAM-INF")) continue;
+
+    const attrs = lines[i];
+    const resolution = /RESOLUTION=(\d+)x(\d+)/.exec(attrs);
+    if (!resolution) continue;
+    const bandwidth = /[^-]BANDWIDTH=(\d+)/.exec(attrs);
+
+    // The URI is the next line that isn't itself a tag.
+    let uri: string | null = null;
+    for (let j = i + 1; j < lines.length; j++) {
+      if (lines[j].length === 0) continue;
+      if (lines[j].startsWith("#")) break;
+      uri = lines[j];
+      break;
+    }
+    if (!uri) continue;
+
+    variants.push({
+      label: `${resolution[2]}p`,
+      bitrate: bandwidth ? Number(bandwidth[1]) : null,
+      url: new URL(uri, baseUrl).toString(),
+    });
+  }
+
+  // Highest first, which is the order a quality menu reads in.
+  variants.sort((a, b) => parseInt(b.label) - parseInt(a.label));
+  return variants;
+}
+
+export async function inspectBunnyManifest(
   url: string,
   signed: boolean,
-): Promise<string | null> {
+): Promise<ManifestInspection> {
   try {
     // GET, not HEAD: CDNs are inconsistent about HEAD on cached objects,
     // and a manifest is a few hundred bytes.
@@ -161,10 +216,14 @@ export async function checkBunnyManifest(
       // rather than trusting the code alone.
       const body = await res.text();
       if (!body.trimStart().startsWith("#EXTM3U")) {
-        return "The video CDN returned something that isn't an HLS " +
-          "playlist. Check that BUNNY_STREAM_PULL_ZONE names this " +
-          "library's own pull zone.";
+        return fault(
+          "The video CDN returned something that isn't an HLS playlist. " +
+            "Check that BUNNY_STREAM_PULL_ZONE names this library's own " +
+            "pull zone.",
+        );
       }
+
+      const variants = parseVariants(body, url);
 
       // The master playlist passing means nothing on its own. A player
       // immediately follows it to a rendition playlist, and with a
@@ -179,19 +238,22 @@ export async function checkBunnyManifest(
         const childRes = await fetch(child, { headers: { accept: "*/*" } });
         await childRes.body?.cancel();
         if (childRes.status === 403) {
-          return "Bunny served the playlist but rejected the video's " +
-            "renditions (403). The playback token doesn't survive the " +
-            "jump from the master playlist, so token authentication on " +
-            "this pull zone can't be used with a native player — turn " +
-            "it off, or unset BUNNY_STREAM_TOKEN_KEY to serve unsigned " +
-            "URLs.";
+          return fault(
+            "Bunny served the playlist but rejected the video's " +
+              "renditions (403). The playback token doesn't survive the " +
+              "jump from the master playlist, so token authentication on " +
+              "this pull zone can't be used with a native player - turn " +
+              "it off, or unset BUNNY_STREAM_TOKEN_KEY to serve unsigned " +
+              "URLs.",
+          );
         }
         if (!childRes.ok) {
-          return `Bunny returned ${childRes.status} for this video's ` +
-            `renditions.`;
+          return fault(
+            `Bunny returned ${childRes.status} for this video's renditions.`,
+          );
         }
       }
-      return null;
+      return { problem: null, variants };
     }
 
     // Drain the body so the connection can be reused rather than reset.
@@ -200,25 +262,33 @@ export async function checkBunnyManifest(
     if (res.status === 403) {
       // Same status, opposite causes — and blaming the key when no key
       // was used sends you to a setting that is already correct.
-      return signed
-        ? "Bunny rejected the playback token (403). Check " +
-          "BUNNY_STREAM_TOKEN_KEY against the pull zone's Token " +
-          "Authentication key."
-        : "Bunny refused an unsigned request (403), so something is " +
-          "still requiring a token. Check Stream > your library > " +
-          "Security for 'Token authentication' AND 'Block direct URL " +
-          "file access' - the pull zone's own toggle is not the only " +
-          "one.";
+      return fault(
+        signed
+          ? "Bunny rejected the playback token (403). Check " +
+            "BUNNY_STREAM_TOKEN_KEY against the pull zone's Token " +
+            "Authentication key."
+          : "Bunny refused an unsigned request (403), so something is " +
+            "still requiring a token. Check Stream > your library > " +
+            "Security for 'Token authentication' AND 'Block direct URL " +
+            "file access' - the pull zone's own toggle is not the only " +
+            "one.",
+      );
     }
     if (res.status === 404) {
-      return "Bunny has no playlist for this video yet (404). It may " +
-        "still be encoding, or BUNNY_STREAM_PULL_ZONE may be pointing " +
-        "at the wrong zone.";
+      return fault(
+        "Bunny has no playlist for this video yet (404). It may still be " +
+          "encoding, or BUNNY_STREAM_PULL_ZONE may be pointing at the " +
+          "wrong zone.",
+      );
     }
-    return `Bunny returned ${res.status} for this video's playlist.`;
+    return fault(`Bunny returned ${res.status} for this video's playlist.`);
   } catch (e) {
-    return `Could not reach the video CDN: ${e}`;
+    return fault(`Could not reach the video CDN: ${e}`);
   }
+}
+
+function fault(problem: string): ManifestInspection {
+  return { problem, variants: [] };
 }
 
 /// Asks Bunny what state a video is actually in.
