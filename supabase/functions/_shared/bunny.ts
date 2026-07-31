@@ -1,14 +1,27 @@
 // Bunny Stream signed playback URLs.
 //
-// Bunny's Token Authentication v2:
-//   token = "HS256-" + base64url(HMAC-SHA256(securityKey, path + expires))
-// with the base64 made URL-safe ('+' -> '-', '/' -> '_', '=' stripped).
+// Bunny's advanced ("HS256-") token authentication:
+//
+//   token = "HS256-" + base64url(
+//     HMAC-SHA256(securityKey, signaturePath + expires + signingData))
+//
+// where signingData is every token_* parameter, sorted by key, joined as
+// raw `key=value` pairs — so token_path is part of the signed message,
+// not merely a parameter travelling next to it. The base64 is made
+// URL-safe ('+' -> '-', '/' -> '_', '=' stripped).
 //
 // The token is signed over a DIRECTORY path, not the manifest file. This
 // matters: an HLS player fetches playlist.m3u8 and then dozens of .ts
 // segments beneath it, so a token scoped to just the manifest would
 // authorize the first request and 403 every segment after it — playback
-// would start and immediately stall.
+// would start and immediately stall. For the same reason the token is
+// carried in the URL path (/bcdn_token=…) rather than the query string:
+// segment URLs inside a manifest are relative, so only a path prefix is
+// inherited by them.
+//
+// This mirrors bunny.net's own signer at
+// github.com/BunnyWay/BunnyCDN.TokenAuthentication (nodejs/token.js);
+// the output was checked against it byte-for-byte.
 //
 // Secrets: BUNNY_STREAM_TOKEN_KEY (the library's token authentication
 // key) and BUNNY_STREAM_PULL_ZONE (e.g. vz-abc123.b-cdn.net).
@@ -61,7 +74,7 @@ export async function signBunnyPlayback(
   }
 
   const expires = Math.floor(Date.now() / 1000) + ttlSeconds;
-  const base = `https://${pullZone}/${bunnyVideoId}/playlist.m3u8`;
+  const unsigned = `https://${pullZone}/${bunnyVideoId}/playlist.m3u8`;
 
   // No key, no token. Signing with a missing key yields a signature that
   // is guaranteed wrong, so a pull zone with token authentication ON
@@ -75,19 +88,36 @@ export async function signBunnyPlayback(
         "URL. This works only while the pull zone has token " +
         "authentication disabled.",
     );
-    return { hlsUrl: base, expiresAt: expires };
+    return { hlsUrl: unsigned, expiresAt: expires };
   }
 
   // Trailing slash: this is a directory prefix covering the manifest and
   // every segment under it.
   const tokenPath = `/${bunnyVideoId}/`;
 
-  const signature = await hmacSha256(securityKey, `${tokenPath}${expires}`);
+  // token_path is part of what gets signed, not just a query parameter
+  // alongside the signature. Bunny folds every token_* parameter into the
+  // HMAC message, sorted by key, as raw (un-encoded) `key=value` pairs.
+  // Omitting it — as this did — produces a signature Bunny computes
+  // differently and rejects with a 403 on every request.
+  const signingData = `token_path=${tokenPath}`;
+  const signature = await hmacSha256(
+    securityKey,
+    `${tokenPath}${expires}${signingData}`,
+  );
   const token = `HS256-${base64Url(signature)}`;
 
+  // Directory tokens go in the PATH, not the query string. An HLS
+  // manifest lists its segments as relative URLs, so the player resolves
+  // them against the manifest's directory — a token in the query string
+  // is dropped the moment the player asks for the first .ts segment, and
+  // playback dies a second or two in. Carrying it as a path prefix means
+  // every segment request inherits it for free.
   const url =
-    `${base}?token=${token}&expires=${expires}` +
-    `&token_path=${encodeURIComponent(tokenPath)}`;
+    `https://${pullZone}/bcdn_token=${token}` +
+    `&token_path=${encodeURIComponent(tokenPath)}` +
+    `&expires=${expires}` +
+    `/${bunnyVideoId}/playlist.m3u8`;
 
   return { hlsUrl: url, expiresAt: expires };
 }
