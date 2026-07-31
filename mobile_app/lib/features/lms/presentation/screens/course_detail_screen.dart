@@ -25,12 +25,38 @@ class CourseDetailScreen extends ConsumerStatefulWidget {
   ConsumerState<CourseDetailScreen> createState() => _CourseDetailScreenState();
 }
 
-class _CourseDetailScreenState extends ConsumerState<CourseDetailScreen> {
+class _CourseDetailScreenState extends ConsumerState<CourseDetailScreen>
+    with WidgetsBindingObserver {
   bool _starting = false;
 
   /// The course being viewed, once loaded — needed to price the purchase
   /// sheet from anywhere in this screen.
   CourseSummaryRef? _course;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    // Fallback for when the deep-link return from checkout doesn't fire
+    // (browser/OS didn't follow the link, or the user manually switched
+    // back instead of tapping "Return to app") — re-check ownership
+    // whenever this screen comes back to the foreground rather than
+    // leaving it stuck showing locked after a completed payment.
+    if (state == AppLifecycleState.resumed) {
+      ref.invalidate(courseDetailProvider(widget.courseId));
+      ref.invalidate(coursesProvider);
+    }
+  }
 
   Future<void> _promptPurchase() async {
     final course = _course;
@@ -169,12 +195,13 @@ class _CourseDetailScreenState extends ConsumerState<CourseDetailScreen> {
                 ),
               ),
 
-              // Pulled up so the card overlaps the hero, the way the
-              // reference layers its title card over the cover image.
+              // Sits below the hero with clear air between them. An
+              // earlier version pulled this up to overlap the cover, but
+              // slivers paint first-on-top, so the hero covered the card
+              // and clipped the title.
+              const SliverToBoxAdapter(child: SizedBox(height: 16)),
               SliverToBoxAdapter(
-                child: Transform.translate(
-                  offset: const Offset(0, -28),
-                  child: Padding(
+                child: Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 20),
                     child: _MetaCard(
                       title: detail.course.title,
@@ -194,14 +221,11 @@ class _CourseDetailScreenState extends ConsumerState<CourseDetailScreen> {
                       },
                     ),
                   ),
-                ),
               ),
 
-              SliverToBoxAdapter(
-                child: Transform.translate(
-                  offset: const Offset(0, -14),
-                  child: const Padding(
-                    padding: EdgeInsets.fromLTRB(20, 0, 20, 10),
+              const SliverToBoxAdapter(
+                child: Padding(
+                    padding: EdgeInsets.fromLTRB(20, 24, 20, 10),
                     child: Text(
                       'Lessons',
                       style: TextStyle(
@@ -211,7 +235,6 @@ class _CourseDetailScreenState extends ConsumerState<CourseDetailScreen> {
                       ),
                     ),
                   ),
-                ),
               ),
 
               if (detail.modules.isEmpty)
@@ -233,9 +256,7 @@ class _CourseDetailScreenState extends ConsumerState<CourseDetailScreen> {
                 // distinguish.
                 if (detail.modules.length > 1)
                   SliverToBoxAdapter(
-                    child: Transform.translate(
-                      offset: const Offset(0, -14),
-                      child: Padding(
+                    child: Padding(
                         padding: const EdgeInsets.fromLTRB(20, 10, 20, 8),
                         child: Text(
                           module.title.toUpperCase(),
@@ -247,7 +268,6 @@ class _CourseDetailScreenState extends ConsumerState<CourseDetailScreen> {
                           ),
                         ),
                       ),
-                    ),
                   ),
                 SliverList.separated(
                   itemCount: module.lessons.length,
@@ -255,9 +275,7 @@ class _CourseDetailScreenState extends ConsumerState<CourseDetailScreen> {
                   itemBuilder: (_, i) {
                     final lesson = module.lessons[i];
                     lessonNumber++;
-                    return Transform.translate(
-                      offset: const Offset(0, -14),
-                      child: Padding(
+                    return Padding(
                         padding: const EdgeInsets.symmetric(horizontal: 20),
                         child: _LessonTile(
                           number: lessonNumber,
@@ -265,7 +283,6 @@ class _CourseDetailScreenState extends ConsumerState<CourseDetailScreen> {
                           locked: locked,
                           onTap: () => _openLesson(lesson, locked),
                         ),
-                      ),
                     );
                   },
                 ),

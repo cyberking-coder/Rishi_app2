@@ -34,12 +34,16 @@
             android:hardwareAccelerated="true"
             android:windowSoftInputMode="adjustResize">
 
-            <!-- Deep link for password reset emails -->
+            <!-- Deep links back into the app: password reset emails, and
+                 the course-checkout web page once Razorpay confirms a
+                 payment (so paying returns the user straight to their
+                 course instead of leaving them stranded in the browser). -->
             <intent-filter android:autoVerify="true">
                 <action android:name="android.intent.action.VIEW" />
                 <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.BROWSABLE" />
                 <data android:scheme="meditationapp" android:host="reset-password" />
+                <data android:scheme="meditationapp" android:host="payment-success" />
             </intent-filter>
 
             <intent-filter>

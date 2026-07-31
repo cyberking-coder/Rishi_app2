@@ -68,10 +68,12 @@ class _CoursePurchaseSheetState extends ConsumerState<_CoursePurchaseSheet> {
           await launchUrl(url, mode: LaunchMode.externalApplication);
       if (!opened) throw Exception('Could not open checkout');
       if (mounted) Navigator.pop(context);
-    } catch (_) {
+    } catch (e) {
+      // Show what actually failed. A blanket "something went wrong" here
+      // hid a real, fixable cause (an edge function that hadn't been
+      // redeployed) behind a message that suggested emailing support.
       if (mounted) {
-        setState(() =>
-            _error = 'Something went wrong starting checkout.\n\n$_fallback');
+        setState(() => _error = '$e\n\n$_fallback');
       }
     } finally {
       if (mounted) setState(() => _loading = false);

@@ -232,6 +232,7 @@ Deno.serve(async (req) => {
         phone,
         state,
         plan_name: plan.name,
+        content_type: "subscription",
         amount: payment.amount / 100,
         currency: payment.currency ?? "INR",
         reason: payment.error_description ?? "Payment failed",
@@ -334,6 +335,7 @@ Deno.serve(async (req) => {
       phone,
       state,
       plan_name: plan.name,
+      content_type: "subscription",
       amount: payment.amount / 100,
       currency: payment.currency ?? "INR",
     });
@@ -417,6 +419,25 @@ async function handleCoursePurchase(
     status,
   });
 
+  // The coupon (if any) was attached to the row at checkout time and
+  // survives this upsert untouched (see the comment above the upsert) —
+  // read it back so the notification can say what was saved.
+  const { data: purchaseRow } = await supabase
+    .from("course_purchases")
+    .select("coupon_id, discount_amount")
+    .eq("razorpay_order_id", payment.order_id)
+    .maybeSingle();
+
+  let couponCode: string | undefined;
+  if (purchaseRow?.coupon_id) {
+    const { data: coupon } = await supabase
+      .from("coupons")
+      .select("code")
+      .eq("id", purchaseRow.coupon_id)
+      .maybeSingle();
+    couponCode = coupon?.code;
+  }
+
   let email = billing.email;
   if (!email) {
     try {
@@ -436,6 +457,12 @@ async function handleCoursePurchase(
       phone: billing.phone,
       state: billing.state,
       plan_name: course.title,
+      content_type: "course",
+      course_id: course.id,
+      coupon_code: couponCode,
+      discount_amount: purchaseRow?.discount_amount
+        ? purchaseRow.discount_amount / 100
+        : undefined,
       amount: amountRupees,
       currency: payment.currency ?? "INR",
       reason:

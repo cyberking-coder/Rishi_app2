@@ -11,14 +11,39 @@ export interface PaymentNotification {
   /** Collected on our own checkout form; falls back to Razorpay's contact. */
   phone: string | null;
   state: string | null;
+  /** Subscription plan name, or the course title for a course purchase. */
   plan_name: string;
   amount: number; // rupees, not paise
   currency: string;
   reason?: string; // only set for payment_failed
+  /** Lets the n8n workflow pick a different WhatsApp/email template for a
+   *  course purchase vs the recurring subscription — "you're in Rishi
+   *  Mode" reads wrong on a one-off course sale, and vice versa. */
+  content_type?: "subscription" | "course";
+  /** Only set for content_type: "course" — lets the message deep-link
+   *  straight to the course instead of the generic app link. */
+  course_id?: string;
+  /** Set when a coupon was applied, so the message can say what was saved. */
+  coupon_code?: string;
+  discount_amount?: number; // rupees
+}
+
+/** Course purchases and the subscription go to separate n8n workflows —
+ *  they're different products with different messages, and a course
+ *  workflow can ship and iterate without touching the subscription one
+ *  (which isn't in active use right now). Falls back to the shared
+ *  N8N_PAYMENT_WEBHOOK_URL if no course-specific one is set, so this
+ *  degrades gracefully rather than going silent mid-rollout. */
+function webhookUrlFor(notification: PaymentNotification): string | undefined {
+  if (notification.content_type === "course") {
+    return Deno.env.get("N8N_COURSE_PAYMENT_WEBHOOK_URL") ??
+      Deno.env.get("N8N_PAYMENT_WEBHOOK_URL");
+  }
+  return Deno.env.get("N8N_PAYMENT_WEBHOOK_URL");
 }
 
 export async function notifyN8n(notification: PaymentNotification): Promise<void> {
-  const webhookUrl = Deno.env.get("N8N_PAYMENT_WEBHOOK_URL");
+  const webhookUrl = webhookUrlFor(notification);
   if (!webhookUrl) return; // not configured yet - skip silently
 
   const res = await fetch(webhookUrl, {
