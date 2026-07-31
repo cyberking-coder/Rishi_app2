@@ -185,7 +185,13 @@ class ProfileScreen extends ConsumerWidget {
                   onTap: () => _showSubscriptionDetails(
                     context,
                     subPlan,
-                    subAsync.valueOrNull,
+                    // Never pass the raw subscription row for an account
+                    // without live access — it records what was once
+                    // bought and is never cleared on revoke, so a
+                    // free/revoked user would still see the old renewal
+                    // date. hasMembership is the only thing that decides
+                    // whether this row is current.
+                    hasMembership ? subAsync.valueOrNull : null,
                     isFree,
                   ),
                 ),
