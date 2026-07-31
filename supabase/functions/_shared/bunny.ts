@@ -134,10 +134,24 @@ export async function checkBunnyManifest(url: string): Promise<string | null> {
     // GET, not HEAD: CDNs are inconsistent about HEAD on cached objects,
     // and a manifest is a few hundred bytes.
     const res = await fetch(url, { headers: { accept: "*/*" } });
+
+    if (res.ok) {
+      // A 200 isn't proof of a playlist — a CDN error page, or a zone
+      // serving something other than this video, arrives with the same
+      // status. Every HLS manifest starts with #EXTM3U, so check for it
+      // rather than trusting the code alone.
+      const body = await res.text();
+      if (!body.trimStart().startsWith("#EXTM3U")) {
+        return "The video CDN returned something that isn't an HLS " +
+          "playlist. Check that BUNNY_STREAM_PULL_ZONE names this " +
+          "library's own pull zone.";
+      }
+      return null;
+    }
+
     // Drain the body so the connection can be reused rather than reset.
     await res.body?.cancel();
 
-    if (res.ok) return null;
     if (res.status === 403) {
       return "Bunny rejected the playback token (403). Check " +
         "BUNNY_STREAM_TOKEN_KEY against the pull zone's token " +

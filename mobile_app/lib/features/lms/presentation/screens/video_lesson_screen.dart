@@ -22,6 +22,7 @@ class _VideoLessonScreenState extends ConsumerState<VideoLessonScreen> {
   VideoPlayerController? _controller;
   ChewieController? _chewie;
   String? _error;
+  String? _errorDetails;
 
   /// Whether the stream actually started. Returned to the course screen
   /// on pop so a lesson that failed to load isn't ticked off as done.
@@ -65,7 +66,12 @@ class _VideoLessonScreenState extends ConsumerState<VideoLessonScreen> {
         );
       });
     } catch (e) {
-      if (mounted) setState(() => _error = _describeError(e));
+      if (mounted) {
+        setState(() {
+          _error = _describeError(e);
+          _errorDetails = _errorDetail(e);
+        });
+      }
     }
   }
 
@@ -84,13 +90,25 @@ class _VideoLessonScreenState extends ConsumerState<VideoLessonScreen> {
       }
       return 'Could not start this video (${e.status}).';
     }
-    // Anything from the platform player: the stream was reachable enough
-    // to hand over, but playback itself failed.
     if (e is PlatformException) {
       return 'This video could not be played. It may still be processing '
           '— please try again in a few minutes.';
     }
     return e.toString();
+  }
+
+  /// The underlying failure, shown small beneath the friendly message.
+  ///
+  /// ExoPlayer names the actual cause in here — "Response code: 403" for
+  /// a rejected token, "404" for a manifest that isn't there, a codec
+  /// name when the file itself is the problem. Hiding all of it behind
+  /// "may still be processing" made the screen calmer and useless: every
+  /// distinct failure looked identical.
+  String? _errorDetail(Object e) {
+    if (e is PlatformException) {
+      return [e.code, e.message].where((s) => s != null).join(': ');
+    }
+    return null;
   }
 
   @override
@@ -149,10 +167,20 @@ class _VideoLessonScreenState extends ConsumerState<VideoLessonScreen> {
           Text(_error!,
               textAlign: TextAlign.center,
               style: const TextStyle(color: Colors.white70, height: 1.5)),
+          if (_errorDetails != null) ...[
+            const SizedBox(height: 8),
+            Text(_errorDetails!,
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                    color: Colors.white38, fontSize: 11, height: 1.4)),
+          ],
           const SizedBox(height: 16),
           FilledButton(
             onPressed: () {
-              setState(() => _error = null);
+              setState(() {
+                _error = null;
+                _errorDetails = null;
+              });
               _load();
             },
             child: const Text('Try again'),
