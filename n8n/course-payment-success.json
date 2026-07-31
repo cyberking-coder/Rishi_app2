@@ -1,5 +1,5 @@
 {
-  "name": "Rishi App — Course payment success",
+  "name": "Rishi App — Course payments (success + failed)",
   "nodes": [
     {
       "parameters": {
@@ -12,7 +12,10 @@
       "name": "Payment webhook",
       "type": "n8n-nodes-base.webhook",
       "typeVersion": 2,
-      "position": [-220, 0],
+      "position": [
+        -220,
+        0
+      ],
       "webhookId": "6872d5b6-912a-411b-b40e-ad393e4454f7"
     },
     {
@@ -42,7 +45,10 @@
       "name": "Is success?",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2,
-      "position": [0, 0]
+      "position": [
+        0,
+        0
+      ]
     },
     {
       "parameters": {
@@ -141,7 +147,10 @@
       "name": "Normalise",
       "type": "n8n-nodes-base.set",
       "typeVersion": 3.4,
-      "position": [220, -100]
+      "position": [
+        220,
+        -100
+      ]
     },
     {
       "parameters": {
@@ -165,7 +174,10 @@
       "name": "Wati: send confirmation",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [440, -100]
+      "position": [
+        440,
+        -100
+      ]
     },
     {
       "parameters": {
@@ -205,15 +217,182 @@
       "name": "Log sale to Sheets",
       "type": "n8n-nodes-base.googleSheets",
       "typeVersion": 4.5,
-      "position": [660, -100]
+      "position": [
+        660,
+        -100
+      ]
     },
     {
-      "parameters": {},
-      "id": "a1000000-0000-4000-8000-000000000006",
-      "name": "Not a success event",
-      "type": "n8n-nodes-base.noOp",
-      "typeVersion": 1,
-      "position": [220, 120]
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "f2000000-0000-4000-8000-000000000001",
+              "name": "waNumber",
+              "type": "string",
+              "value": "={{ ($json.body.phone || '').replace(/\\D/g, '').replace(/^(?!91)(\\d{10})$/, '91$1') }}"
+            },
+            {
+              "id": "f2000000-0000-4000-8000-000000000002",
+              "name": "firstName",
+              "type": "string",
+              "value": "={{ ($json.body.name || 'there').split(' ')[0] }}"
+            },
+            {
+              "id": "f2000000-0000-4000-8000-000000000003",
+              "name": "courseTitle",
+              "type": "string",
+              "value": "={{ $json.body.plan_name }}"
+            },
+            {
+              "id": "f2000000-0000-4000-8000-000000000004",
+              "name": "amountLabel",
+              "type": "string",
+              "value": "={{ $json.body.currency === 'INR' ? '₹' + $json.body.amount : $json.body.currency + ' ' + $json.body.amount }}"
+            },
+            {
+              "id": "f2000000-0000-4000-8000-000000000005",
+              "name": "reason",
+              "type": "string",
+              "value": "={{ ($json.body.reason || 'The payment could not be completed.').slice(0, 200) }}"
+            },
+            {
+              "id": "f2000000-0000-4000-8000-000000000006",
+              "name": "buyerName",
+              "type": "string",
+              "value": "={{ $json.body.name || '' }}"
+            },
+            {
+              "id": "f2000000-0000-4000-8000-000000000007",
+              "name": "buyerEmail",
+              "type": "string",
+              "value": "={{ $json.body.email || '' }}"
+            },
+            {
+              "id": "f2000000-0000-4000-8000-000000000008",
+              "name": "buyerState",
+              "type": "string",
+              "value": "={{ $json.body.state || '' }}"
+            },
+            {
+              "id": "f2000000-0000-4000-8000-000000000009",
+              "name": "amount",
+              "type": "number",
+              "value": "={{ $json.body.amount }}"
+            },
+            {
+              "id": "f2000000-0000-4000-8000-000000000010",
+              "name": "currency",
+              "type": "string",
+              "value": "={{ $json.body.currency }}"
+            },
+            {
+              "id": "f2000000-0000-4000-8000-000000000011",
+              "name": "couponCode",
+              "type": "string",
+              "value": "={{ $json.body.coupon_code || '' }}"
+            },
+            {
+              "id": "f2000000-0000-4000-8000-000000000012",
+              "name": "userId",
+              "type": "string",
+              "value": "={{ $json.body.user_id }}"
+            },
+            {
+              "id": "f2000000-0000-4000-8000-000000000013",
+              "name": "courseId",
+              "type": "string",
+              "value": "={{ $json.body.course_id }}"
+            },
+            {
+              "id": "f2000000-0000-4000-8000-000000000014",
+              "name": "failedAt",
+              "type": "string",
+              "value": "={{ $now.setZone('Asia/Kolkata').format('yyyy-LL-dd HH:mm') }}"
+            }
+          ]
+        },
+        "includeOtherFields": false,
+        "options": {}
+      },
+      "id": "a1000000-0000-4000-8000-000000000007",
+      "name": "Normalise (failed)",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        220,
+        160
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://live-server-REPLACE_ME.wati.io/api/v1/sendTemplateMessage?whatsappNumber={{ $json.waNumber }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "Bearer REPLACE_WITH_WATI_TOKEN"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ template_name: 'course_payment_failed', broadcast_name: 'course_payment_failed', parameters: [ { name: 'name', value: $json.firstName }, { name: 'course', value: $json.courseTitle }, { name: 'reason', value: $json.reason } ] }) }}",
+        "options": {}
+      },
+      "id": "a1000000-0000-4000-8000-000000000008",
+      "name": "Wati: send failure notice",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        440,
+        160
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "REPLACE_WITH_SPREADSHEET_ID",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "Failures",
+          "mode": "name"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Date": "={{ $('Normalise (failed)').item.json.failedAt }}",
+            "Name": "={{ $('Normalise (failed)').item.json.buyerName }}",
+            "Email": "={{ $('Normalise (failed)').item.json.buyerEmail }}",
+            "Phone": "={{ $('Normalise (failed)').item.json.waNumber }}",
+            "State": "={{ $('Normalise (failed)').item.json.buyerState }}",
+            "Course": "={{ $('Normalise (failed)').item.json.courseTitle }}",
+            "Amount": "={{ $('Normalise (failed)').item.json.amount }}",
+            "Currency": "={{ $('Normalise (failed)').item.json.currency }}",
+            "Coupon": "={{ $('Normalise (failed)').item.json.couponCode }}",
+            "Reason": "={{ $('Normalise (failed)').item.json.reason }}",
+            "User ID": "={{ $('Normalise (failed)').item.json.userId }}",
+            "Course ID": "={{ $('Normalise (failed)').item.json.courseId }}"
+          },
+          "matchingColumns": [],
+          "schema": []
+        },
+        "options": {}
+      },
+      "id": "a1000000-0000-4000-8000-000000000009",
+      "name": "Log failure to Sheets",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        660,
+        160
+      ]
     }
   ],
   "connections": {
@@ -239,7 +418,7 @@
         ],
         [
           {
-            "node": "Not a success event",
+            "node": "Normalise (failed)",
             "type": "main",
             "index": 0
           }
@@ -262,6 +441,28 @@
         [
           {
             "node": "Log sale to Sheets",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalise (failed)": {
+      "main": [
+        [
+          {
+            "node": "Wati: send failure notice",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wati: send failure notice": {
+      "main": [
+        [
+          {
+            "node": "Log failure to Sheets",
             "type": "main",
             "index": 0
           }
