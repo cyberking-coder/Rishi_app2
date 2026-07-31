@@ -48,6 +48,7 @@ export function CheckoutClient({
   /** Course price in paise. Undefined for subscription checkout, where
    *  the price is a recurring plan rather than a discountable total. */
   priceAmount,
+  priceLabel,
   allowCoupon = false,
 }: {
   token: string;
@@ -55,6 +56,9 @@ export function CheckoutClient({
   defaultName: string;
   defaultEmail: string;
   priceAmount?: number;
+  /** Display price for the button when there's no discountable total —
+   *  a subscription's "₹199 / month" rather than a one-off amount. */
+  priceLabel?: string;
   allowCoupon?: boolean;
 }) {
   const [status, setStatus] = useState<Status>("idle");
@@ -325,7 +329,9 @@ export function CheckoutClient({
             ? "Get free access"
             : payable !== undefined
               ? `Pay ${formatPaise(payable)}`
-              : "Proceed to pay"}
+              : priceLabel
+                ? `Pay ${priceLabel}`
+                : "Proceed to pay"}
       </Button>
 
       <p className="mt-3 text-center text-xs text-muted-foreground">
