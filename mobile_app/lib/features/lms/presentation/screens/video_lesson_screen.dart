@@ -1,6 +1,8 @@
 import 'package:chewie/chewie.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart' show PlatformException;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:supabase_flutter/supabase_flutter.dart' show FunctionException;
 import 'package:video_player/video_player.dart';
 
 import '../../../../app/theme/app_theme.dart';
@@ -63,8 +65,32 @@ class _VideoLessonScreenState extends ConsumerState<VideoLessonScreen> {
         );
       });
     } catch (e) {
-      if (mounted) setState(() => _error = e.toString());
+      if (mounted) setState(() => _error = _describeError(e));
     }
+  }
+
+  /// Turns whatever was thrown into something a viewer can act on.
+  ///
+  /// Raw toString() output was reaching the screen verbatim — an
+  /// ExoPlayer "Source error" stack fragment tells someone watching a
+  /// meditation course nothing at all. The edge function already returns
+  /// a written explanation for the cases it can identify, so prefer that
+  /// whenever it's there.
+  String _describeError(Object e) {
+    if (e is FunctionException) {
+      final details = e.details;
+      if (details is Map && details['error'] is String) {
+        return details['error'] as String;
+      }
+      return 'Could not start this video (${e.status}).';
+    }
+    // Anything from the platform player: the stream was reachable enough
+    // to hand over, but playback itself failed.
+    if (e is PlatformException) {
+      return 'This video could not be played. It may still be processing '
+          '— please try again in a few minutes.';
+    }
+    return e.toString();
   }
 
   @override

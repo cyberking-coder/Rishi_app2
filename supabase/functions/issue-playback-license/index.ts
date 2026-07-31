@@ -11,7 +11,12 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { handlePreflight, jsonResponse } from "../_shared/cors.ts";
 import { DEFAULT_DOWNLOAD_TTL_SECONDS, presignGet } from "../_shared/r2.ts";
-import { fetchBunnyStatus, signBunnyPlayback } from "../_shared/bunny.ts";
+import type { BunnyPlayback } from "../_shared/bunny.ts";
+import {
+  checkBunnyManifest,
+  fetchBunnyStatus,
+  signBunnyPlayback,
+} from "../_shared/bunny.ts";
 
 const SIGNED_URL_TTL_SECONDS = DEFAULT_DOWNLOAD_TTL_SECONDS; // 10 minutes
 
@@ -174,10 +179,30 @@ Deno.serve(async (req) => {
       }
     }
 
-    const playback = await signBunnyPlayback(
-      video.bunny_video_id,
-      SIGNED_URL_TTL_SECONDS,
-    );
+    let playback: BunnyPlayback;
+    try {
+      playback = await signBunnyPlayback(
+        video.bunny_video_id,
+        SIGNED_URL_TTL_SECONDS,
+      );
+    } catch (e) {
+      console.error("Bunny playback signing failed:", e);
+      return jsonResponse(
+        { error: e instanceof Error ? e.message : "Playback is misconfigured." },
+        500,
+      );
+    }
+
+    // Handing the phone a URL the CDN won't serve produces a bare
+    // "Source error" in the player, which is the same message for a
+    // wrong hostname, a rejected token, and an unfinished encode.
+    // Checking here costs one small request and turns all three into
+    // something the message actually names.
+    const manifestProblem = await checkBunnyManifest(playback.hlsUrl);
+    if (manifestProblem) {
+      console.error(`${manifestProblem} (video ${videoId})`);
+      return jsonResponse({ error: manifestProblem }, 502);
+    }
 
     const { data: bunnyHistory } = await supabase
       .from("watch_history")
