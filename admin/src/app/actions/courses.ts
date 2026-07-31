@@ -513,17 +513,18 @@ export async function moveLesson(args: {
 /**
  * Revokes or restores one student's access to one course.
  *
- * Works by setting `expires_at`, not by changing `status`. A revoked
- * enrolment is still a payment that was received — flipping it to
- * 'refunded' would quietly remove it from the roster and the revenue
- * total, which would then disagree with what Razorpay actually settled.
- * has_course_access() already treats a past expires_at as no access, so
- * this is the whole mechanism: the app relocks the course, the license
- * functions refuse its lessons' media, and the sale stays on the books.
+ * Moves the row between 'paid' and 'revoked' rather than dating
+ * `expires_at`, because uq_course_purchases_paid allows only one paid
+ * row per (user, course). Leaving a withdrawn enrolment as 'paid' meant
+ * the student could never buy the course again — checkout refused them
+ * as already owning it, and had it not, the webhook's update to 'paid'
+ * would have hit the unique index after their card was charged.
  *
- * Ending a user's subscription access does NOT do this. Courses are sold
- * outright, so a lapsed subscription leaves a bought course open on
- * purpose — this is the control for taking one back.
+ * The revoked row keeps its amount and payment id, so the sale stays on
+ * the books; has_course_access() requires 'paid', so access ends at
+ * once. Ending a user's SUBSCRIPTION access does none of this — courses
+ * are sold outright, so a lapsed subscription leaves a bought course
+ * open on purpose, and this is the control for taking one back.
  */
 export async function setCourseEnrolmentAccess(
   userId: string,
@@ -533,19 +534,42 @@ export async function setCourseEnrolmentAccess(
   await requireAdmin();
   const db = createAdminClient();
 
+  if (!revoked) {
+    // Restoring can collide: if the student rebought the course after
+    // being removed, they already hold an active row and promoting the
+    // old one would violate the unique index. Say so rather than
+    // surfacing a constraint error.
+    const { data: active } = await db
+      .from("course_purchases")
+      .select("id")
+      .eq("user_id", userId)
+      .eq("course_id", courseId)
+      .eq("status", "paid")
+      .maybeSingle();
+
+    if (active) {
+      return {
+        ok: false,
+        error: "This student already has an active enrolment — they " +
+          "bought the course again after being removed.",
+      };
+    }
+  }
+
   const { error } = await db
     .from("course_purchases")
     .update({
-      expires_at: revoked ? new Date().toISOString() : null,
+      status: revoked ? "revoked" : "paid",
       updated_at: new Date().toISOString(),
     })
     .eq("user_id", userId)
     .eq("course_id", courseId)
-    .eq("status", "paid");
+    .eq("status", revoked ? "paid" : "revoked");
 
   if (error) return { ok: false, error: error.message };
 
   revalidatePath(`/courses/${courseId}`);
+  revalidatePath("/courses");
   revalidatePath("/users");
   return { ok: true };
 }

@@ -19,7 +19,9 @@ interface PurchaseRow {
   currency: string;
   discount_amount: number | null;
   created_at: string;
-  /** Past timestamp = access revoked. null = permanent. */
+  status: "paid" | "revoked";
+  /** Time-limited access that lapses on its own. null = permanent.
+   *  Independent of `status`, which is what an admin withdrawal sets. */
   expires_at: string | null;
 }
 
@@ -36,18 +38,22 @@ export async function EnrolledStudents({ courseId }: { courseId: string }) {
   const { data: purchases } = await supabase
     .from("course_purchases")
     .select(
-      "user_id, amount, currency, discount_amount, created_at, expires_at",
+      "user_id, amount, currency, discount_amount, created_at, status, expires_at",
     )
     .eq("course_id", courseId)
-    .eq("status", "paid")
+    // Withdrawn enrolments are 'revoked', not deleted — they belong on
+    // the roster so the removal can be undone and the payment stays
+    // visible.
+    .in("status", ["paid", "revoked"])
     .order("created_at", { ascending: false })
     .returns<PurchaseRow[]>();
 
   const rows = purchases ?? [];
 
-  // One person can hold more than one paid row (a rebuy after a refund),
-  // and they're one student either way. Keep the earliest-listed row,
-  // which is the most recent purchase given the ordering above.
+  // One person can hold more than one row — a rebuy after being removed
+  // leaves the revoked one behind — and they're one student either way.
+  // Keep the earliest-listed, which is the most recent purchase given
+  // the ordering above, so a student who rebought reads as active.
   const seen = new Set<string>();
   const unique = rows.filter((r) => {
     if (seen.has(r.user_id)) return false;
@@ -179,9 +185,12 @@ export async function EnrolledStudents({ courseId }: { courseId: string }) {
   );
 }
 
-/** Access is withdrawn by dating `expires_at` in the past rather than
- *  by changing `status`, so the sale stays on the books. */
+/** No current access, whether an admin withdrew it or a time-limited
+ *  enrolment simply ran out. */
 function isRevoked(row: PurchaseRow): boolean {
+  if (row.status === "revoked") return true;
+  // A time-limited enrolment that has run out is equally "no access",
+  // even though no admin touched it.
   return row.expires_at !== null && new Date(row.expires_at) <= new Date();
 }
 
