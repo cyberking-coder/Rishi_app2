@@ -129,6 +129,18 @@ export async function signBunnyPlayback(
 /// playlist yet — reaches the phone as the same opaque ExoPlayer
 /// "Source error", which says nothing about which of those it was.
 /// Returns null when the manifest is fine, or a human-readable reason.
+/// The first media URI in an HLS playlist — the line after a #EXT-X-
+/// tag that isn't itself a tag. Returns null for a playlist with no
+/// entries at all.
+function firstPlaylistUri(body: string): string | null {
+  for (const raw of body.split("\n")) {
+    const line = raw.trim();
+    if (line.length === 0 || line.startsWith("#")) continue;
+    return line;
+  }
+  return null;
+}
+
 export async function checkBunnyManifest(url: string): Promise<string | null> {
   try {
     // GET, not HEAD: CDNs are inconsistent about HEAD on cached objects,
@@ -145,6 +157,32 @@ export async function checkBunnyManifest(url: string): Promise<string | null> {
         return "The video CDN returned something that isn't an HLS " +
           "playlist. Check that BUNNY_STREAM_PULL_ZONE names this " +
           "library's own pull zone.";
+      }
+
+      // The master playlist passing means nothing on its own. A player
+      // immediately follows it to a rendition playlist, and with a
+      // path-embedded token that second request only carries the token
+      // if the reference is relative — an absolute one resolves against
+      // the domain root and loses the whole /bcdn_token=…/ prefix. That
+      // failure reaches the phone as a 403 while this check, which only
+      // ever looked at the master, reported everything fine.
+      const rendition = firstPlaylistUri(body);
+      if (rendition) {
+        const child = new URL(rendition, url).toString();
+        const childRes = await fetch(child, { headers: { accept: "*/*" } });
+        await childRes.body?.cancel();
+        if (childRes.status === 403) {
+          return "Bunny served the playlist but rejected the video's " +
+            "renditions (403). The playback token doesn't survive the " +
+            "jump from the master playlist, so token authentication on " +
+            "this pull zone can't be used with a native player — turn " +
+            "it off, or unset BUNNY_STREAM_TOKEN_KEY to serve unsigned " +
+            "URLs.";
+        }
+        if (!childRes.ok) {
+          return `Bunny returned ${childRes.status} for this video's ` +
+            `renditions.`;
+        }
       }
       return null;
     }
