@@ -26,11 +26,31 @@ export const dynamic = "force-dynamic";
 
 export default async function UsersPage() {
   const supabase = createClient();
-  const { data: users } = await supabase
-    .from("profiles")
-    .select("*")
-    .order("created_at", { ascending: false })
-    .returns<Profile[]>();
+  const [{ data: users }, { data: purchases }] = await Promise.all([
+    supabase
+      .from("profiles")
+      .select("*")
+      .order("created_at", { ascending: false })
+      .returns<Profile[]>(),
+    // Courses are sold individually, so someone can be a paying customer
+    // with no subscription at all. Without this the tier column reads
+    // "Free" for a buyer, which is the same mistake the app's profile
+    // header was making.
+    supabase
+      .from("course_purchases")
+      .select("user_id, course_id")
+      .eq("status", "paid")
+      .returns<{ user_id: string; course_id: string }[]>(),
+  ]);
+
+  // Distinct courses per buyer — a rebuy after a refund leaves two paid
+  // rows for the same course and shouldn't read as two courses owned.
+  const coursesByUser = new Map<string, Set<string>>();
+  for (const p of purchases ?? []) {
+    const set = coursesByUser.get(p.user_id) ?? new Set<string>();
+    set.add(p.course_id);
+    coursesByUser.set(p.user_id, set);
+  }
 
   // Email lives in auth.users, not profiles. Fetch it with the service-role
   // client so each row can be identified by email (display names are often
@@ -96,13 +116,19 @@ export default async function UsersPage() {
                       <Badge variant="outline">{u.role}</Badge>
                     </TableCell>
                     <TableCell>
-                      <TierCell profile={u} />
+                      <TierCell
+                        profile={u}
+                        coursesOwned={coursesByUser.get(u.id)?.size ?? 0}
+                      />
                     </TableCell>
                     <TableCell>
                       <UserStatusBadge status={u.status} />
                     </TableCell>
                     <TableCell>
-                      <AccessCell profile={u} />
+                      <AccessCell
+                        profile={u}
+                        coursesOwned={coursesByUser.get(u.id)?.size ?? 0}
+                      />
                     </TableCell>
                     <TableCell className="text-muted-foreground">
                       {formatDate(u.created_at)}
@@ -125,7 +151,13 @@ export default async function UsersPage() {
  *  `subscription_tier` column, so ending a user's access immediately shows
  *  them as Free. The column alone would keep reading "premium" until
  *  something happened to rewrite it. */
-function TierCell({ profile }: { profile: Profile }) {
+function TierCell({
+  profile,
+  coursesOwned,
+}: {
+  profile: Profile;
+  coursesOwned: number;
+}) {
   const tier = resolveTier(profile);
   if (tier === "admin") {
     return <Badge variant="outline">Staff</Badge>;
@@ -133,14 +165,41 @@ function TierCell({ profile }: { profile: Profile }) {
   if (tier === "retreat") {
     return <Badge>Premium</Badge>;
   }
+  // A course buyer is premium too, but for a different reason — the
+  // tooltip says which, so "Premium" with no subscription in the Access
+  // column doesn't look like a bug.
+  if (coursesOwned > 0) {
+    return (
+      <Badge
+        title={`Bought ${coursesOwned} course${coursesOwned === 1 ? "" : "s"}`}
+      >
+        Premium
+      </Badge>
+    );
+  }
   return <Badge variant="outline">Free</Badge>;
 }
 
 /** Shows the user's resolved tier / remaining access window as a badge. */
-function AccessCell({ profile }: { profile: Profile }) {
+function AccessCell({
+  profile,
+  coursesOwned,
+}: {
+  profile: Profile;
+  coursesOwned: number;
+}) {
   const tier = resolveTier(profile);
 
   if (tier === "free") {
+    // No subscription window to report, but course access is real and
+    // permanent — say so rather than flatly "Free".
+    if (coursesOwned > 0) {
+      return (
+        <Badge variant="secondary">
+          {coursesOwned} course{coursesOwned === 1 ? "" : "s"}
+        </Badge>
+      );
+    }
     return <Badge variant="outline">Free</Badge>;
   }
 
