@@ -137,6 +137,12 @@
               "name": "purchasedAt",
               "value": "={{ $now.setZone('Asia/Kolkata').format('yyyy-LL-dd HH:mm') }}",
               "type": "string"
+            },
+            {
+              "id": "f3000000-0000-4000-8000-000000000001",
+              "name": "eventType",
+              "type": "string",
+              "value": "={{ $json.body.event === 'payment_success' ? 'Success' : 'Failed' }}"
             }
           ]
         },
@@ -196,6 +202,7 @@
           "mappingMode": "defineBelow",
           "value": {
             "Date": "={{ $('Normalise').item.json.purchasedAt }}",
+            "Event": "={{ $('Normalise').item.json.eventType }}",
             "Name": "={{ $('Normalise').item.json.buyerName }}",
             "Email": "={{ $('Normalise').item.json.buyerEmail }}",
             "Phone": "={{ $('Normalise').item.json.waNumber }}",
@@ -309,6 +316,12 @@
               "name": "failedAt",
               "type": "string",
               "value": "={{ $now.setZone('Asia/Kolkata').format('yyyy-LL-dd HH:mm') }}"
+            },
+            {
+              "id": "f3000000-0000-4000-8000-000000000002",
+              "name": "eventType",
+              "type": "string",
+              "value": "={{ $json.body.event === 'payment_success' ? 'Success' : 'Failed' }}"
             }
           ]
         },
@@ -368,6 +381,7 @@
           "mappingMode": "defineBelow",
           "value": {
             "Date": "={{ $('Normalise (failed)').item.json.failedAt }}",
+            "Event": "={{ $('Normalise (failed)').item.json.eventType }}",
             "Name": "={{ $('Normalise (failed)').item.json.buyerName }}",
             "Email": "={{ $('Normalise (failed)').item.json.buyerEmail }}",
             "Phone": "={{ $('Normalise (failed)').item.json.waNumber }}",
