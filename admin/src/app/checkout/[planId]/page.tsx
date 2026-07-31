@@ -186,6 +186,7 @@ export default async function CheckoutPage({
             defaultName={defaultName}
             defaultEmail={defaultEmail}
             priceAmount={priceAmount}
+            priceLabel={priceLabel}
             allowCoupon={payload.kind === "course"}
           />
         </CardContent>
