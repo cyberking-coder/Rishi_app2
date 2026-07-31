@@ -122,6 +122,52 @@ Deno.serve(async (req) => {
     return jsonResponse({ error: dedupeError.message }, 500);
   }
 
+  // The claim above is staked BEFORE the work it guards, so it has to be
+  // given back when that work doesn't finish. Without this, one failed
+  // delivery poisoned the payment permanently: the row was already
+  // there, so every Razorpay retry took the "already processed" branch
+  // and returned 200 without granting anything. A purchase could sit
+  // paid-for and locked forever, and the logs showed only a cheerful
+  // "skipping" line.
+  let response: Response;
+  try {
+    response = await processEvent(supabase, eventType, payment);
+  } catch (e) {
+    // A thrown error must not read as a handled outcome — 500 both tells
+    // Razorpay to retry and triggers the release below.
+    console.error("[razorpay-webhook] unhandled error:", e);
+    response = jsonResponse(
+      { error: e instanceof Error ? e.message : "Unhandled error" },
+      500,
+    );
+  }
+
+  if (!response.ok) {
+    console.error(
+      `[razorpay-webhook] handling failed (${response.status}) - releasing ` +
+        `${eventKey} so Razorpay's retry can try again`,
+    );
+    await supabase
+      .from("webhook_events")
+      .delete()
+      .eq("provider", "razorpay")
+      .eq("event_key", eventKey);
+  }
+  return response;
+});
+
+/// Everything after the idempotency claim. Split out so a single caller
+/// owns whether that claim survives — the release above depends on there
+/// being exactly one exit point, which an inline body full of early
+/// returns could not offer.
+async function processEvent(
+  // deno-lint-ignore no-explicit-any
+  supabase: any,
+  eventType: string,
+  // deno-lint-ignore no-explicit-any
+  payment: any,
+): Promise<Response> {
+
   // The order's notes (set at creation time by admin/src/lib/razorpay.ts)
   // are the authoritative source - Checkout.js never re-passes notes when
   // opening the payment modal, so payment.notes below is only a fallback
@@ -344,7 +390,7 @@ Deno.serve(async (req) => {
   }
 
   return jsonResponse({ ok: true });
-});
+}
 
 
 // ── Course purchases ─────────────────────────────────────────────────
