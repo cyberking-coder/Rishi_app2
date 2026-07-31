@@ -37,7 +37,18 @@ function webhookUrlFor(notification: PaymentNotification): string | undefined {
 
 export async function notifyN8n(notification: PaymentNotification): Promise<void> {
   const webhookUrl = webhookUrlFor(notification);
-  if (!webhookUrl) return; // not configured yet - skip silently
+
+  // Skipping used to be silent, which made "no data arrived in n8n"
+  // indistinguishable from "the variable isn't set on this deployment" —
+  // the single most likely reason for it. Say which.
+  if (!webhookUrl) {
+    console.warn(
+      `n8n notification skipped: no webhook URL configured for ` +
+        `content_type=${notification.content_type ?? "subscription"}. ` +
+        `Set N8N_COURSE_PAYMENT_WEBHOOK_URL (or N8N_PAYMENT_WEBHOOK_URL).`,
+    );
+    return;
+  }
 
   const res = await fetch(webhookUrl, {
     method: "POST",
@@ -46,6 +57,26 @@ export async function notifyN8n(notification: PaymentNotification): Promise<void
   });
 
   if (!res.ok) {
-    throw new Error(`n8n webhook returned ${res.status}`);
+    // n8n's body explains itself — a test URL nobody is listening on
+    // answers 404 with "the requested webhook is not registered", a
+    // completely different fix from a 500.
+    const detail = await res.text().catch(() => "");
+    throw new Error(
+      `n8n webhook returned ${res.status} for ${redact(webhookUrl)}` +
+        (detail ? `: ${detail.slice(0, 300)}` : ""),
+    );
+  }
+
+  console.log(`n8n notified (${res.status}) at ${redact(webhookUrl)}`);
+}
+
+/** Host plus path, no query string — enough to tell a test URL from a
+ *  production one without copying any token into the logs. */
+function redact(url: string): string {
+  try {
+    const parsed = new URL(url);
+    return `${parsed.host}${parsed.pathname}`;
+  } catch {
+    return "an unparseable URL";
   }
 }
