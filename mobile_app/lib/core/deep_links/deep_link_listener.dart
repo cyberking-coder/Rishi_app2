@@ -37,7 +37,7 @@ class _DeepLinkListenerState extends ConsumerState<DeepLinkListener> {
   Future<void> _init() async {
     // Cold start: the app was launched BY tapping the link.
     try {
-      final initial = await _appLinks.getInitialAppLink();
+      final initial = await _appLinks.getInitialLink();
       if (initial != null) _handle(initial);
     } catch (_) {
       // Platform channel can throw on some devices; a missed cold-start
