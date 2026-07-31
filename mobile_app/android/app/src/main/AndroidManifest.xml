@@ -37,8 +37,10 @@
             <!-- Deep links back into the app: password reset emails, and
                  the course-checkout web page once Razorpay confirms a
                  payment (so paying returns the user straight to their
-                 course instead of leaving them stranded in the browser). -->
-            <intent-filter android:autoVerify="true">
+                 course instead of leaving them stranded in the browser).
+                 No autoVerify here — that is for http/https App Links and
+                 does nothing for a custom scheme. -->
+            <intent-filter>
                 <action android:name="android.intent.action.VIEW" />
                 <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.BROWSABLE" />
