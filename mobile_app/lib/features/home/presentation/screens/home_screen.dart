@@ -16,6 +16,8 @@ import '../../domain/entities/category_summary.dart';
 import '../../domain/entities/continue_listening_item.dart';
 import '../../../lms/application/lms_providers.dart';
 import '../../../lms/domain/entities/course_summary.dart';
+import '../../../watch/application/watch_providers.dart';
+import '../../../watch/presentation/widgets/youtube_card.dart';
 import '../widgets/premium_lock.dart';
 
 class HomeScreen extends ConsumerStatefulWidget {
@@ -126,6 +128,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
           ref.invalidate(categoriesProvider);
           ref.invalidate(coursesProvider);
           ref.invalidate(continueListeningProvider);
+          ref.invalidate(youtubeVideosProvider);
         },
         child: ListView(
           padding: const EdgeInsets.only(bottom: 28),
@@ -154,6 +157,17 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
             ),
             const SizedBox(height: 24),
 
+            // Audio leads: it's the app's core content and was previously
+            // below the courses row, far enough down that it went unseen.
+            _SectionTitle(
+              title: 'Featured for you',
+              action: 'See all',
+              onAction: () => context.push('/search'),
+            ),
+            const SizedBox(height: 12),
+            _FeaturedRow(onPlay: _playAudio),
+            const SizedBox(height: 24),
+
             _SectionTitle(
               title: 'Courses',
               action: 'See all',
@@ -164,12 +178,12 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
             const SizedBox(height: 24),
 
             _SectionTitle(
-              title: 'Featured for you',
+              title: 'Watch on YouTube',
               action: 'See all',
-              onAction: () => context.push('/search'),
+              onAction: () => context.push('/watch'),
             ),
             const SizedBox(height: 12),
-            _FeaturedRow(onPlay: _playAudio),
+            const _YoutubeRow(),
           ],
         ),
       ),
@@ -815,6 +829,62 @@ class _EmptyHint extends StatelessWidget {
           ),
         ),
       ]),
+    );
+  }
+}
+
+
+// ── Watch on YouTube ─────────────────────────────────────────────────
+
+class _YoutubeRow extends ConsumerWidget {
+  const _YoutubeRow();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final async = ref.watch(youtubeVideosProvider);
+
+    return async.maybeWhen(
+      orElse: () => const SizedBox(height: 150),
+      data: (videos) {
+        if (videos.isEmpty) return const SizedBox.shrink();
+
+        return SizedBox(
+          height: 172,
+          child: ListView.separated(
+            scrollDirection: Axis.horizontal,
+            padding: const EdgeInsets.symmetric(horizontal: 20),
+            itemCount: videos.length,
+            separatorBuilder: (_, __) => const SizedBox(width: 14),
+            itemBuilder: (_, i) {
+              final video = videos[i];
+              return GestureDetector(
+                onTap: () => openYoutube(context, video),
+                child: SizedBox(
+                  width: 226,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      YoutubeThumbnail(video: video),
+                      const SizedBox(height: 8),
+                      Text(
+                        video.title,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          fontSize: 12.5,
+                          fontWeight: FontWeight.w600,
+                          height: 1.3,
+                          color: AppTheme.textPrimary,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            },
+          ),
+        );
+      },
     );
   }
 }

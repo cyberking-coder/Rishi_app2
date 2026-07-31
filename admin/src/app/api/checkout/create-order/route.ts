@@ -3,6 +3,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { verifyCheckoutToken } from "@/lib/checkout-token";
 import { createRazorpayOrder } from "@/lib/razorpay";
 import { env } from "@/lib/env";
+import { priceWithCoupon } from "@/lib/coupons";
 
 // Public route - protected by the checkout token, not Supabase auth (the
 // caller is an anonymous browser tab opened from the mobile app, not a
@@ -14,6 +15,7 @@ interface CreateOrderBody {
   phone?: string;
   email?: string;
   state?: string;
+  coupon?: string;
 }
 
 export async function POST(req: NextRequest) {
@@ -69,12 +71,13 @@ export async function POST(req: NextRequest) {
 
   // Courses are sold individually, priced from the course row itself.
   if (payload.kind === "course") {
-    return await createCourseOrder(db, payload.uid, payload.tid, {
-      name,
-      phone,
-      email,
-      state,
-    });
+    return await createCourseOrder(
+      db,
+      payload.uid,
+      payload.tid,
+      { name, phone, email, state },
+      (body.coupon ?? "").trim().toUpperCase() || null,
+    );
   }
 
   const { data: plan, error } = await db
@@ -141,6 +144,7 @@ async function createCourseOrder(
   userId: string,
   courseId: string,
   billing: Billing,
+  couponCode: string | null,
 ) {
   const { data: course } = await db
     .from("courses")
@@ -191,9 +195,76 @@ async function createCourseOrder(
     }
   }
 
+  // Apply a coupon if one was entered. Eligibility is re-checked here
+  // rather than trusting the preview the browser saw — the price the
+  // gateway charges must be derived server-side.
+  let payable = course.price_amount;
+  let discountAmount = 0;
+  let couponId: string | null = null;
+
+  if (couponCode) {
+    const { data: couponRow } = await db
+      .from("coupons")
+      .select(
+        "id, code, discount_type, discount_value, course_id, max_redemptions, times_redeemed, starts_at, expires_at, is_active",
+      )
+      .eq("code", couponCode)
+      .maybeSingle();
+
+    const priced = priceWithCoupon(couponRow ?? null, course.id, course.price_amount);
+    if (!priced.ok) {
+      return NextResponse.json({ error: priced.error }, { status: 400 });
+    }
+
+    // Claim the redemption before charging. If two buyers race for the
+    // last one, only the winner gets the discount — the loser is told
+    // rather than silently charged full price.
+    const { data: claimed } = await db.rpc("redeem_coupon", {
+      p_coupon_id: priced.result.coupon.id,
+    });
+    if (claimed !== true) {
+      return NextResponse.json(
+        { error: "That code has just been fully redeemed." },
+        { status: 409 },
+      );
+    }
+
+    payable = priced.result.finalAmount;
+    discountAmount = priced.result.discountAmount;
+    couponId = priced.result.coupon.id;
+  }
+
+  // A 100%-off code leaves nothing to charge. Grant it directly rather
+  // than sending the buyer to a gateway for a ₹0 payment, which Razorpay
+  // would reject anyway.
+  if (payable === 0) {
+    // Plain insert, not an upsert: the "already owned" check above
+    // already returned 409, and the paid-row unique index is partial
+    // (status = 'paid') so it can't serve as an ON CONFLICT target
+    // without repeating its predicate.
+    const { error: grantError } = await db.from("course_purchases").insert({
+      user_id: userId,
+      course_id: course.id,
+      amount: 0,
+      currency: course.currency,
+      status: "paid",
+      coupon_id: couponId,
+      discount_amount: discountAmount,
+    });
+
+    if (grantError) {
+      return NextResponse.json({ error: grantError.message }, { status: 500 });
+    }
+
+    return NextResponse.json({
+      free: true,
+      plan_name: course.title,
+    });
+  }
+
   try {
     const order = await createRazorpayOrder({
-      amountRupees: course.price_amount / 100,
+      amountRupees: payable / 100,
       currency: course.currency,
       notes: {
         user_id: userId,
@@ -211,10 +282,12 @@ async function createCourseOrder(
       {
         user_id: userId,
         course_id: course.id,
-        amount: course.price_amount,
+        amount: payable,
         currency: course.currency,
         status: "pending",
         razorpay_order_id: order.id,
+        coupon_id: couponId,
+        discount_amount: discountAmount,
       },
       { onConflict: "razorpay_order_id" },
     );

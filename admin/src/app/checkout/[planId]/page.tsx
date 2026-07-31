@@ -13,6 +13,7 @@ interface CourseRow {
   currency: string;
   seat_limit: number | null;
   status: string;
+  cover_image_url: string | null;
 }
 
 interface PlanRow {
@@ -53,11 +54,16 @@ export default async function CheckoutPage({
   let description: string | null;
   let priceLabel: string;
   let seatsLeft: number | null = null;
+  let coverUrl: string | null = null;
+  let priceAmount: number | undefined;
+  let lessonCount = 0;
 
   if (payload.kind === "course") {
     const { data: course } = await db
       .from("courses")
-      .select("id, title, description, price_amount, currency, seat_limit, status")
+      .select(
+        "id, title, description, price_amount, currency, seat_limit, status, cover_image_url",
+      )
       .eq("id", planId)
       .maybeSingle<CourseRow>();
 
@@ -78,8 +84,21 @@ export default async function CheckoutPage({
       }
     }
 
+    // Lesson count is part of what the buyer is judging, so it belongs
+    // on the page they decide from.
+    const { data: modules } = await db
+      .from("course_modules")
+      .select("lessons(id)")
+      .eq("course_id", course.id);
+    lessonCount = (modules ?? []).reduce(
+      (n: number, m: { lessons?: unknown[] }) => n + (m.lessons?.length ?? 0),
+      0,
+    );
+
     title = course.title;
     description = course.description;
+    coverUrl = course.cover_image_url;
+    priceAmount = course.price_amount;
     priceLabel = formatPrice(course.price_amount / 100, course.currency);
   } else {
     const { data: plan } = await db
@@ -117,27 +136,57 @@ export default async function CheckoutPage({
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-background p-4">
-      <Card className="w-full max-w-md">
-        <CardHeader>
-          <CardTitle>{title}</CardTitle>
+    <div className="flex min-h-screen items-center justify-center bg-background p-4 py-8">
+      <Card className="w-full max-w-md overflow-hidden">
+        {coverUrl && (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={coverUrl}
+            alt=""
+            className="h-40 w-full object-cover"
+          />
+        )}
+        <CardHeader className="pb-3">
+          <CardTitle className="text-xl leading-snug">{title}</CardTitle>
+          <div className="flex flex-wrap items-center gap-2 pt-1">
+            <span className="text-2xl font-bold text-foreground">
+              {priceLabel}
+            </span>
+            {priceAmount !== undefined && (
+              <span className="text-xs text-muted-foreground">
+                one-time payment
+              </span>
+            )}
+          </div>
+          <div className="flex flex-wrap gap-2 pt-1">
+            {lessonCount > 0 && (
+              <span className="rounded-full bg-primary/10 px-2.5 py-1 text-xs font-medium text-primary">
+                {lessonCount} {lessonCount === 1 ? "lesson" : "lessons"}
+              </span>
+            )}
+            <span className="rounded-full bg-primary/10 px-2.5 py-1 text-xs font-medium text-primary">
+              Lifetime access
+            </span>
+            {seatsLeft !== null && (
+              <span className="rounded-full bg-amber-100 px-2.5 py-1 text-xs font-semibold text-amber-700">
+                Only {seatsLeft} {seatsLeft === 1 ? "seat" : "seats"} left
+              </span>
+            )}
+          </div>
         </CardHeader>
         <CardContent>
           {description && (
-            <p className="mb-4 text-sm text-muted-foreground">{description}</p>
-          )}
-          <p className="mb-2 text-3xl font-bold">{priceLabel}</p>
-          {seatsLeft !== null && (
-            <p className="mb-4 text-sm font-medium text-amber-600">
-              Only {seatsLeft} {seatsLeft === 1 ? "seat" : "seats"} left
+            <p className="mb-5 whitespace-pre-line text-sm leading-relaxed text-muted-foreground">
+              {description}
             </p>
           )}
-          <div className="mb-2" />
           <CheckoutClient
             token={token}
             planName={title}
             defaultName={defaultName}
             defaultEmail={defaultEmail}
+            priceAmount={priceAmount}
+            allowCoupon={payload.kind === "course"}
           />
         </CardContent>
       </Card>
@@ -152,7 +201,7 @@ function formatPrice(price: number, currency: string): string {
 
 function ErrorCard({ message }: { message: string }) {
   return (
-    <div className="flex min-h-screen items-center justify-center bg-background p-4">
+    <div className="flex min-h-screen items-center justify-center bg-background p-4 py-8">
       <Card className="w-full max-w-md">
         <CardHeader>
           <CardTitle>Checkout unavailable</CardTitle>

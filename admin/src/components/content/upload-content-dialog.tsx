@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { Upload } from "lucide-react";
@@ -12,7 +12,10 @@ import {
   updateContentStatus,
   uploadCover,
 } from "@/app/actions/content";
-import { uploadVideoToBunny } from "@/lib/bunny-upload-client";
+import {
+  UploadCancelledError,
+  uploadVideoToBunny,
+} from "@/lib/bunny-upload-client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -33,6 +36,9 @@ export function UploadContentDialog({ kind }: { kind: ContentKind }) {
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const [progress, setProgress] = useState<string | null>(null);
+  // Held across renders so the Cancel button can reach the
+  // in-flight upload.
+  const abortRef = useRef<AbortController | null>(null);
 
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
@@ -113,8 +119,13 @@ export function UploadContentDialog({ kind }: { kind: ContentKind }) {
         });
         if (!creds.ok) throw new Error(creds.error);
 
-        await uploadVideoToBunny(file, title.trim(), creds, (pct) =>
-          setProgress(`Uploading to Bunny… ${pct}%`),
+        abortRef.current = new AbortController();
+        await uploadVideoToBunny(
+          file,
+          title.trim(),
+          creds,
+          (pct) => setProgress(`Uploading to Bunny… ${pct}%`),
+          abortRef.current.signal,
         );
 
         await updateContentStatus({ kind, contentId: created.id, status: "processing" });
@@ -161,8 +172,14 @@ export function UploadContentDialog({ kind }: { kind: ContentKind }) {
       reset();
       router.refresh();
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Upload failed");
+      // A cancel is a deliberate action, not an error to shout about.
+      if (err instanceof UploadCancelledError) {
+        toast("Upload cancelled");
+      } else {
+        toast.error(err instanceof Error ? err.message : "Upload failed");
+      }
     } finally {
+      abortRef.current = null;
       setBusy(false);
       setProgress(null);
     }
@@ -262,6 +279,26 @@ export function UploadContentDialog({ kind }: { kind: ContentKind }) {
             </p>
           </div>
           <DialogFooter>
+            {busy ? (
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => abortRef.current?.abort()}
+                // Only a Bunny upload is interruptible mid-flight; the
+                // short server steps either side finish in moments.
+                disabled={!abortRef.current}
+              >
+                Cancel
+              </Button>
+            ) : (
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setOpen(false)}
+              >
+                Close
+              </Button>
+            )}
             <Button type="submit" disabled={busy}>
               {busy ? (progress ?? "Working…") : "Upload"}
             </Button>

@@ -168,3 +168,34 @@ export interface CoursePurchase {
   created_at: string;
   updated_at: string;
 }
+
+export interface Coupon {
+  id: string;
+  code: string;
+  description: string | null;
+  discount_type: "percent" | "flat";
+  /** Percent: 1-100. Flat: minor units (paise). */
+  discount_value: number;
+  course_id: string | null;
+  max_redemptions: number | null;
+  times_redeemed: number;
+  starts_at: string | null;
+  expires_at: string | null;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface YoutubeVideo {
+  id: string;
+  title: string;
+  description: string | null;
+  youtube_url: string;
+  youtube_id: string;
+  thumbnail_url: string | null;
+  category_id: string | null;
+  is_published: boolean;
+  sort_order: number;
+  created_at: string;
+  updated_at: string;
+}

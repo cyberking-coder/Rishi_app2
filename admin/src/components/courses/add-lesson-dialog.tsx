@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { Plus } from "lucide-react";
@@ -25,7 +25,10 @@ import {
   presignContentUpload,
   updateContentStatus,
 } from "@/app/actions/content";
-import { uploadVideoToBunny } from "@/lib/bunny-upload-client";
+import {
+  UploadCancelledError,
+  uploadVideoToBunny,
+} from "@/lib/bunny-upload-client";
 import type { Audio, LessonType, Video } from "@/lib/types";
 
 type MediaMode = "existing" | "upload";
@@ -83,6 +86,9 @@ export function AddLessonDialog({
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const [progress, setProgress] = useState<string | null>(null);
+  // Held across renders so the Cancel button can reach the
+  // in-flight upload.
+  const abortRef = useRef<AbortController | null>(null);
 
   const [title, setTitle] = useState("");
   const [lessonType, setLessonType] = useState<LessonType>("audio");
@@ -167,8 +173,13 @@ export function AddLessonDialog({
     });
     if (!creds.ok) throw new Error(creds.error);
 
-    await uploadVideoToBunny(mediaFile, title.trim(), creds, (pct) =>
-      setProgress(`Uploading to Bunny… ${pct}%`),
+    abortRef.current = new AbortController();
+    await uploadVideoToBunny(
+      mediaFile,
+      title.trim(),
+      creds,
+      (pct) => setProgress(`Uploading to Bunny… ${pct}%`),
+      abortRef.current.signal,
     );
 
     setProgress("Finalizing…");
@@ -252,8 +263,13 @@ export function AddLessonDialog({
       reset();
       router.refresh();
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Could not add lesson");
+      if (err instanceof UploadCancelledError) {
+        toast("Upload cancelled");
+      } else {
+        toast.error(err instanceof Error ? err.message : "Could not add lesson");
+      }
     } finally {
+      abortRef.current = null;
       setBusy(false);
       setProgress(null);
     }
@@ -496,8 +512,12 @@ export function AddLessonDialog({
             <Button
               type="button"
               variant="outline"
-              onClick={() => setOpen(false)}
-              disabled={busy}
+              onClick={() =>
+                busy ? abortRef.current?.abort() : setOpen(false)
+              }
+              // While a Bunny upload is running this aborts it; the short
+              // server steps either side aren't worth interrupting.
+              disabled={busy && !abortRef.current}
             >
               Cancel
             </Button>
