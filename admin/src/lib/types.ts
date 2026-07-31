@@ -87,7 +87,18 @@ export type ContentKind = "video" | "audio";
 // media of its own to transcode; its lessons reference content rows that
 // carry that state themselves).
 export type CourseStatus = "draft" | "published" | "archived";
-export type LessonType = "audio" | "video" | "text";
+export type LessonType =
+  | "audio"
+  | "video"
+  | "text"
+  | "pdf"
+  | "image"
+  | "file"
+  | "link";
+
+/** Lesson types whose payload is a URL in `resource_url` rather than
+ *  attached media or inline markdown. */
+export const RESOURCE_LESSON_TYPES = ["pdf", "image", "file", "link"] as const;
 
 export interface Course {
   id: string;
@@ -98,6 +109,12 @@ export interface Course {
   category_id: string | null;
   is_premium: boolean;
   status: CourseStatus;
+  /** Minor units (paise). 0 means the course is free. */
+  price_amount: number;
+  currency: string;
+  /** null means unlimited. */
+  seat_limit: number | null;
+  short_description: string | null;
   sort_order: number;
   created_by: string | null;
   created_at: string;
@@ -123,6 +140,8 @@ export interface Lesson {
   audio_id: string | null;
   video_id: string | null;
   body_markdown: string | null;
+  resource_url: string | null;
+  resource_name: string | null;
   position: number;
   created_at: string;
   updated_at: string;
@@ -134,4 +153,18 @@ export interface Lesson {
 export interface LessonWithMedia extends Lesson {
   audios: { id: string; title: string; is_premium: boolean } | null;
   videos: { id: string; title: string; is_premium: boolean } | null;
+}
+
+export interface CoursePurchase {
+  id: string;
+  user_id: string;
+  course_id: string;
+  amount: number;
+  currency: string;
+  status: "pending" | "paid" | "failed" | "refunded";
+  razorpay_order_id: string | null;
+  razorpay_payment_id: string | null;
+  expires_at: string | null;
+  created_at: string;
+  updated_at: string;
 }

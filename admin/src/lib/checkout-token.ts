@@ -5,9 +5,11 @@ import { env } from "./env";
 // MUST stay byte-for-byte compatible with that file's format:
 //   base64url(JSON payload) + "." + base64url(HMAC-SHA256 signature)
 
+export type CheckoutKind = "subscription" | "course";
+
 export interface CheckoutTokenPayload {
   uid: string;
-  kind: "subscription";
+  kind: CheckoutKind;
   tid: string;
   exp: number;
 }
@@ -44,7 +46,11 @@ export function verifyCheckoutToken(token: string): CheckoutTokenPayload | null 
     return null;
   }
 
-  if (payload.kind !== "subscription" || !payload.uid || !payload.tid) {
+  if (
+    (payload.kind !== "subscription" && payload.kind !== "course") ||
+    !payload.uid ||
+    !payload.tid
+  ) {
     return null;
   }
   if (payload.exp * 1000 < Date.now()) {

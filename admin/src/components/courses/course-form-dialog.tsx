@@ -20,6 +20,7 @@ import { NativeOption, NativeSelect } from "@/components/ui/native-select";
 import {
   createCourse,
   updateCourse,
+  updateCoursePricing,
   uploadCourseCover,
 } from "@/app/actions/courses";
 import type { Category, Course } from "@/lib/types";
@@ -59,17 +60,31 @@ export function CourseFormDialog({
   const [title, setTitle] = useState(course?.title ?? "");
   const [description, setDescription] = useState(course?.description ?? "");
   const [categoryId, setCategoryId] = useState(course?.category_id ?? "");
-  const [isPremium, setIsPremium] = useState(course?.is_premium ?? true);
+  // Rupees in the form, paise in the database — admins think in rupees
+  // and Razorpay wants minor units.
+  const [priceRupees, setPriceRupees] = useState(
+    course ? String((course.price_amount ?? 0) / 100) : "0",
+  );
+  const [seatLimit, setSeatLimit] = useState(
+    course?.seat_limit != null ? String(course.seat_limit) : "",
+  );
   const [coverFile, setCoverFile] = useState<File | null>(null);
   const [coverPreviewUrl, setCoverPreviewUrl] = useState<string | null>(
     course?.cover_image_url ?? null,
   );
 
+  // Derived, not a separate checkbox: courses are sold individually now,
+  // so "is it premium" is entirely a question of whether it costs money.
+  // A standalone toggle could contradict the price with no right answer
+  // for which one wins.
+  const isPremium = Number(priceRupees || "0") > 0;
+
   function reset() {
     setTitle(course?.title ?? "");
     setDescription(course?.description ?? "");
     setCategoryId(course?.category_id ?? "");
-    setIsPremium(course?.is_premium ?? true);
+    setPriceRupees(course ? String((course.price_amount ?? 0) / 100) : "0");
+    setSeatLimit(course?.seat_limit != null ? String(course.seat_limit) : "");
     setCoverFile(null);
     setCoverPreviewUrl(course?.cover_image_url ?? null);
   }
@@ -105,6 +120,17 @@ export function CourseFormDialog({
         });
         if (!result.ok) throw new Error(result.error);
         courseId = result.id;
+      }
+
+      if (courseId) {
+        const parsedPrice = Number(priceRupees || "0");
+        const parsedSeats = seatLimit.trim() === "" ? null : Number(seatLimit);
+        const pricing = await updateCoursePricing({
+          courseId,
+          priceRupees: parsedPrice,
+          seatLimit: parsedSeats,
+        });
+        if (!pricing.ok) throw new Error(pricing.error);
       }
 
       if (coverFile && courseId) {
@@ -213,16 +239,38 @@ export function CourseFormDialog({
               </NativeSelect>
             </div>
 
-            <div className="flex items-center gap-2">
-              <input
-                id="cf-premium"
-                type="checkbox"
-                checked={isPremium}
-                onChange={(e) => setIsPremium(e.target.checked)}
-                disabled={busy}
-                className="h-4 w-4 accent-primary"
-              />
-              <Label htmlFor="cf-premium">Premium course</Label>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label htmlFor="cf-price">Price (₹)</Label>
+                <Input
+                  id="cf-price"
+                  type="number"
+                  min={0}
+                  step={1}
+                  value={priceRupees}
+                  onChange={(e) => setPriceRupees(e.target.value)}
+                  disabled={busy}
+                />
+                <p className="mt-1 text-xs text-muted-foreground">
+                  0 makes it free for every signed-in user.
+                </p>
+              </div>
+              <div>
+                <Label htmlFor="cf-seats">Seat limit</Label>
+                <Input
+                  id="cf-seats"
+                  type="number"
+                  min={1}
+                  step={1}
+                  value={seatLimit}
+                  onChange={(e) => setSeatLimit(e.target.value)}
+                  placeholder="Unlimited"
+                  disabled={busy}
+                />
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Blank for unlimited. Drives the “only N left” copy.
+                </p>
+              </div>
             </div>
 
             {!isEdit && (
@@ -259,16 +307,21 @@ export function CourseFormDialog({
                     ) : (
                       <Unlock className="h-2.5 w-2.5" />
                     )}
-                    {isPremium ? "Premium" : "Free"}
+                    {isPremium ? `₹${Number(priceRupees || "0")}` : "Free"}
                   </span>
                 </div>
                 <div className="flex-1 space-y-1.5 overflow-hidden p-2.5">
                   <p className="line-clamp-2 text-xs font-semibold leading-snug">
                     {title.trim() || "Course title"}
                   </p>
-                  <p className="line-clamp-4 text-[10px] leading-snug text-muted-foreground">
+                  <p className="line-clamp-3 text-[10px] leading-snug text-muted-foreground">
                     {description.trim() || "Course description will appear here."}
                   </p>
+                  {seatLimit.trim() !== "" && (
+                    <p className="text-[10px] font-semibold text-amber-600">
+                      Only {seatLimit} seats left
+                    </p>
+                  )}
                 </div>
               </div>
             </div>

@@ -109,19 +109,29 @@ Deno.serve(async (req) => {
     });
 
     if (hasAccess !== true) {
-      const { data: entitlement } = await supabase
-        .from("entitlements")
-        .select("id")
-        .eq("user_id", userId)
-        .or(`content_id.eq.${videoId},content_id.is.null`)
-        .gt("expires_at", new Date().toISOString())
-        .maybeSingle();
+      // Courses are sold individually, so a user with no subscription can
+      // still legitimately own this video by having bought a course that
+      // teaches it.
+      const { data: viaCourse } = await supabase.rpc(
+        "has_media_access_via_course",
+        { p_user_id: userId, p_content_type: "video", p_content_id: videoId },
+      );
 
-      if (!entitlement) {
-        return jsonResponse(
-          { error: "No active entitlement for this video" },
-          402,
-        );
+      if (viaCourse !== true) {
+        const { data: entitlement } = await supabase
+          .from("entitlements")
+          .select("id")
+          .eq("user_id", userId)
+          .or(`content_id.eq.${videoId},content_id.is.null`)
+          .gt("expires_at", new Date().toISOString())
+          .maybeSingle();
+
+        if (!entitlement) {
+          return jsonResponse(
+            { error: "No active entitlement for this video" },
+            402,
+          );
+        }
       }
     }
   }

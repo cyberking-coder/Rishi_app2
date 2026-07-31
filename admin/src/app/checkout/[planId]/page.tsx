@@ -5,6 +5,16 @@ import { CheckoutClient } from "./checkout-client";
 
 export const dynamic = "force-dynamic";
 
+interface CourseRow {
+  id: string;
+  title: string;
+  description: string | null;
+  price_amount: number;
+  currency: string;
+  seat_limit: number | null;
+  status: string;
+}
+
 interface PlanRow {
   id: string;
   name: string;
@@ -36,15 +46,56 @@ export default async function CheckoutPage({
   }
 
   const db = createAdminClient();
-  const { data: plan } = await db
-    .from("subscription_plans")
-    .select("id, name, description, price, currency, billing_interval")
-    .eq("id", planId)
-    .eq("is_active", true)
-    .maybeSingle<PlanRow>();
 
-  if (!plan) {
-    return <ErrorCard message="This plan is no longer available." />;
+  // The route param is a plan id or a course id depending on what the
+  // token was minted for — the token's `kind` decides, never the URL.
+  let title: string;
+  let description: string | null;
+  let priceLabel: string;
+  let seatsLeft: number | null = null;
+
+  if (payload.kind === "course") {
+    const { data: course } = await db
+      .from("courses")
+      .select("id, title, description, price_amount, currency, seat_limit, status")
+      .eq("id", planId)
+      .maybeSingle<CourseRow>();
+
+    if (!course || course.status !== "published") {
+      return <ErrorCard message="This course is no longer available." />;
+    }
+
+    if (course.seat_limit !== null) {
+      const { count } = await db
+        .from("course_purchases")
+        .select("id", { count: "exact", head: true })
+        .eq("course_id", course.id)
+        .eq("status", "paid");
+      seatsLeft = Math.max(0, course.seat_limit - (count ?? 0));
+
+      if (seatsLeft === 0) {
+        return <ErrorCard message="This course is sold out." />;
+      }
+    }
+
+    title = course.title;
+    description = course.description;
+    priceLabel = formatPrice(course.price_amount / 100, course.currency);
+  } else {
+    const { data: plan } = await db
+      .from("subscription_plans")
+      .select("id, name, description, price, currency, billing_interval")
+      .eq("id", planId)
+      .eq("is_active", true)
+      .maybeSingle<PlanRow>();
+
+    if (!plan) {
+      return <ErrorCard message="This plan is no longer available." />;
+    }
+
+    title = plan.name;
+    description = plan.description;
+    priceLabel = `${formatPrice(plan.price, plan.currency)} / ${plan.billing_interval.replace("ly", "")}`;
   }
 
   // Prefill what we already know about this user so they type as little as
@@ -69,22 +120,22 @@ export default async function CheckoutPage({
     <div className="flex min-h-screen items-center justify-center bg-background p-4">
       <Card className="w-full max-w-md">
         <CardHeader>
-          <CardTitle>{plan.name}</CardTitle>
+          <CardTitle>{title}</CardTitle>
         </CardHeader>
         <CardContent>
-          {plan.description && (
-            <p className="mb-4 text-sm text-muted-foreground">{plan.description}</p>
+          {description && (
+            <p className="mb-4 text-sm text-muted-foreground">{description}</p>
           )}
-          <p className="mb-6 text-3xl font-bold">
-            {formatPrice(plan.price, plan.currency)}
-            <span className="text-base font-normal text-muted-foreground">
-              {" "}
-              / {plan.billing_interval.replace("ly", "")}
-            </span>
-          </p>
+          <p className="mb-2 text-3xl font-bold">{priceLabel}</p>
+          {seatsLeft !== null && (
+            <p className="mb-4 text-sm font-medium text-amber-600">
+              Only {seatsLeft} {seatsLeft === 1 ? "seat" : "seats"} left
+            </p>
+          )}
+          <div className="mb-2" />
           <CheckoutClient
             token={token}
-            planName={plan.name}
+            planName={title}
             defaultName={defaultName}
             defaultEmail={defaultEmail}
           />

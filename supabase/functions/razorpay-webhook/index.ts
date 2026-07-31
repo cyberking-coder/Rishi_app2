@@ -137,9 +137,28 @@ Deno.serve(async (req) => {
     console.error("[razorpay-webhook] order fetch failed, falling back to payment.notes:", e);
     notes = payment.notes ?? {};
   }
-  if (!notes.user_id || !notes.plan_id) {
+  if (!notes.user_id || (!notes.plan_id && !notes.course_id)) {
     console.log("[razorpay-webhook] order notes incomplete, trying payment.notes");
     notes = payment.notes ?? {};
+  }
+
+  // Courses are sold individually and carry course_id instead of plan_id.
+  // They grant access to that one course rather than touching the
+  // account's subscription window, so they branch out before any of the
+  // plan lookup below.
+  if (notes.course_id) {
+    return await handleCoursePurchase(supabase, {
+      eventType,
+      payment,
+      userId: notes.user_id,
+      courseId: notes.course_id,
+      billing: {
+        email: notes.billing_email ?? null,
+        name: notes.billing_name ?? null,
+        phone: notes.billing_phone ?? payment.contact ?? null,
+        state: notes.billing_state ?? null,
+      },
+    });
   }
 
   const userId = notes.user_id;
@@ -324,3 +343,109 @@ Deno.serve(async (req) => {
 
   return jsonResponse({ ok: true });
 });
+
+
+// ── Course purchases ─────────────────────────────────────────────────
+//
+// A course sale is a one-off, not a renewable window: there is no period
+// to extend and no subscription_tier to flip. The purchase row IS the
+// entitlement, and has_course_access() reads it directly.
+interface CourseBilling {
+  email: string | null;
+  name: string | null;
+  phone: string | null;
+  state: string | null;
+}
+
+async function handleCoursePurchase(
+  // deno-lint-ignore no-explicit-any
+  supabase: any,
+  args: {
+    eventType: string;
+    // deno-lint-ignore no-explicit-any
+    payment: any;
+    userId?: string;
+    courseId: string;
+    billing: CourseBilling;
+  },
+): Promise<Response> {
+  const { eventType, payment, userId, courseId, billing } = args;
+
+  if (!userId) {
+    console.error("[razorpay-webhook] course purchase missing user_id");
+    return jsonResponse({ error: "Payment missing user_id note" }, 400);
+  }
+
+  const { data: course } = await supabase
+    .from("courses")
+    .select("id, title")
+    .eq("id", courseId)
+    .maybeSingle();
+
+  if (!course) {
+    console.error("[razorpay-webhook] unknown course on notes", { courseId });
+    return jsonResponse({ error: "Unknown course on payment notes" }, 404);
+  }
+
+  const amountRupees = payment.amount / 100;
+  const status = eventType === "payment.failed" ? "failed" : "paid";
+
+  // Matched on the order id so a retried webhook updates the pending row
+  // created at checkout rather than inserting a duplicate.
+  const { error: purchaseError } = await supabase
+    .from("course_purchases")
+    .upsert(
+      {
+        user_id: userId,
+        course_id: courseId,
+        amount: payment.amount,
+        currency: payment.currency ?? "INR",
+        status,
+        razorpay_order_id: payment.order_id,
+        razorpay_payment_id: payment.id,
+      },
+      { onConflict: "razorpay_order_id" },
+    );
+
+  if (purchaseError) {
+    console.error("[razorpay-webhook] COURSE GRANT FAILED:", purchaseError.message);
+    return jsonResponse({ error: purchaseError.message }, 500);
+  }
+  console.log("[razorpay-webhook] course purchase recorded", {
+    userId,
+    courseId,
+    status,
+  });
+
+  let email = billing.email;
+  if (!email) {
+    try {
+      const { data: authUser } = await supabase.auth.admin.getUserById(userId);
+      email = authUser.user?.email ?? null;
+    } catch {
+      // non-fatal
+    }
+  }
+
+  try {
+    await notifyN8n({
+      event: status === "paid" ? "payment_success" : "payment_failed",
+      user_id: userId,
+      email,
+      name: billing.name,
+      phone: billing.phone,
+      state: billing.state,
+      plan_name: course.title,
+      amount: amountRupees,
+      currency: payment.currency ?? "INR",
+      reason:
+        status === "failed"
+          ? (payment.error_description ?? "Payment failed")
+          : undefined,
+    });
+  } catch (e) {
+    console.error("n8n course notification failed:", e);
+  }
+
+  return jsonResponse({ ok: true });
+}
