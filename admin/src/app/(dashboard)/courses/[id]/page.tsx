@@ -4,8 +4,17 @@ import { ChevronLeft } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { PageHeader } from "@/components/page-header";
 import { CourseBuilder } from "@/components/courses/course-builder";
+import { CourseFormDialog } from "@/components/courses/course-form-dialog";
 import { Badge } from "@/components/ui/badge";
-import type { Audio, Course, CourseModule, LessonWithMedia } from "@/lib/types";
+import { Button } from "@/components/ui/button";
+import type {
+  Audio,
+  Category,
+  Course,
+  CourseModule,
+  LessonWithMedia,
+  Video,
+} from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
@@ -29,26 +38,59 @@ export default async function CourseBuilderPage({
 
   if (!course) notFound();
 
-  const [{ data: modules }, { data: audios }] = await Promise.all([
-    supabase
-      .from("course_modules")
-      .select(
-        "*, lessons(*, audios(id, title, is_premium), videos(id, title, is_premium))",
-      )
-      .eq("course_id", id)
-      .order("position", { ascending: true })
-      .returns<ModuleWithLessons[]>(),
-    // The library the builder picks lesson media from. Only published
-    // audio can be attached — attaching a draft would produce a lesson
-    // that silently fails at playback, since the license functions
-    // require status = 'published'.
-    supabase
-      .from("audios")
-      .select("*")
-      .eq("status", "published")
-      .order("created_at", { ascending: false })
-      .returns<Audio[]>(),
-  ]);
+  const [
+    { data: modules },
+    { data: audios },
+    { data: videos },
+    { data: categories },
+    { data: assets },
+  ] = await Promise.all([
+      supabase
+        .from("course_modules")
+        .select(
+          "*, lessons(*, audios(id, title, is_premium), videos(id, title, is_premium))",
+        )
+        .eq("course_id", id)
+        .order("position", { ascending: true })
+        .returns<ModuleWithLessons[]>(),
+      // The library the builder picks lesson media from. Only published
+      // audio can be attached — attaching a draft would produce a lesson
+      // that silently fails at playback, since the license functions
+      // require status = 'published'.
+      supabase
+        .from("audios")
+        .select("*")
+        .eq("status", "published")
+        .order("created_at", { ascending: false })
+        .returns<Audio[]>(),
+      supabase
+        .from("videos")
+        .select("*")
+        .eq("status", "published")
+        .order("created_at", { ascending: false })
+        .returns<Video[]>(),
+      supabase
+        .from("categories")
+        .select("*")
+        .order("name", { ascending: true })
+        .returns<Category[]>(),
+      // content_assets is polymorphic (no FK to videos), so this can't be
+      // an embedded join — fetch the ready asset ids and intersect below.
+      supabase
+        .from("content_assets")
+        .select("content_id")
+        .eq("content_type", "video")
+        .eq("status", "ready")
+        .returns<{ content_id: string }[]>(),
+    ]);
+
+  // A video with neither a Bunny id nor a ready R2 asset has no media
+  // behind it — attaching it produces a lesson that 404s the moment
+  // someone taps it. Keep those out of the picker entirely.
+  const withAsset = new Set((assets ?? []).map((a) => a.content_id));
+  const playableVideos = (videos ?? []).filter(
+    (v) => v.bunny_video_id !== null || withAsset.has(v.id),
+  );
 
   // Lessons come back nested but unordered; sort them here so the builder
   // component stays presentational.
@@ -80,6 +122,11 @@ export default async function CourseBuilderPage({
             >
               {course.status}
             </Badge>
+            <CourseFormDialog
+              categories={categories ?? []}
+              course={course}
+              trigger={<Button variant="outline" size="sm">Edit details</Button>}
+            />
           </div>
         }
       />
@@ -88,6 +135,7 @@ export default async function CourseBuilderPage({
         course={course}
         modules={orderedModules}
         audioLibrary={audios ?? []}
+        videoLibrary={playableVideos}
       />
     </div>
   );

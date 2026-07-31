@@ -3,7 +3,8 @@
 import { revalidatePath } from "next/cache";
 import { requireAdmin } from "@/lib/auth";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { buildObjectKey, presignUpload } from "@/lib/r2";
+import { buildObjectKey, deleteObject, presignUpload } from "@/lib/r2";
+import { createBunnyTusUpload, getBunnyStatus } from "@/lib/bunny";
 import { slugify } from "@/lib/utils";
 import type { ContentKind, ContentStatus } from "@/lib/types";
 import type { ActionResult } from "./users";
@@ -61,6 +62,33 @@ export async function createContent(
   return { ok: true, id: data.id };
 }
 
+/** Signs a direct browser-to-Bunny TUS upload for a video row, skipping
+ *  R2 entirely — no staging copy, no server-to-server pull. */
+export async function presignBunnyVideoUpload(args: {
+  contentId: string;
+  title: string;
+}): Promise<
+  | { ok: true; videoId: string; libraryId: string; signature: string; expire: number }
+  | { ok: false; error: string }
+> {
+  await requireAdmin();
+  try {
+    const upload = await createBunnyTusUpload(args.title);
+    const db = createAdminClient();
+    const { error } = await db
+      .from("videos")
+      .update({ bunny_video_id: upload.videoId, bunny_status: "processing" })
+      .eq("id", args.contentId);
+    if (error) return { ok: false, error: error.message };
+    return { ok: true, ...upload };
+  } catch (e) {
+    return {
+      ok: false,
+      error: e instanceof Error ? e.message : "Could not start Bunny upload",
+    };
+  }
+}
+
 /** Presigns a direct-to-R2 PUT URL for a content file. */
 export async function presignContentUpload(args: {
   kind: ContentKind;
@@ -111,7 +139,70 @@ export async function attachUpload(args: {
   });
   if (assetError) return { ok: false, error: assetError.message };
 
+  // Video no longer routes through here — it uploads straight to Bunny
+  // via presignBunnyVideoUpload (see below), so there's no R2 file for
+  // this function to hand off. This path now only serves audio (and any
+  // legacy R2-only video row from before the direct-upload switch).
+
   revalidatePath(args.kind === "video" ? "/videos" : "/audios");
+  return { ok: true };
+}
+
+/** Polls Bunny for encode progress. Called from the Videos page, since
+ *  Bunny has no webhook configured — transcoding finishes on its own
+ *  schedule and nothing pushes us the result. */
+export async function refreshBunnyStatus(
+  videoId: string,
+): Promise<ActionResult> {
+  await requireAdmin();
+  const db = createAdminClient();
+
+  const { data: video } = await db
+    .from("videos")
+    .select("bunny_video_id, r2_path")
+    .eq("id", videoId)
+    .maybeSingle<{ bunny_video_id: string | null; r2_path: string | null }>();
+
+  if (!video?.bunny_video_id) {
+    return { ok: false, error: "This video isn't on Bunny Stream." };
+  }
+
+  try {
+    const status = await getBunnyStatus(video.bunny_video_id);
+    await db
+      .from("videos")
+      .update({ bunny_status: status })
+      .eq("id", videoId);
+
+    // Once Bunny confirms the video is ready, playback is served
+    // entirely from Bunny (issue-playback-license never reads r2_path
+    // for a Bunny-backed video) — the R2 copy was only ever staging for
+    // Bunny's pull, so drop it rather than paying to store it twice.
+    if (status === "ready" && video.r2_path) {
+      try {
+        await deleteObject(video.r2_path);
+        await db.from("videos").update({ r2_path: null }).eq("id", videoId);
+        // Drop the content_assets row too. Leaving it would advertise a
+        // "ready" rendition pointing at an object that no longer exists.
+        await db
+          .from("content_assets")
+          .delete()
+          .eq("content_type", "video")
+          .eq("content_id", videoId);
+      } catch (e) {
+        // Non-fatal: playback already works off Bunny either way. Leave
+        // r2_path set so the next status refresh retries the cleanup.
+        console.error("R2 cleanup failed:", e);
+      }
+    }
+  } catch (e) {
+    return {
+      ok: false,
+      error: e instanceof Error ? e.message : "Could not reach Bunny",
+    };
+  }
+
+  revalidatePath("/videos");
   return { ok: true };
 }
 

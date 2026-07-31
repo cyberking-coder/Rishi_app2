@@ -7,8 +7,11 @@ import {
   AlertTriangle,
   ChevronDown,
   ChevronUp,
+  FileDown,
   FileText,
   Headphones,
+  Image as ImageIcon,
+  Link as LinkIcon,
   Trash2,
   Video as VideoIcon,
 } from "lucide-react";
@@ -24,26 +27,40 @@ import {
   moveModule,
 } from "@/app/actions/courses";
 import { AddLessonDialog } from "./add-lesson-dialog";
-import type { Audio, Course, CourseModule, LessonWithMedia } from "@/lib/types";
+import { RESOURCE_LESSON_TYPES } from "@/lib/types";
+import type {
+  Audio,
+  Course,
+  CourseModule,
+  LessonType,
+  LessonWithMedia,
+  Video,
+} from "@/lib/types";
 
 interface ModuleWithLessons extends CourseModule {
   lessons: LessonWithMedia[];
 }
 
-const LESSON_ICON = {
+const LESSON_ICON: Record<LessonType, typeof Headphones> = {
   audio: Headphones,
   video: VideoIcon,
   text: FileText,
-} as const;
+  pdf: FileText,
+  image: ImageIcon,
+  file: FileDown,
+  link: LinkIcon,
+};
 
 export function CourseBuilder({
   course,
   modules,
   audioLibrary,
+  videoLibrary,
 }: {
   course: Course;
   modules: ModuleWithLessons[];
   audioLibrary: Audio[];
+  videoLibrary: Video[];
 }) {
   const router = useRouter();
   const [newModuleTitle, setNewModuleTitle] = useState("");
@@ -180,9 +197,15 @@ export function CourseBuilder({
                       <p className="truncate text-xs text-muted-foreground">
                         {lesson.lesson_type === "text"
                           ? "Text lesson"
-                          : media
-                            ? media.title
-                            : "Media unavailable — it may have been deleted"}
+                          : lesson.lesson_type === "link"
+                            ? lesson.resource_url
+                            : RESOURCE_LESSON_TYPES.includes(
+                                  lesson.lesson_type as (typeof RESOURCE_LESSON_TYPES)[number],
+                                )
+                              ? (lesson.resource_name ?? "Attached file")
+                              : media
+                                ? media.title
+                                : "Media unavailable — it may have been deleted"}
                       </p>
                     </div>
 
@@ -266,7 +289,9 @@ export function CourseBuilder({
               <AddLessonDialog
                 courseId={course.id}
                 moduleId={module.id}
+                coursePremium={course.is_premium}
                 audioLibrary={audioLibrary}
+                videoLibrary={videoLibrary}
               />
             </div>
           </CardContent>

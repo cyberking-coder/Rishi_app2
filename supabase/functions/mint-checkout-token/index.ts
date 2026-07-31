@@ -16,6 +16,8 @@ const TOKEN_TTL_SECONDS = 15 * 60; // 15 minutes — long enough to open a
 
 interface Body {
   plan_id?: string;
+  /** Set instead of plan_id to buy a single course. */
+  course_id?: string;
 }
 
 Deno.serve(async (req) => {
@@ -49,8 +51,32 @@ Deno.serve(async (req) => {
     return jsonResponse({ error: "Invalid JSON body" }, 400);
   }
 
+  // Courses are sold individually; a course token targets a courses.id
+  // and the web checkout prices it from that row.
+  if (body.course_id) {
+    const { data: course, error: courseError } = await supabase
+      .from("courses")
+      .select("id")
+      .eq("id", body.course_id)
+      .eq("status", "published")
+      .maybeSingle();
+
+    if (courseError || !course) {
+      return jsonResponse({ error: "Course not found" }, 404);
+    }
+
+    const courseToken = await mintCheckoutToken(
+      { uid: userData.user.id, kind: "course", tid: course.id },
+      TOKEN_TTL_SECONDS,
+    );
+    return jsonResponse({
+      token: courseToken,
+      expires_in_seconds: TOKEN_TTL_SECONDS,
+    });
+  }
+
   if (!body.plan_id) {
-    return jsonResponse({ error: "plan_id is required" }, 400);
+    return jsonResponse({ error: "plan_id or course_id is required" }, 400);
   }
 
   const { data: plan, error: planError } = await supabase

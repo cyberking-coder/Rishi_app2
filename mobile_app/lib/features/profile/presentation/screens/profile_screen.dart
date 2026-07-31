@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../../app/theme/app_theme.dart';
 import '../../../../core/device/device_info_service.dart';
 import '../../../access/application/access_providers.dart';
 import '../../../access/domain/access_state.dart';
@@ -24,12 +25,12 @@ String _planLabelFor(UserTier? tier) {
   }
 }
 
-const _kBg = Color(0xFF12082E);
-const _kSurface = Color(0xFF1C1040);
-const _kAccent = Color(0xFF8B5CF6);
-const _kPink = Color(0xFFEC4899);
-const _kText = Colors.white;
-const _kSub = Color(0xFFB0A8CC);
+const _kBg = AppTheme.background;
+const _kSurface = AppTheme.surface;
+const _kAccent = AppTheme.sage;
+const _kPink = AppTheme.clay;
+const _kText = AppTheme.textPrimary;
+const _kSub = AppTheme.textSecondary;
 
 class ProfileScreen extends ConsumerWidget {
   const ProfileScreen({super.key});
@@ -69,11 +70,7 @@ class ProfileScreen extends ConsumerWidget {
                         height: 96,
                         decoration: BoxDecoration(
                           shape: BoxShape.circle,
-                          gradient: const LinearGradient(
-                            colors: [Color(0xFF7C3AED), Color(0xFFEC4899)],
-                            begin: Alignment.topLeft,
-                            end: Alignment.bottomRight,
-                          ),
+                          gradient: AppTheme.sageGradient,
                           boxShadow: [
                             BoxShadow(
                               color: _kAccent.withValues(alpha: 0.45),
@@ -138,7 +135,7 @@ class ProfileScreen extends ConsumerWidget {
                     ),
                     _Badge(
                       emoji: '💎',
-                      color: const Color(0xFFEC4899),
+                      color: AppTheme.clay,
                       label: 'Premium',
                       onTap: () => _showAchievement(context, '💎', 'Premium',
                           'You are a premium member with full access to all content.'),

@@ -11,6 +11,7 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { handlePreflight, jsonResponse } from "../_shared/cors.ts";
 import { DEFAULT_DOWNLOAD_TTL_SECONDS, presignGet } from "../_shared/r2.ts";
+import { signBunnyPlayback } from "../_shared/bunny.ts";
 
 const SIGNED_URL_TTL_SECONDS = DEFAULT_DOWNLOAD_TTL_SECONDS; // 10 minutes
 
@@ -19,6 +20,8 @@ interface VideoRow {
   is_premium: boolean;
   status: string;
   r2_path: string | null;
+  bunny_video_id: string | null;
+  bunny_status: string | null;
 }
 
 interface AssetRow {
@@ -87,7 +90,7 @@ Deno.serve(async (req) => {
 
   const { data: video, error: videoError } = await supabase
     .from("videos")
-    .select("id, is_premium, status, r2_path")
+    .select("id, is_premium, status, r2_path, bunny_video_id, bunny_status")
     .eq("id", videoId)
     .maybeSingle<VideoRow>();
 
@@ -106,37 +109,93 @@ Deno.serve(async (req) => {
     });
 
     if (hasAccess !== true) {
-      const { data: entitlement } = await supabase
-        .from("entitlements")
-        .select("id")
-        .eq("user_id", userId)
-        .or(`content_id.eq.${videoId},content_id.is.null`)
-        .gt("expires_at", new Date().toISOString())
-        .maybeSingle();
+      // Courses are sold individually, so a user with no subscription can
+      // still legitimately own this video by having bought a course that
+      // teaches it.
+      const { data: viaCourse } = await supabase.rpc(
+        "has_media_access_via_course",
+        { p_user_id: userId, p_content_type: "video", p_content_id: videoId },
+      );
 
-      if (!entitlement) {
-        return jsonResponse(
-          { error: "No active entitlement for this video" },
-          402,
-        );
+      if (viaCourse !== true) {
+        const { data: entitlement } = await supabase
+          .from("entitlements")
+          .select("id")
+          .eq("user_id", userId)
+          .or(`content_id.eq.${videoId},content_id.is.null`)
+          .gt("expires_at", new Date().toISOString())
+          .maybeSingle();
+
+        if (!entitlement) {
+          return jsonResponse(
+            { error: "No active entitlement for this video" },
+            402,
+          );
+        }
       }
     }
   }
 
+  // Bunny-backed video: Bunny holds the file and serves its own HLS
+  // ladder, so there are no content_assets rows to look up. Everything
+  // above this point — device lock, access window, entitlements — has
+  // already run, so authorization is identical either way.
+  if (video.bunny_video_id) {
+    if (video.bunny_status !== "ready") {
+      return jsonResponse(
+        { error: "This video is still processing. Please try again shortly." },
+        409,
+      );
+    }
+
+    const playback = await signBunnyPlayback(
+      video.bunny_video_id,
+      SIGNED_URL_TTL_SECONDS,
+    );
+
+    const { data: bunnyHistory } = await supabase
+      .from("watch_history")
+      .select("progress_seconds")
+      .eq("user_id", userId)
+      .eq("video_id", videoId)
+      .maybeSingle();
+
+    return jsonResponse({
+      video_id: videoId,
+      // One adaptive stream rather than a quality list — the player picks
+      // a rendition per segment, so there is nothing for the client to
+      // choose between.
+      qualities: [{ label: "auto", bitrate: null, url: playback.hlsUrl }],
+      hls_url: playback.hlsUrl,
+      resume_position_seconds: bunnyHistory?.progress_seconds ?? 0,
+      expires_in_seconds: SIGNED_URL_TTL_SECONDS,
+    });
+  }
+
+  // Prefer HLS renditions (the quality-ladder design), but fall back to a
+  // single-file MP4. The admin upload path produces video_mp4, so without
+  // this fallback every video uploaded through the dashboard 404s here —
+  // the same gap that was already fixed on the audio side.
   const { data: assets, error: assetsError } = await supabase
     .from("content_assets")
-    .select("resolution, bitrate, r2_path")
+    .select("resolution, bitrate, r2_path, asset_type")
     .eq("content_id", videoId)
-    .eq("asset_type", "video_hls")
+    .in("asset_type", ["video_hls", "video_mp4"])
     .eq("status", "ready")
-    .returns<AssetRow[]>();
+    .returns<Array<AssetRow & { asset_type: string }>>();
 
   if (assetsError || !assets || assets.length === 0) {
     return jsonResponse({ error: "No playable renditions for this video" }, 404);
   }
 
+  // Never mix the two: an HLS manifest and a progressive MP4 aren't
+  // interchangeable qualities of one stream, so return whichever family
+  // is present rather than a mixed ladder the player can't reason about.
+  const hls = assets.filter((a) => a.asset_type === "video_hls");
+  const playable = hls.length > 0 ? hls : assets;
+
   const qualities = await Promise.all(
-    assets.map(async (asset) => ({
+    playable.map(async (asset) => ({
       label: asset.resolution ?? "auto",
       bitrate: asset.bitrate,
       url: await presignGet(asset.r2_path, SIGNED_URL_TTL_SECONDS),

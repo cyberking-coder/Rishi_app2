@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { requireAdmin } from "@/lib/auth";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { slugify } from "@/lib/utils";
+import { RESOURCE_LESSON_TYPES } from "@/lib/types";
 import type { CourseStatus, LessonType } from "@/lib/types";
 import type { ActionResult } from "./users";
 
@@ -53,6 +54,7 @@ export async function updateCourse(args: {
   title?: string;
   description?: string | null;
   categoryId?: string | null;
+  isPremium?: boolean;
 }): Promise<ActionResult> {
   await requireAdmin();
   const db = createAdminClient();
@@ -61,10 +63,89 @@ export async function updateCourse(args: {
   if (args.title !== undefined) patch.title = args.title;
   if (args.description !== undefined) patch.description = args.description;
   if (args.categoryId !== undefined) patch.category_id = args.categoryId || null;
+  if (args.isPremium !== undefined) patch.is_premium = args.isPremium;
 
   const { error } = await db.from("courses").update(patch).eq("id", args.courseId);
   if (error) return { ok: false, error: error.message };
 
+  revalidatePath("/courses");
+  revalidatePath(`/courses/${args.courseId}`);
+  return { ok: true };
+}
+
+/** Uploads a course cover image to the public `covers` bucket (same
+ *  bucket the audio/video cover art uses) and stores its URL. Passed as
+ *  base64 since cover files are small. */
+export async function uploadCourseCover(args: {
+  courseId: string;
+  fileName: string;
+  contentType: string;
+  base64: string;
+}): Promise<ActionResult> {
+  await requireAdmin();
+  const db = createAdminClient();
+
+  const ext = args.fileName.includes(".")
+    ? args.fileName.split(".").pop()
+    : "jpg";
+  const path = `course/${args.courseId}/cover.${ext}`;
+  const bytes = Buffer.from(args.base64, "base64");
+
+  const { error: uploadError } = await db.storage
+    .from("covers")
+    .upload(path, bytes, { contentType: args.contentType, upsert: true });
+  if (uploadError) return { ok: false, error: uploadError.message };
+
+  const { data } = db.storage.from("covers").getPublicUrl(path);
+  const { error: updateError } = await db
+    .from("courses")
+    .update({ cover_image_url: data.publicUrl })
+    .eq("id", args.courseId);
+  if (updateError) return { ok: false, error: updateError.message };
+
+  revalidatePath("/courses");
+  revalidatePath(`/courses/${args.courseId}`);
+  return { ok: true };
+}
+
+/** Pricing and seat limit. Kept separate from updateCourse so the
+ *  settings panel can save commercial terms without touching content
+ *  fields, and so a bad price can never be a side effect of a title edit. */
+export async function updateCoursePricing(args: {
+  courseId: string;
+  /** Rupees as typed by the admin; stored as paise. */
+  priceRupees: number;
+  seatLimit: number | null;
+}): Promise<ActionResult> {
+  await requireAdmin();
+  const db = createAdminClient();
+
+  if (!Number.isFinite(args.priceRupees) || args.priceRupees < 0) {
+    return { ok: false, error: "Price must be zero or more." };
+  }
+  if (args.seatLimit !== null && (!Number.isInteger(args.seatLimit) || args.seatLimit < 1)) {
+    return { ok: false, error: "Seat limit must be a whole number above zero." };
+  }
+
+  const priceAmount = Math.round(args.priceRupees * 100);
+
+  // Selling below Razorpay's floor produces an order the gateway rejects
+  // at checkout, which reads to the buyer as a broken site.
+  if (priceAmount > 0 && priceAmount < 100) {
+    return { ok: false, error: "Paid courses must be priced at ₹1 or more." };
+  }
+
+  const { error } = await db
+    .from("courses")
+    .update({
+      price_amount: priceAmount,
+      // A paid course is by definition not free content.
+      is_premium: priceAmount > 0,
+      seat_limit: args.seatLimit,
+    })
+    .eq("id", args.courseId);
+
+  if (error) return { ok: false, error: error.message };
   revalidatePath("/courses");
   revalidatePath(`/courses/${args.courseId}`);
   return { ok: true };
@@ -236,6 +317,10 @@ export interface CreateLessonInput {
   audioId?: string;
   videoId?: string;
   bodyMarkdown?: string;
+  /** For pdf/image/file lessons: the uploaded file's public URL. For a
+   *  link lesson: the URL the admin pasted. */
+  resourceUrl?: string;
+  resourceName?: string;
 }
 
 export async function createLesson(
@@ -253,6 +338,20 @@ export async function createLesson(
   if (input.lessonType === "video" && !input.videoId) {
     return { ok: false, error: "Pick a video for this lesson." };
   }
+  if (
+    RESOURCE_LESSON_TYPES.includes(
+      input.lessonType as (typeof RESOURCE_LESSON_TYPES)[number],
+    ) &&
+    !input.resourceUrl?.trim()
+  ) {
+    return {
+      ok: false,
+      error:
+        input.lessonType === "link"
+          ? "Paste the link for this lesson."
+          : "Choose a file to upload for this lesson.",
+    };
+  }
 
   const { data: last } = await db
     .from("lessons")
@@ -269,12 +368,50 @@ export async function createLesson(
     audio_id: input.lessonType === "audio" ? input.audioId : null,
     video_id: input.lessonType === "video" ? input.videoId : null,
     body_markdown: input.lessonType === "text" ? input.bodyMarkdown : null,
+    resource_url: input.resourceUrl?.trim() || null,
+    resource_name: input.resourceName?.trim() || null,
     position: (last?.position ?? -1) + 1,
   });
 
   if (error) return { ok: false, error: error.message };
   revalidatePath(`/courses/${input.courseId}`);
   return { ok: true };
+}
+
+/** Uploads a lesson handout (PDF / image / any file) to the public
+ *  `covers` bucket and returns its URL for attaching to a lesson.
+ *
+ *  These deliberately do NOT go through R2 + signed-URL licensing: that
+ *  pipeline exists to protect streamed audio/video, and a course handout
+ *  is already only reachable from inside a course the user paid for.
+ *  Routing it through licensing would mean a new edge function for no
+ *  additional protection. */
+export async function uploadLessonResource(args: {
+  courseId: string;
+  fileName: string;
+  contentType: string;
+  base64: string;
+}): Promise<{ ok: true; url: string } | { ok: false; error: string }> {
+  await requireAdmin();
+  const db = createAdminClient();
+
+  const bytes = Buffer.from(args.base64, "base64");
+  // 25 MB. Server Actions cap the request body, and a handout past this
+  // size should be a link to a hosted file instead.
+  if (bytes.byteLength > 25 * 1024 * 1024) {
+    return { ok: false, error: "Files must be under 25 MB. Use a link instead." };
+  }
+
+  const safeName = args.fileName.replace(/[^a-zA-Z0-9._-]/g, "_");
+  const path = `lesson/${args.courseId}/${Date.now().toString(36)}-${safeName}`;
+
+  const { error: uploadError } = await db.storage
+    .from("covers")
+    .upload(path, bytes, { contentType: args.contentType, upsert: false });
+  if (uploadError) return { ok: false, error: uploadError.message };
+
+  const { data } = db.storage.from("covers").getPublicUrl(path);
+  return { ok: true, url: data.publicUrl };
 }
 
 export async function deleteLesson(args: {

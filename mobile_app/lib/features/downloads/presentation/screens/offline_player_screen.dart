@@ -7,9 +7,9 @@ import 'package:just_audio/just_audio.dart';
 import '../../../audio/application/audio_providers.dart';
 import '../../application/download_providers.dart';
 
-const _kBg = Color(0xFF12082E);
-const _kAccent = Color(0xFF8B5CF6);
-const _kSub = Color(0xFFB0A8CC);
+const _kBg = Color(0xFF1B2723);
+const _kAccent = Color(0xFF8FB3A6);
+const _kSub = Color(0xFFA8BBB2);
 
 /// Plays a fully-downloaded, encrypted audio file entirely offline.
 /// Bytes are decrypted on the fly by the loopback proxy so no plaintext

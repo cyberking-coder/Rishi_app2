@@ -2,13 +2,14 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../../app/theme/app_theme.dart';
 import '../../application/download_providers.dart';
 import '../../domain/entities/download_status.dart';
 import '../widgets/download_tile.dart';
 
-const _kBg = Color(0xFF12082E);
-const _kAccent = Color(0xFF8B5CF6);
-const _kSub = Color(0xFFB0A8CC);
+const _kBg = AppTheme.background;
+const _kAccent = AppTheme.sage;
+const _kSub = AppTheme.textSecondary;
 
 /// Lists every offline download with its live status, and routes completed
 /// items to the encrypted offline player.
@@ -39,8 +40,8 @@ class _DownloadsScreenState extends ConsumerState<DownloadsScreen> {
       backgroundColor: _kBg,
       appBar: AppBar(
         backgroundColor: _kBg,
-        title: const Text('Downloads', style: TextStyle(color: Colors.white)),
-        iconTheme: const IconThemeData(color: Colors.white),
+        title: const Text('Downloads', style: TextStyle(color: AppTheme.textPrimary)),
+        iconTheme: const IconThemeData(color: AppTheme.textPrimary),
       ),
       body: tasksAsync.when(
         loading: () =>
@@ -66,7 +67,7 @@ class _DownloadsScreenState extends ConsumerState<DownloadsScreen> {
           return ListView.separated(
             itemCount: tasks.length,
             separatorBuilder: (_, __) =>
-                const Divider(height: 1, color: Colors.white10),
+                const Divider(height: 1, color: AppTheme.border),
             itemBuilder: (context, index) {
               final task = tasks[index];
               return DownloadTile(

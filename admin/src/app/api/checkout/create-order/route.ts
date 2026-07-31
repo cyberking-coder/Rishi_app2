@@ -66,6 +66,17 @@ export async function POST(req: NextRequest) {
   }
 
   const db = createAdminClient();
+
+  // Courses are sold individually, priced from the course row itself.
+  if (payload.kind === "course") {
+    return await createCourseOrder(db, payload.uid, payload.tid, {
+      name,
+      phone,
+      email,
+      state,
+    });
+  }
+
   const { data: plan, error } = await db
     .from("subscription_plans")
     .select("id, name, price, currency")
@@ -100,6 +111,125 @@ export async function POST(req: NextRequest) {
       key_id: env.razorpay().keyId,
       plan_name: plan.name,
       prefill: { name, email, contact: phone },
+    });
+  } catch (e) {
+    return NextResponse.json(
+      { error: e instanceof Error ? e.message : "Could not create order" },
+      { status: 502 },
+    );
+  }
+}
+
+
+interface Billing {
+  name: string;
+  phone: string;
+  email: string;
+  state: string;
+}
+
+/**
+ * Builds a Razorpay order for a single course.
+ *
+ * Seat availability is checked here rather than only in the UI: the
+ * checkout page can be left open while the last seat sells, and the seat
+ * count is the whole point of a limited cohort.
+ */
+async function createCourseOrder(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  db: any,
+  userId: string,
+  courseId: string,
+  billing: Billing,
+) {
+  const { data: course } = await db
+    .from("courses")
+    .select("id, title, price_amount, currency, seat_limit, status")
+    .eq("id", courseId)
+    .maybeSingle();
+
+  if (!course || course.status !== "published") {
+    return NextResponse.json({ error: "Course not found" }, { status: 404 });
+  }
+  if (course.price_amount <= 0) {
+    return NextResponse.json(
+      { error: "This course is free — no payment is needed." },
+      { status: 400 },
+    );
+  }
+
+  // Already owned: paying twice for the same course is never what the
+  // buyer meant, and the unique index would reject the second grant
+  // anyway — better to say so before taking money.
+  const { data: existing } = await db
+    .from("course_purchases")
+    .select("id")
+    .eq("user_id", userId)
+    .eq("course_id", courseId)
+    .eq("status", "paid")
+    .maybeSingle();
+
+  if (existing) {
+    return NextResponse.json(
+      { error: "You already have access to this course." },
+      { status: 409 },
+    );
+  }
+
+  if (course.seat_limit !== null) {
+    const { count } = await db
+      .from("course_purchases")
+      .select("id", { count: "exact", head: true })
+      .eq("course_id", courseId)
+      .eq("status", "paid");
+
+    if ((count ?? 0) >= course.seat_limit) {
+      return NextResponse.json(
+        { error: "This course is sold out." },
+        { status: 409 },
+      );
+    }
+  }
+
+  try {
+    const order = await createRazorpayOrder({
+      amountRupees: course.price_amount / 100,
+      currency: course.currency,
+      notes: {
+        user_id: userId,
+        course_id: course.id,
+        billing_name: billing.name,
+        billing_phone: billing.phone,
+        billing_email: billing.email,
+        billing_state: billing.state,
+      },
+    });
+
+    // Recorded as pending so an abandoned checkout is still visible to
+    // the admin; the webhook flips it to paid on the same order id.
+    await db.from("course_purchases").upsert(
+      {
+        user_id: userId,
+        course_id: course.id,
+        amount: course.price_amount,
+        currency: course.currency,
+        status: "pending",
+        razorpay_order_id: order.id,
+      },
+      { onConflict: "razorpay_order_id" },
+    );
+
+    return NextResponse.json({
+      order_id: order.id,
+      amount: order.amount,
+      currency: order.currency,
+      key_id: env.razorpay().keyId,
+      plan_name: course.title,
+      prefill: {
+        name: billing.name,
+        email: billing.email,
+        contact: billing.phone,
+      },
     });
   } catch (e) {
     return NextResponse.json(

@@ -12,6 +12,11 @@ import '../../features/downloads/presentation/screens/downloads_screen.dart';
 import '../../features/downloads/presentation/screens/offline_player_screen.dart';
 import '../../features/home/presentation/screens/home_screen.dart';
 import '../../features/home/presentation/screens/browse_screen.dart';
+import '../../features/lms/domain/entities/lesson.dart';
+import '../../features/lms/presentation/screens/course_detail_screen.dart';
+import '../../features/lms/presentation/screens/courses_screen.dart';
+import '../../features/lms/presentation/screens/text_lesson_screen.dart';
+import '../../features/lms/presentation/screens/video_lesson_screen.dart';
 import '../../features/profile/presentation/screens/profile_screen.dart';
 import '../widgets/app_shell.dart';
 
@@ -45,7 +50,8 @@ final goRouterProvider = Provider<GoRouter>((ref) {
       GoRoute(path: '/signup', builder: (_, __) => const SignupScreen()),
       GoRoute(
         path: '/home',
-        builder: (_, __) => const AppShell(child: HomeScreen()),
+        builder: (_, __) =>
+            const AppShell(tab: AppTab.home, child: HomeScreen()),
       ),
       GoRoute(
         path: '/now-playing',
@@ -53,7 +59,8 @@ final goRouterProvider = Provider<GoRouter>((ref) {
       ),
       GoRoute(
         path: '/downloads',
-        builder: (_, __) => const AppShell(child: DownloadsScreen()),
+        builder: (_, __) =>
+            const AppShell(tab: AppTab.downloads, child: DownloadsScreen()),
       ),
       GoRoute(
         path: '/offline-player/:contentId',
@@ -64,7 +71,30 @@ final goRouterProvider = Provider<GoRouter>((ref) {
       ),
       GoRoute(
         path: '/profile',
-        builder: (_, __) => const AppShell(child: ProfileScreen()),
+        builder: (_, __) =>
+            const AppShell(tab: AppTab.profile, child: ProfileScreen()),
+      ),
+      GoRoute(
+        path: '/courses',
+        builder: (_, __) =>
+            const AppShell(tab: AppTab.courses, child: CoursesScreen()),
+      ),
+      GoRoute(
+        path: '/course/:id',
+        builder: (_, state) => CourseDetailScreen(
+          courseId: state.pathParameters['id']!,
+          title: state.extra as String? ?? 'Course',
+        ),
+      ),
+      GoRoute(
+        path: '/lesson-video/:id',
+        builder: (_, state) =>
+            VideoLessonScreen(lesson: state.extra as Lesson),
+      ),
+      GoRoute(
+        path: '/lesson-text/:id',
+        builder: (_, state) =>
+            TextLessonScreen(lesson: state.extra as Lesson),
       ),
       GoRoute(
         path: '/search',

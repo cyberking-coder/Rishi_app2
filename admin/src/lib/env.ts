@@ -30,6 +30,10 @@ export const env = {
     bucket: required("R2_BUCKET", process.env.R2_BUCKET),
     publicBaseUrl: process.env.R2_PUBLIC_BASE_URL ?? "",
   }),
+  bunny: () => ({
+    apiKey: required("BUNNY_STREAM_API_KEY", process.env.BUNNY_STREAM_API_KEY),
+    libraryId: required("BUNNY_STREAM_LIBRARY_ID", process.env.BUNNY_STREAM_LIBRARY_ID),
+  }),
   checkoutTokenSecret: () =>
     required("CHECKOUT_TOKEN_SECRET", process.env.CHECKOUT_TOKEN_SECRET),
   razorpay: () => ({

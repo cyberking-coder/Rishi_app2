@@ -4,10 +4,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../../app/theme/app_theme.dart';
 import '../../../../app/widgets/lotus_logo.dart';
 import '../../application/auth_providers.dart';
 
-/// The branded opening screen: a dark violet glow with the lotus mark and
+/// The branded opening screen: a soft sage wash behind the lotus mark and
 /// the "Anurag Rishi — Find Peace Within" wordmark. Holds for a moment, then
 /// routes to /home or /login depending on whether a session is active.
 class SplashScreen extends ConsumerStatefulWidget {
@@ -57,17 +58,16 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      // Dark canvas behind the radial violet glow.
-      backgroundColor: const Color(0xFF140C2E),
+      backgroundColor: AppTheme.background,
       body: Container(
         decoration: const BoxDecoration(
           gradient: RadialGradient(
             center: Alignment(0, -0.25),
-            radius: 0.9,
+            radius: 0.95,
             colors: [
-              Color(0xFF4C2A85), // violet glow core
-              Color(0xFF2A1A52), // mid
-              Color(0xFF140C2E), // dark edges
+              Color(0xFFFFFFFF), // light core behind the mark
+              AppTheme.sageSoft, // mid
+              AppTheme.background, // warm edges
             ],
             stops: [0.0, 0.55, 1.0],
           ),
@@ -88,14 +88,14 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
                       shape: BoxShape.circle,
                       boxShadow: [
                         BoxShadow(
-                          color: const Color(0xFF8B5CF6).withValues(alpha: 0.55),
-                          blurRadius: 70,
-                          spreadRadius: 18,
+                          color: AppTheme.sage.withValues(alpha: 0.22),
+                          blurRadius: 60,
+                          spreadRadius: 12,
                         ),
                       ],
                     ),
                     child: const Center(
-                      child: LotusLogo(size: 96, color: Color(0xFFB79CF0)),
+                      child: LotusLogo(size: 96, color: AppTheme.sage),
                     ),
                   ),
                   const SizedBox(height: 36),
@@ -106,7 +106,7 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
                       width: 9,
                       height: 9,
                       decoration: BoxDecoration(
-                        color: const Color(0xFFB79CF0).withValues(alpha: 0.9),
+                        color: AppTheme.sand,
                         borderRadius: BorderRadius.circular(2),
                       ),
                     ),
@@ -116,7 +116,7 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
                   const Text(
                     'Anurag Rishi',
                     style: TextStyle(
-                      color: Colors.white,
+                      color: AppTheme.textPrimary,
                       fontSize: 32,
                       fontWeight: FontWeight.w800,
                       letterSpacing: 0.5,
@@ -125,8 +125,8 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
                   const SizedBox(height: 8),
                   Text(
                     'Find Peace Within',
-                    style: TextStyle(
-                      color: const Color(0xFFB79CF0).withValues(alpha: 0.9),
+                    style: const TextStyle(
+                      color: AppTheme.textSecondary,
                       fontSize: 15,
                       fontWeight: FontWeight.w400,
                       letterSpacing: 0.3,
