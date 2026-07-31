@@ -17,7 +17,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { NativeOption, NativeSelect } from "@/components/ui/native-select";
-import { createLesson, uploadLessonResource } from "@/app/actions/courses";
+import { createLesson } from "@/app/actions/courses";
 import {
   attachUpload,
   createContent,
@@ -32,22 +32,6 @@ import {
 import type { Audio, LessonType, Video } from "@/lib/types";
 
 type MediaMode = "existing" | "upload";
-
-/** File-backed lesson types and what each will accept in the picker. */
-const RESOURCE_ACCEPT: Record<string, string> = {
-  pdf: "application/pdf",
-  image: "image/*",
-  file: "*/*",
-};
-
-function fileToBase64(f: File): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve((reader.result as string).split(",")[1] ?? "");
-    reader.onerror = () => reject(new Error("Could not read file"));
-    reader.readAsDataURL(f);
-  });
-}
 
 function uploadToR2(uploadUrl: string, file: File, onProgress: (msg: string) => void) {
   return new Promise<void>((resolve, reject) => {
@@ -98,7 +82,6 @@ export function AddLessonDialog({
   const [videoId, setVideoId] = useState("");
   const [mediaFile, setMediaFile] = useState<File | null>(null);
   const [bodyMarkdown, setBodyMarkdown] = useState("");
-  const [linkUrl, setLinkUrl] = useState("");
 
   function reset() {
     setTitle("");
@@ -109,7 +92,6 @@ export function AddLessonDialog({
     setVideoId("");
     setMediaFile(null);
     setBodyMarkdown("");
-    setLinkUrl("");
     setProgress(null);
   }
 
@@ -191,21 +173,6 @@ export function AddLessonDialog({
     return created.id;
   }
 
-  /** Uploads a handout and returns its public URL. */
-  async function uploadResource(): Promise<{ url: string; name: string }> {
-    if (!mediaFile) throw new Error("Choose a file to upload");
-    setProgress("Uploading file…");
-    const base64 = await fileToBase64(mediaFile);
-    const result = await uploadLessonResource({
-      courseId,
-      fileName: mediaFile.name,
-      contentType: mediaFile.type || "application/octet-stream",
-      base64,
-    });
-    if (!result.ok) throw new Error(result.error);
-    return { url: result.url, name: mediaFile.name };
-  }
-
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!title.trim()) return toast.error("Give the lesson a title");
@@ -213,10 +180,6 @@ export function AddLessonDialog({
       return toast.error("Pick an audio track, or switch to upload a new one");
     if (lessonType === "video" && videoMode === "existing" && !videoId)
       return toast.error("Pick a video, or switch to upload a new one");
-    if (lessonType === "link" && !linkUrl.trim())
-      return toast.error("Paste the link for this lesson");
-    if (["pdf", "image", "file"].includes(lessonType) && !mediaFile)
-      return toast.error("Choose a file to upload");
 
     setBusy(true);
     try {
@@ -230,16 +193,6 @@ export function AddLessonDialog({
         finalVideoId = await uploadNewVideo();
       }
 
-      let resourceUrl: string | undefined;
-      let resourceName: string | undefined;
-      if (["pdf", "image", "file"].includes(lessonType)) {
-        const uploaded = await uploadResource();
-        resourceUrl = uploaded.url;
-        resourceName = uploaded.name;
-      } else if (lessonType === "link") {
-        resourceUrl = linkUrl.trim();
-      }
-
       setProgress("Adding lesson…");
       const result = await createLesson({
         moduleId,
@@ -249,8 +202,6 @@ export function AddLessonDialog({
         audioId: finalAudioId,
         videoId: finalVideoId,
         bodyMarkdown: lessonType === "text" ? bodyMarkdown : undefined,
-        resourceUrl,
-        resourceName,
       });
       if (!result.ok) throw new Error(result.error);
 
@@ -317,10 +268,6 @@ export function AddLessonDialog({
               <NativeOption value="audio">Audio</NativeOption>
               <NativeOption value="video">Video</NativeOption>
               <NativeOption value="text">Text</NativeOption>
-              <NativeOption value="pdf">PDF</NativeOption>
-              <NativeOption value="image">Image</NativeOption>
-              <NativeOption value="file">Downloadable file</NativeOption>
-              <NativeOption value="link">Embedded link</NativeOption>
             </NativeSelect>
           </div>
 
@@ -449,48 +396,6 @@ export function AddLessonDialog({
                   </p>
                 </>
               )}
-            </div>
-          )}
-
-          {["pdf", "image", "file"].includes(lessonType) && (
-            <div className="space-y-2">
-              <Label htmlFor="al-resource">
-                {lessonType === "pdf"
-                  ? "PDF"
-                  : lessonType === "image"
-                    ? "Image"
-                    : "File"}
-              </Label>
-              <Input
-                id="al-resource"
-                type="file"
-                accept={RESOURCE_ACCEPT[lessonType]}
-                disabled={busy}
-                onChange={(e) => setMediaFile(e.target.files?.[0] ?? null)}
-              />
-              <p className="text-xs text-muted-foreground">
-                Stored as a course handout and shown inside the lesson. Max
-                25 MB — for anything larger, host it and use an embedded
-                link instead.
-              </p>
-            </div>
-          )}
-
-          {lessonType === "link" && (
-            <div className="space-y-2">
-              <Label htmlFor="al-link">Link</Label>
-              <Input
-                id="al-link"
-                type="url"
-                value={linkUrl}
-                onChange={(e) => setLinkUrl(e.target.value)}
-                placeholder="https://…"
-                disabled={busy}
-              />
-              <p className="text-xs text-muted-foreground">
-                A YouTube video, Zoom room, Google Doc — anything with a URL.
-                It opens in the phone&apos;s browser.
-              </p>
             </div>
           )}
 

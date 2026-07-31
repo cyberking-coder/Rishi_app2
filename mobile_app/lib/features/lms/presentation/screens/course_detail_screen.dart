@@ -71,26 +71,6 @@ class _CourseDetailScreenState extends ConsumerState<CourseDetailScreen> {
         await _markComplete(lesson);
         return;
 
-      case LessonType.pdf:
-      case LessonType.image:
-      case LessonType.file:
-      case LessonType.link:
-        // Handouts and links open outside the app: there's no in-app
-        // viewer for arbitrary file types, and the browser already
-        // handles PDFs, images and embedded pages well.
-        final uri = Uri.tryParse(lesson.resourceUrl!);
-        if (uri == null) return;
-        final opened =
-            await launchUrl(uri, mode: LaunchMode.externalApplication);
-        if (!opened && mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Could not open this lesson.')),
-          );
-          return;
-        }
-        await _markComplete(lesson);
-        return;
-
       case LessonType.video:
         // Unlike a text lesson, opening the player proves nothing — the
         // stream can still fail. The player reports back whether it
@@ -544,14 +524,6 @@ class _LessonTile extends StatelessWidget {
         return Icons.play_arrow_rounded;
       case LessonType.text:
         return Icons.article_rounded;
-      case LessonType.pdf:
-        return Icons.picture_as_pdf_rounded;
-      case LessonType.image:
-        return Icons.image_rounded;
-      case LessonType.file:
-        return Icons.download_rounded;
-      case LessonType.link:
-        return Icons.open_in_new_rounded;
     }
   }
 
@@ -566,14 +538,6 @@ class _LessonTile extends StatelessWidget {
         return 'Video';
       case LessonType.text:
         return 'Reading';
-      case LessonType.pdf:
-        return 'PDF';
-      case LessonType.image:
-        return 'Image';
-      case LessonType.file:
-        return lesson.resourceName ?? 'Download';
-      case LessonType.link:
-        return 'Link';
     }
   }
 
@@ -581,12 +545,15 @@ class _LessonTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final done = lesson.completed && !locked;
 
-    return Material(
-      color: AppTheme.surfaceCream,
-      borderRadius: BorderRadius.circular(AppTheme.radiusRow),
-      child: InkWell(
-        onTap: onTap,
+    return Container(
+      decoration: BoxDecoration(
+        color: AppTheme.surfaceCream,
         borderRadius: BorderRadius.circular(AppTheme.radiusRow),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: Column(children: [
+        InkWell(
+        onTap: onTap,
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
           child: Row(children: [
@@ -655,6 +622,82 @@ class _LessonTile extends StatelessWidget {
             ),
           ]),
         ),
+        ),
+
+        // Attachments sit under the lesson they belong to, visually
+        // subordinate — they support the lesson rather than being one.
+        if (!locked && lesson.resources.isNotEmpty)
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.fromLTRB(14, 0, 14, 10),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                for (final resource in lesson.resources)
+                  _ResourceRow(resource: resource),
+              ],
+            ),
+          ),
+      ]),
+    );
+  }
+}
+
+class _ResourceRow extends StatelessWidget {
+  final LessonResource resource;
+
+  const _ResourceRow({required this.resource});
+
+  IconData get _icon {
+    switch (resource.type) {
+      case ResourceType.pdf:
+        return Icons.picture_as_pdf_rounded;
+      case ResourceType.image:
+        return Icons.image_rounded;
+      case ResourceType.file:
+        return Icons.download_rounded;
+      case ResourceType.link:
+        return Icons.link_rounded;
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: () async {
+        final uri = Uri.tryParse(resource.url);
+        if (uri == null) return;
+        // Opened in the browser: there is no in-app viewer for arbitrary
+        // file types, and the browser already handles PDFs and images.
+        final opened =
+            await launchUrl(uri, mode: LaunchMode.externalApplication);
+        if (!opened && context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Could not open this resource.')),
+          );
+        }
+      },
+      borderRadius: BorderRadius.circular(8),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 5, horizontal: 4),
+        child: Row(children: [
+          Icon(_icon, size: 15, color: AppTheme.sage),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              resource.title,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+                color: AppTheme.sage,
+              ),
+            ),
+          ),
+          const Icon(Icons.open_in_new_rounded,
+              size: 12, color: AppTheme.textSecondary),
+        ]),
       ),
     );
   }

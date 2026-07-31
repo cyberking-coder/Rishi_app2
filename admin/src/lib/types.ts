@@ -87,18 +87,22 @@ export type ContentKind = "video" | "audio";
 // media of its own to transcode; its lessons reference content rows that
 // carry that state themselves).
 export type CourseStatus = "draft" | "published" | "archived";
-export type LessonType =
-  | "audio"
-  | "video"
-  | "text"
-  | "pdf"
-  | "image"
-  | "file"
-  | "link";
+export type LessonType = "audio" | "video" | "text";
 
-/** Lesson types whose payload is a URL in `resource_url` rather than
- *  attached media or inline markdown. */
-export const RESOURCE_LESSON_TYPES = ["pdf", "image", "file", "link"] as const;
+/** Attachments that hang off a lesson: handouts and links, not teaching
+ *  formats of their own. */
+export type ResourceType = "pdf" | "image" | "file" | "link";
+
+export interface LessonResource {
+  id: string;
+  lesson_id: string;
+  title: string;
+  resource_type: ResourceType;
+  url: string;
+  position: number;
+  created_at: string;
+  updated_at: string;
+}
 
 export interface Course {
   id: string;
@@ -140,6 +144,8 @@ export interface Lesson {
   audio_id: string | null;
   video_id: string | null;
   body_markdown: string | null;
+  /** Superseded by lesson_resources. Kept only because the column still
+   *  exists; nothing reads these. */
   resource_url: string | null;
   resource_name: string | null;
   position: number;
@@ -151,6 +157,7 @@ export interface Lesson {
  *  it surface the attached title and warn when the media's is_premium
  *  disagrees with its course's. */
 export interface LessonWithMedia extends Lesson {
+  lesson_resources?: LessonResource[];
   audios: { id: string; title: string; is_premium: boolean } | null;
   videos: { id: string; title: string; is_premium: boolean } | null;
 }

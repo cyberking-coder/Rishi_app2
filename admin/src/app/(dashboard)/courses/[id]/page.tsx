@@ -48,7 +48,7 @@ export default async function CourseBuilderPage({
       supabase
         .from("course_modules")
         .select(
-          "*, lessons(*, audios(id, title, is_premium), videos(id, title, is_premium))",
+          "*, lessons(*, audios(id, title, is_premium), videos(id, title, is_premium), lesson_resources(*))",
         )
         .eq("course_id", id)
         .order("position", { ascending: true })
