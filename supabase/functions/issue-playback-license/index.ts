@@ -198,7 +198,10 @@ Deno.serve(async (req) => {
     // wrong hostname, a rejected token, and an unfinished encode.
     // Checking here costs one small request and turns all three into
     // something the message actually names.
-    const manifestProblem = await checkBunnyManifest(playback.hlsUrl);
+    const manifestProblem = await checkBunnyManifest(
+      playback.hlsUrl,
+      playback.signed,
+    );
     if (manifestProblem) {
       console.error(`${manifestProblem} (video ${videoId})`);
       return jsonResponse({ error: manifestProblem }, 502);

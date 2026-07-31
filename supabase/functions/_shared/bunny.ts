@@ -51,6 +51,10 @@ async function hmacSha256(key: string, message: string): Promise<Uint8Array> {
 export interface BunnyPlayback {
   hlsUrl: string;
   expiresAt: number;
+  /** Whether a token was attached. Decides how to read a 403: with a
+   *  token it's a signature or key mismatch, without one it means the
+   *  CDN is still demanding a token nobody is sending. */
+  signed: boolean;
 }
 
 export class BunnyConfigError extends Error {}
@@ -88,7 +92,7 @@ export async function signBunnyPlayback(
         "URL. This works only while the pull zone has token " +
         "authentication disabled.",
     );
-    return { hlsUrl: unsigned, expiresAt: expires };
+    return { hlsUrl: unsigned, expiresAt: expires, signed: false };
   }
 
   // Trailing slash: this is a directory prefix covering the manifest and
@@ -119,7 +123,7 @@ export async function signBunnyPlayback(
     `&expires=${expires}` +
     `/${bunnyVideoId}/playlist.m3u8`;
 
-  return { hlsUrl: url, expiresAt: expires };
+  return { hlsUrl: url, expiresAt: expires, signed: true };
 }
 
 /// Confirms the CDN will actually serve this manifest.
@@ -141,7 +145,10 @@ function firstPlaylistUri(body: string): string | null {
   return null;
 }
 
-export async function checkBunnyManifest(url: string): Promise<string | null> {
+export async function checkBunnyManifest(
+  url: string,
+  signed: boolean,
+): Promise<string | null> {
   try {
     // GET, not HEAD: CDNs are inconsistent about HEAD on cached objects,
     // and a manifest is a few hundred bytes.
@@ -191,9 +198,17 @@ export async function checkBunnyManifest(url: string): Promise<string | null> {
     await res.body?.cancel();
 
     if (res.status === 403) {
-      return "Bunny rejected the playback token (403). Check " +
-        "BUNNY_STREAM_TOKEN_KEY against the pull zone's token " +
-        "authentication key.";
+      // Same status, opposite causes — and blaming the key when no key
+      // was used sends you to a setting that is already correct.
+      return signed
+        ? "Bunny rejected the playback token (403). Check " +
+          "BUNNY_STREAM_TOKEN_KEY against the pull zone's Token " +
+          "Authentication key."
+        : "Bunny refused an unsigned request (403), so something is " +
+          "still requiring a token. Check Stream > your library > " +
+          "Security for 'Token authentication' AND 'Block direct URL " +
+          "file access' - the pull zone's own toggle is not the only " +
+          "one.";
     }
     if (res.status === 404) {
       return "Bunny has no playlist for this video yet (404). It may " +
