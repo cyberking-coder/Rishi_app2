@@ -50,6 +50,18 @@ export async function EnrolledStudents({ courseId }: { courseId: string }) {
 
   const rows = purchases ?? [];
 
+  // Payments taken for a course the buyer already owned. Deliberately
+  // counted apart from the roster rather than folded into it: they
+  // enrolled nobody, and the dedupe below keeps one row per student, so
+  // a duplicate listed alongside would hide the real enrolment it
+  // duplicates. Surfacing the count is what makes the refund owed
+  // visible at all.
+  const { count: duplicateCount } = await supabase
+    .from("course_purchases")
+    .select("id", { count: "exact", head: true })
+    .eq("course_id", courseId)
+    .eq("status", "duplicate");
+
   // One person can hold more than one row — a rebuy after being removed
   // leaves the revoked one behind — and they're one student either way.
   // Keep the earliest-listed, which is the most recent purchase given
@@ -112,6 +124,14 @@ export async function EnrolledStudents({ courseId }: { courseId: string }) {
           )}
           {revenue > 0 && (
             <Badge variant="success">{formatMoney(revenue)} collected</Badge>
+          )}
+          {(duplicateCount ?? 0) > 0 && (
+            <Badge
+              variant="destructive"
+              title="Paid for a course the buyer already owned — no access was granted and a refund is owed."
+            >
+              {duplicateCount} duplicate{duplicateCount === 1 ? "" : "s"} to refund
+            </Badge>
           )}
         </div>
       </CardHeader>
