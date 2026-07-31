@@ -47,7 +47,14 @@ class CheckoutRemoteDataSource {
     );
 
     if (response.status != 200) {
-      throw Exception('Could not start checkout. Please try again.');
+      // Include what the function actually said. The usual cause is
+      // mint-checkout-token not having been redeployed with course
+      // support, which reports as "plan_id is required" — useless if
+      // it's swallowed into a generic retry message.
+      final detail = response.data is Map
+          ? (response.data as Map)['error'] ?? response.data
+          : response.data;
+      throw Exception('Checkout failed (${response.status}): $detail');
     }
 
     final token = (response.data as Map)['token'] as String;
