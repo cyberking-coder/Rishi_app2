@@ -38,8 +38,13 @@ export default async function CourseBuilderPage({
 
   if (!course) notFound();
 
-  const [{ data: modules }, { data: audios }, { data: videos }, { data: categories }] =
-    await Promise.all([
+  const [
+    { data: modules },
+    { data: audios },
+    { data: videos },
+    { data: categories },
+    { data: assets },
+  ] = await Promise.all([
       supabase
         .from("course_modules")
         .select(
@@ -69,7 +74,23 @@ export default async function CourseBuilderPage({
         .select("*")
         .order("name", { ascending: true })
         .returns<Category[]>(),
+      // content_assets is polymorphic (no FK to videos), so this can't be
+      // an embedded join — fetch the ready asset ids and intersect below.
+      supabase
+        .from("content_assets")
+        .select("content_id")
+        .eq("content_type", "video")
+        .eq("status", "ready")
+        .returns<{ content_id: string }[]>(),
     ]);
+
+  // A video with neither a Bunny id nor a ready R2 asset has no media
+  // behind it — attaching it produces a lesson that 404s the moment
+  // someone taps it. Keep those out of the picker entirely.
+  const withAsset = new Set((assets ?? []).map((a) => a.content_id));
+  const playableVideos = (videos ?? []).filter(
+    (v) => v.bunny_video_id !== null || withAsset.has(v.id),
+  );
 
   // Lessons come back nested but unordered; sort them here so the builder
   // component stays presentational.
@@ -114,7 +135,7 @@ export default async function CourseBuilderPage({
         course={course}
         modules={orderedModules}
         audioLibrary={audios ?? []}
-        videoLibrary={videos ?? []}
+        videoLibrary={playableVideos}
       />
     </div>
   );

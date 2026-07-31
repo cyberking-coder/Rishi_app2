@@ -21,6 +21,10 @@ class _VideoLessonScreenState extends ConsumerState<VideoLessonScreen> {
   ChewieController? _chewie;
   String? _error;
 
+  /// Whether the stream actually started. Returned to the course screen
+  /// on pop so a lesson that failed to load isn't ticked off as done.
+  bool _played = false;
+
   @override
   void initState() {
     super.initState();
@@ -41,6 +45,7 @@ class _VideoLessonScreenState extends ConsumerState<VideoLessonScreen> {
       }
 
       setState(() {
+        _played = true;
         _controller = controller;
         _chewie = ChewieController(
           videoPlayerController: controller,
@@ -73,9 +78,14 @@ class _VideoLessonScreenState extends ConsumerState<VideoLessonScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: const Color(0xFF141B18),
-      body: SafeArea(
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, _) {
+        if (!didPop) Navigator.of(context).pop(_played);
+      },
+      child: Scaffold(
+        backgroundColor: const Color(0xFF141B18),
+        body: SafeArea(
         child: Column(children: [
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
@@ -83,7 +93,7 @@ class _VideoLessonScreenState extends ConsumerState<VideoLessonScreen> {
               IconButton(
                 icon: const Icon(Icons.arrow_back_rounded,
                     color: Colors.white, size: 20),
-                onPressed: () => Navigator.of(context).pop(),
+                onPressed: () => Navigator.of(context).pop(_played),
               ),
               Expanded(
                 child: Text(widget.lesson.title,
@@ -98,6 +108,7 @@ class _VideoLessonScreenState extends ConsumerState<VideoLessonScreen> {
           ),
           Expanded(child: Center(child: _body())),
         ]),
+        ),
       ),
     );
   }

@@ -182,6 +182,13 @@ export async function refreshBunnyStatus(
       try {
         await deleteObject(video.r2_path);
         await db.from("videos").update({ r2_path: null }).eq("id", videoId);
+        // Drop the content_assets row too. Leaving it would advertise a
+        // "ready" rendition pointing at an object that no longer exists.
+        await db
+          .from("content_assets")
+          .delete()
+          .eq("content_type", "video")
+          .eq("content_id", videoId);
       } catch (e) {
         // Non-fatal: playback already works off Bunny either way. Leave
         // r2_path set so the next status refresh retries the cleanup.

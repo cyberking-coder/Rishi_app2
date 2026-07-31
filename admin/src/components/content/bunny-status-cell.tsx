@@ -20,18 +20,32 @@ export function BunnyStatusCell({
   videoId,
   bunnyVideoId,
   bunnyStatus,
+  hasDirectAsset,
 }: {
   videoId: string;
   bunnyVideoId: string | null;
   bunnyStatus: Video["bunny_status"];
+  /** True when a ready content_assets row exists (the pre-Bunny R2 path). */
+  hasDirectAsset: boolean;
 }) {
   const router = useRouter();
   const [busy, setBusy] = useState(false);
 
+  // No Bunny video and no R2 asset means playback has nothing to serve —
+  // the app fails with "No playable renditions". This used to render as
+  // "Direct", which read as fine and hid the problem until someone tried
+  // to watch it on a phone.
   if (!bunnyVideoId) {
-    return (
+    return hasDirectAsset ? (
       <Badge variant="outline" title="Plays from R2 as a single file">
         Direct
+      </Badge>
+    ) : (
+      <Badge
+        variant="destructive"
+        title="This video has no media behind it — the upload never completed. Delete it and upload again."
+      >
+        No media
       </Badge>
     );
   }

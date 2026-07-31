@@ -51,8 +51,14 @@ class _CourseDetailScreenState extends ConsumerState<CourseDetailScreen> {
         return;
 
       case LessonType.video:
-        context.push('/lesson-video/${lesson.id}', extra: lesson);
-        await _markComplete(lesson);
+        // Unlike a text lesson, opening the player proves nothing — the
+        // stream can still fail. The player reports back whether it
+        // actually played, and only then does this count as complete.
+        final played = await context.push<bool>(
+          '/lesson-video/${lesson.id}',
+          extra: lesson,
+        );
+        if (played == true) await _markComplete(lesson);
         return;
 
       case LessonType.audio:

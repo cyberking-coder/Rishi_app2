@@ -21,11 +21,24 @@ export const dynamic = "force-dynamic";
 
 export default async function VideosPage() {
   const supabase = createClient();
-  const { data: videos } = await supabase
-    .from("videos")
-    .select("id, title, status, video_type, is_premium, view_count, created_at, bunny_video_id, bunny_status")
-    .order("created_at", { ascending: false })
-    .returns<Video[]>();
+  const [{ data: videos }, { data: assets }] = await Promise.all([
+    supabase
+      .from("videos")
+      .select("id, title, status, video_type, is_premium, view_count, created_at, bunny_video_id, bunny_status")
+      .order("created_at", { ascending: false })
+      .returns<Video[]>(),
+    // Which videos still have a playable R2 rendition. Without this the
+    // page can't tell "uploaded before Bunny" from "upload never
+    // finished" — both look like a row with no bunny_video_id.
+    supabase
+      .from("content_assets")
+      .select("content_id")
+      .eq("content_type", "video")
+      .eq("status", "ready")
+      .returns<{ content_id: string }[]>(),
+  ]);
+
+  const videosWithAsset = new Set((assets ?? []).map((a) => a.content_id));
 
   return (
     <div>
@@ -76,6 +89,7 @@ export default async function VideosPage() {
                         videoId={v.id}
                         bunnyVideoId={v.bunny_video_id}
                         bunnyStatus={v.bunny_status}
+                        hasDirectAsset={videosWithAsset.has(v.id)}
                       />
                     </TableCell>
                     <TableCell className="text-muted-foreground">
