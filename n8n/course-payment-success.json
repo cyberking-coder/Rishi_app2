@@ -155,7 +155,7 @@
     {
       "parameters": {
         "method": "POST",
-        "url": "=https://live-server-REPLACE_ME.wati.io/api/v1/sendTemplateMessage?whatsappNumber={{ $json.waNumber }}",
+        "url": "=https://live-mt-server.wati.io/REPLACE_TENANT_ID/api/v1/sendTemplateMessage?whatsappNumber={{ $json.waNumber }}",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
@@ -167,7 +167,7 @@
         },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={{ JSON.stringify({ template_name: 'course_purchase_success', broadcast_name: 'course_purchase_success', parameters: [ { name: 'name', value: $json.firstName }, { name: 'course', value: $json.courseTitle }, { name: 'amount', value: $json.amountLabel } ] }) }}",
+        "jsonBody": "={{ JSON.stringify({ template_name: 'course_purchase_success', broadcast_name: 'course_purchase_success', parameters: [ { name: '1', value: $json.firstName }, { name: '2', value: $json.amountLabel }, { name: '3', value: $json.courseTitle } ] }) }}",
         "options": {}
       },
       "id": "a1000000-0000-4000-8000-000000000004",
@@ -327,7 +327,7 @@
     {
       "parameters": {
         "method": "POST",
-        "url": "=https://live-server-REPLACE_ME.wati.io/api/v1/sendTemplateMessage?whatsappNumber={{ $json.waNumber }}",
+        "url": "=https://live-mt-server.wati.io/REPLACE_TENANT_ID/api/v1/sendTemplateMessage?whatsappNumber={{ $json.waNumber }}",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
@@ -339,7 +339,7 @@
         },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={{ JSON.stringify({ template_name: 'course_payment_failed', broadcast_name: 'course_payment_failed', parameters: [ { name: 'name', value: $json.firstName }, { name: 'course', value: $json.courseTitle }, { name: 'reason', value: $json.reason } ] }) }}",
+        "jsonBody": "={{ JSON.stringify({ template_name: 'course_payment_failed', broadcast_name: 'course_payment_failed', parameters: [ { name: '1', value: $json.firstName }, { name: '2', value: $json.courseTitle }, { name: '3', value: $json.reason } ] }) }}",
         "options": {}
       },
       "id": "a1000000-0000-4000-8000-000000000008",
