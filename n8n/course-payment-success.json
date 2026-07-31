@@ -272,5 +272,32 @@
   "settings": {
     "executionOrder": "v1"
   },
-  "pinData": {}
+  "pinData": {
+    "Payment webhook": [
+      {
+        "json": {
+          "headers": {
+            "content-type": "application/json"
+          },
+          "params": {},
+          "query": {},
+          "body": {
+            "event": "payment_success",
+            "content_type": "course",
+            "user_id": "3a56bb6b-979d-4690-8666-612393d93dbf",
+            "course_id": "8f4b87c8-ef1d-4873-97d1-022558a69968",
+            "plan_name": "Mental Detox",
+            "name": "Ritesh Kelkar",
+            "email": "riteshkelkar45@gmail.com",
+            "phone": "8180804366",
+            "state": "Maharashtra",
+            "amount": 499,
+            "currency": "INR",
+            "coupon_code": "LAUNCH50",
+            "discount_amount": 50
+          }
+        }
+      }
+    ]
+  }
 }
