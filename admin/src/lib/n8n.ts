@@ -24,8 +24,19 @@ export interface PaymentNotification {
   discount_amount?: number; // rupees
 }
 
+/** Course purchases and the subscription go to separate n8n workflows —
+ *  see the matching comment in the edge function's copy of this file.
+ *  Falls back to the shared webhook if no course-specific one is set. */
+function webhookUrlFor(notification: PaymentNotification): string | undefined {
+  if (notification.content_type === "course") {
+    return process.env.N8N_COURSE_PAYMENT_WEBHOOK_URL ??
+      process.env.N8N_PAYMENT_WEBHOOK_URL;
+  }
+  return process.env.N8N_PAYMENT_WEBHOOK_URL;
+}
+
 export async function notifyN8n(notification: PaymentNotification): Promise<void> {
-  const webhookUrl = process.env.N8N_PAYMENT_WEBHOOK_URL;
+  const webhookUrl = webhookUrlFor(notification);
   if (!webhookUrl) return; // not configured yet - skip silently
 
   const res = await fetch(webhookUrl, {
