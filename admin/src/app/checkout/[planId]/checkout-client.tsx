@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Script from "next/script";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -50,6 +50,7 @@ export function CheckoutClient({
   priceAmount,
   priceLabel,
   allowCoupon = false,
+  returnUrl,
 }: {
   token: string;
   planName: string;
@@ -60,6 +61,9 @@ export function CheckoutClient({
    *  a subscription's "₹199 / month" rather than a one-off amount. */
   priceLabel?: string;
   allowCoupon?: boolean;
+  /** meditationapp:// link opened once payment is confirmed, so the
+   *  buyer returns to the app instead of being stranded on this page. */
+  returnUrl?: string;
 }) {
   const [status, setStatus] = useState<Status>("idle");
   const [error, setError] = useState<string | null>(null);
@@ -80,6 +84,19 @@ export function CheckoutClient({
   } | null>(null);
 
   const busy = status === "loading" || status === "processing";
+
+  // Best-effort automatic return to the app once payment is confirmed.
+  // Not guaranteed to fire — some mobile browsers refuse a programmatic
+  // navigation to a custom scheme without a fresh user gesture — which is
+  // why the "done" state below also renders a tappable fallback link
+  // pointing at the same URL.
+  useEffect(() => {
+    if (status !== "done" || !returnUrl) return;
+    const timer = setTimeout(() => {
+      window.location.href = returnUrl;
+    }, 800);
+    return () => clearTimeout(timer);
+  }, [status, returnUrl]);
   const payable = applied?.final ?? priceAmount;
 
   function validate(): string | null {
@@ -185,8 +202,18 @@ export function CheckoutClient({
         <p className="mb-1 font-semibold">Payment received</p>
         <p className="text-sm text-muted-foreground">
           Your access is being activated — this usually takes just a few
-          seconds. Return to the app and it should unlock automatically.
+          seconds.
+          {returnUrl
+            ? " You'll be taken back to the app automatically."
+            : " Return to the app and it should unlock automatically."}
         </p>
+        {returnUrl && (
+          <Button asChild className="mt-4 w-full" size="lg">
+            {/* A real user tap here also satisfies browsers that block a
+                programmatic redirect to a custom scheme without one. */}
+            <a href={returnUrl}>Return to the app</a>
+          </Button>
+        )}
       </div>
     );
   }

@@ -103,6 +103,19 @@
 				<string>com.googleusercontent.apps.395908400723-qlv7qnkm0p6ml5c28opm7p1l0iksiul9</string>
 			</array>
 		</dict>
+		<!-- App-owned deep link scheme: password-reset emails and the
+		     course-checkout web page both open meditationapp://... to
+		     return the user straight into the app. This was previously
+		     only registered on Android (AndroidManifest.xml) — password
+		     reset links have likely never worked from an iPhone. -->
+		<dict>
+			<key>CFBundleTypeRole</key>
+			<string>Editor</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>meditationapp</string>
+			</array>
+		</dict>
 	</array>
 </dict>
 </plist>

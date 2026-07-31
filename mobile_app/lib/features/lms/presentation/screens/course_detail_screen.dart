@@ -25,12 +25,38 @@ class CourseDetailScreen extends ConsumerStatefulWidget {
   ConsumerState<CourseDetailScreen> createState() => _CourseDetailScreenState();
 }
 
-class _CourseDetailScreenState extends ConsumerState<CourseDetailScreen> {
+class _CourseDetailScreenState extends ConsumerState<CourseDetailScreen>
+    with WidgetsBindingObserver {
   bool _starting = false;
 
   /// The course being viewed, once loaded — needed to price the purchase
   /// sheet from anywhere in this screen.
   CourseSummaryRef? _course;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    // Fallback for when the deep-link return from checkout doesn't fire
+    // (browser/OS didn't follow the link, or the user manually switched
+    // back instead of tapping "Return to app") — re-check ownership
+    // whenever this screen comes back to the foreground rather than
+    // leaving it stuck showing locked after a completed payment.
+    if (state == AppLifecycleState.resumed) {
+      ref.invalidate(courseDetailProvider(widget.courseId));
+      ref.invalidate(coursesProvider);
+    }
+  }
 
   Future<void> _promptPurchase() async {
     final course = _course;
