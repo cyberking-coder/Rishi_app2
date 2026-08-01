@@ -50,7 +50,18 @@ class CertificateScreen extends StatelessWidget {
               child: ListView(
                 padding: const EdgeInsets.fromLTRB(20, 8, 20, 28),
                 children: [
-                  _CertificateCard(certificate: certificate),
+                  // The admin's own artwork when they've uploaded some,
+                  // otherwise the app's drawn design. A course with no
+                  // template still issues a presentable certificate.
+                  if (certificate.layout != null)
+                    _TemplateCertificate(
+                      layout: certificate.layout!,
+                      name: certificate.recipientName?.trim().isNotEmpty == true
+                          ? certificate.recipientName!
+                          : 'Student',
+                    )
+                  else
+                    _CertificateCard(certificate: certificate),
                   const SizedBox(height: 20),
                   if (!certificate.isValid)
                     const Padding(
@@ -235,6 +246,94 @@ class _Meta extends StatelessWidget {
           ),
         ),
       ],
+    );
+  }
+}
+
+/// The admin's certificate artwork with the recipient's name printed on
+/// it.
+///
+/// Everything is laid out in fractions of the rendered image, using
+/// LayoutBuilder to learn its actual width — the admin positioned the
+/// name against a preview of some other size, and only a proportional
+/// layout puts it in the same place here. A pixel offset would be right
+/// on exactly one screen.
+class _TemplateCertificate extends StatelessWidget {
+  const _TemplateCertificate({required this.layout, required this.name});
+
+  final CertificateLayout layout;
+  final String name;
+
+  @override
+  Widget build(BuildContext context) {
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(14),
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final width = constraints.maxWidth;
+
+          return Stack(
+            children: [
+              Image.network(
+                layout.templateUrl,
+                width: width,
+                fit: BoxFit.fitWidth,
+                // The certificate is the whole screen here, so a failed
+                // image needs to say so rather than collapse to nothing.
+                errorBuilder: (_, __, ___) => Container(
+                  width: width,
+                  padding: const EdgeInsets.all(28),
+                  color: AppTheme.surfaceCream,
+                  child: const Text(
+                    "The certificate artwork couldn't be loaded. Your "
+                    'certificate is still valid — the number below is what '
+                    'proves it.',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(color: AppTheme.textSecondary),
+                  ),
+                ),
+                loadingBuilder: (context, child, progress) {
+                  if (progress == null) return child;
+                  return SizedBox(
+                    width: width,
+                    height: width * 0.7,
+                    child: const Center(
+                      child: CircularProgressIndicator(
+                        color: AppTheme.sage,
+                        strokeWidth: 2,
+                      ),
+                    ),
+                  );
+                },
+              ),
+              Positioned.fill(
+                child: Align(
+                  // Alignment runs -1..1, the stored values 0..100.
+                  alignment: Alignment(
+                    (layout.leftPercent / 50) - 1,
+                    (layout.topPercent / 50) - 1,
+                  ),
+                  child: FractionallySizedBox(
+                    widthFactor: 0.84,
+                    child: Text(
+                      name,
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        // Size as a fraction of the image's width, which
+                        // is what the admin's slider set it to.
+                        fontSize: width * (layout.sizePercent / 100),
+                        fontWeight: FontWeight.w600,
+                        color: Color(layout.colorValue),
+                        height: 1.15,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          );
+        },
+      ),
     );
   }
 }

@@ -320,6 +320,12 @@ Tables: `quizzes` (attached to *either* a course or a lesson, enforced by check 
 
 **Admin**: a quiz builder on every lesson (checkpoint) plus one course-level final assessment, and a Certificates page with revoke/reinstate.
 
+**Admin-designed certificate artwork**: the app originally drew the certificate itself, which guarantees a consistent result but gives the admin no say in how a branded, shareable artefact looks. So `courses` gained `certificate_template_url` plus four layout columns (`20260801000004`): the admin uploads finished artwork with the name area left blank, and the only thing the system adds is the name.
+
+Position is stored as **percentages of the image, never pixels** — the same template has to land correctly in the admin's preview pane, on a phone, and at whatever resolution the artwork was exported at, and a pixel offset would be right in exactly one of those. The admin preview uses CSS container-query units against the artwork's own width and the app uses `LayoutBuilder` against its rendered width, so the two agree by construction. A course with no template still gets the app's drawn design, so this is additive and a half-configured course degrades to something presentable.
+
+The artwork is **not** snapshotted onto the certificate record, unlike the course title. Design is presentation — re-uploading better artwork should improve every certificate already issued. The title is a claim about what was earned and must never change retroactively. That distinction is deliberate.
+
 **Manual award**: there is deliberately no "create certificate" form — a certificate is earned, and the Certificates page only lists what has been issued. But the enrolled-students roster on each course has an **Award** button per student, which bypasses the completion check for the cases that check cannot see (offline cohorts, migrated students, progress lost to a bug). It mints the same number format `issue_certificate()` does, so a manual award is indistinguishable to a verifier — that is the point, not an oversight: it is a real credential, not a marked-down one. Awarding someone who holds a revoked certificate reinstates it rather than minting a second.
 
 ### Bug-fix chronology — Phases 3b through 5

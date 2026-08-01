@@ -120,6 +120,15 @@ export interface Course {
   seat_limit: number | null;
   short_description: string | null;
   sort_order: number;
+  /** Admin-uploaded certificate artwork. Null = the app draws its own. */
+  certificate_template_url: string | null;
+  /** Where the recipient's name is printed, as percentages of the image,
+   *  so one template lands correctly at any resolution. */
+  certificate_name_top: number;
+  certificate_name_left: number;
+  /** Font size as a percentage of image width. */
+  certificate_name_size: number;
+  certificate_name_color: string;
   created_by: string | null;
   created_at: string;
   updated_at: string;

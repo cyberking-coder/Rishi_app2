@@ -573,3 +573,91 @@ export async function setCourseEnrolmentAccess(
   revalidatePath("/users");
   return { ok: true };
 }
+
+// ── Certificate template ─────────────────────────────────────────────────
+
+/** Uploads the admin's own certificate artwork for this course. */
+export async function uploadCertificateTemplate(args: {
+  courseId: string;
+  fileName: string;
+  contentType: string;
+  base64: string;
+}): Promise<ActionResult> {
+  await requireAdmin();
+  const db = createAdminClient();
+
+  const ext = args.fileName.includes(".")
+    ? args.fileName.split(".").pop()
+    : "png";
+  // Same bucket as covers — it's public artwork either way, and reusing
+  // it avoids a second bucket to provision and keep permissions on.
+  const path = `course/${args.courseId}/certificate.${ext}`;
+  const bytes = Buffer.from(args.base64, "base64");
+
+  const { error: uploadError } = await db.storage
+    .from("covers")
+    .upload(path, bytes, { contentType: args.contentType, upsert: true });
+  if (uploadError) return { ok: false, error: uploadError.message };
+
+  const { data } = db.storage.from("covers").getPublicUrl(path);
+  // Cache-busted: upsert reuses the path, so a re-upload would otherwise
+  // keep showing the old artwork until the CDN expired it.
+  const url = `${data.publicUrl}?v=${Date.now()}`;
+
+  const { error: updateError } = await db
+    .from("courses")
+    .update({ certificate_template_url: url })
+    .eq("id", args.courseId);
+  if (updateError) return { ok: false, error: updateError.message };
+
+  revalidatePath(`/courses/${args.courseId}`);
+  return { ok: true };
+}
+
+/** Where the recipient's name is printed, as percentages of the image. */
+export async function updateCertificateLayout(args: {
+  courseId: string;
+  top: number;
+  left: number;
+  size: number;
+  color: string;
+}): Promise<ActionResult> {
+  await requireAdmin();
+  const db = createAdminClient();
+
+  const { error } = await db
+    .from("courses")
+    .update({
+      certificate_name_top: args.top,
+      certificate_name_left: args.left,
+      certificate_name_size: args.size,
+      certificate_name_color: args.color,
+    })
+    .eq("id", args.courseId);
+
+  if (error) return { ok: false, error: error.message };
+
+  revalidatePath(`/courses/${args.courseId}`);
+  return { ok: true };
+}
+
+export async function removeCertificateTemplate(
+  courseId: string,
+): Promise<ActionResult> {
+  await requireAdmin();
+  const db = createAdminClient();
+
+  // Only the reference is cleared; the file stays in the bucket. The
+  // course falls back to the app's own drawn certificate, and any
+  // certificate already issued keeps rendering from whatever the app
+  // does now — the artwork was never baked into the record.
+  const { error } = await db
+    .from("courses")
+    .update({ certificate_template_url: null })
+    .eq("id", courseId);
+
+  if (error) return { ok: false, error: error.message };
+
+  revalidatePath(`/courses/${courseId}`);
+  return { ok: true };
+}

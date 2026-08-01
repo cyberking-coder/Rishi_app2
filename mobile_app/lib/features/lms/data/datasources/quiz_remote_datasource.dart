@@ -141,7 +141,8 @@ class QuizRemoteDataSource {
     final response = await _client
         .rpc('issue_certificate', params: {'p_course_id': courseId});
 
-    return Certificate.fromMap(Map<String, dynamic>.from(response as Map));
+    return Certificate.fromMap(Map<String, dynamic>.from(response as Map))
+        .withLayout(await _layoutFor(courseId));
   }
 
   Future<Certificate?> getCertificate(String courseId) async {
@@ -151,7 +152,35 @@ class QuizRemoteDataSource {
         .eq('course_id', courseId)
         .maybeSingle();
 
-    return row == null ? null : Certificate.fromMap(row);
+    if (row == null) return null;
+    return Certificate.fromMap(row)
+        .withLayout(await _layoutFor(courseId));
+  }
+
+  /// The course's certificate artwork, if the admin uploaded any.
+  ///
+  /// Fetched separately rather than embedded on the certificate query:
+  /// certificates has no FK relationship PostgREST can traverse to
+  /// courses' design columns without an embed, and an embed that fails
+  /// would take the certificate itself down with it.
+  Future<CertificateLayout?> _layoutFor(String courseId) async {
+    try {
+      final row = await _client
+          .from('courses')
+          .select(
+            'certificate_template_url, certificate_name_top, '
+            'certificate_name_left, certificate_name_size, '
+            'certificate_name_color',
+          )
+          .eq('id', courseId)
+          .maybeSingle();
+
+      return CertificateLayout.fromMap(row);
+    } catch (_) {
+      // No artwork is a perfectly good outcome — the app draws its own
+      // certificate. A failure here must not cost the learner theirs.
+      return null;
+    }
   }
 
   Future<List<Certificate>> getMyCertificates() async {
