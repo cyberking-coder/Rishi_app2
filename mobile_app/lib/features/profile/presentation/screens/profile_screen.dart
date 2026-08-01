@@ -294,7 +294,7 @@ class ProfileScreen extends ConsumerWidget {
       context: context,
       backgroundColor: _kSurface,
       shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(30)),
       ),
       builder: (_) => _SettingsSheet(ref: ref),
     );
@@ -310,7 +310,7 @@ class ProfileScreen extends ConsumerWidget {
       context: context,
       backgroundColor: _kSurface,
       shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(30)),
       ),
       builder: (_) => Padding(
         padding: const EdgeInsets.fromLTRB(24, 20, 24, 32),
@@ -373,15 +373,15 @@ class _EnrolledCourseCard extends StatelessWidget {
     final total = course.lessonCount;
 
     return InkWell(
-      borderRadius: BorderRadius.circular(16),
+      borderRadius: BorderRadius.circular(22),
       onTap: () => context.push('/course/${course.id}', extra: course.title),
       child: Container(
         padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
-          color: _kSurface,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: AppTheme.border),
-        ),
+          gradient: AppTheme.clayFill(),
+          borderRadius: BorderRadius.circular(22),
+        boxShadow: AppTheme.cardShadow,
+      ),
         child: Row(
           children: [
             ClipRRect(
@@ -558,13 +558,14 @@ class _ListRow extends StatelessWidget {
   Widget build(BuildContext context) {
     return InkWell(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(14),
+      borderRadius: BorderRadius.circular(20),
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
         decoration: BoxDecoration(
-          color: _kSurface,
-          borderRadius: BorderRadius.circular(14),
-        ),
+          gradient: AppTheme.clayFill(),
+          borderRadius: BorderRadius.circular(20),
+        boxShadow: AppTheme.cardShadow,
+      ),
         child: Row(
           children: [
             Container(
@@ -688,9 +689,10 @@ class _SettingsSheetState extends ConsumerState<_SettingsSheet> {
               width: double.infinity,
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: AppTheme.surfaceCream,
+                gradient: AppTheme.clayFill(AppTheme.surfaceCream),
                 borderRadius: BorderRadius.circular(10),
-              ),
+        boxShadow: AppTheme.cardShadow,
+      ),
               child: Text(_deviceInfo!,
                   style:
                       const TextStyle(color: _kSub, fontSize: 12, height: 1.6)),
@@ -717,13 +719,14 @@ class _SheetTile extends StatelessWidget {
   Widget build(BuildContext context) {
     return InkWell(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(14),
+      borderRadius: BorderRadius.circular(20),
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
         decoration: BoxDecoration(
-          color: AppTheme.surfaceCream,
-          borderRadius: BorderRadius.circular(14),
-        ),
+          gradient: AppTheme.clayFill(AppTheme.surfaceCream),
+          borderRadius: BorderRadius.circular(20),
+        boxShadow: AppTheme.cardShadow,
+      ),
         child: Row(
           children: [
             Container(

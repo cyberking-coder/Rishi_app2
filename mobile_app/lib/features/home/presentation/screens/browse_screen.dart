@@ -97,10 +97,10 @@ class _BrowseScreenState extends ConsumerState<BrowseScreen> {
               padding: const EdgeInsets.fromLTRB(20, 4, 20, 8),
               child: Container(
                 decoration: BoxDecoration(
-                  color: AppTheme.surface,
-                  borderRadius: BorderRadius.circular(14),
-                  border: Border.all(color: AppTheme.border),
-                ),
+                  gradient: AppTheme.clayFill(),
+                  borderRadius: BorderRadius.circular(20),
+        boxShadow: AppTheme.cardShadow,
+      ),
                 child: TextField(
                   controller: _controller,
                   autofocus: true,
@@ -173,10 +173,10 @@ class _AudioRow extends ConsumerWidget {
       child: Container(
         padding: const EdgeInsets.all(10),
         decoration: BoxDecoration(
-          color: _kSurface,
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: AppTheme.border, width: 1),
-        ),
+          gradient: AppTheme.clayFill(),
+          borderRadius: BorderRadius.circular(20),
+        boxShadow: AppTheme.cardShadow,
+      ),
         child: Row(children: [
           SizedBox(
             width: 50,
@@ -184,12 +184,12 @@ class _AudioRow extends ConsumerWidget {
             child: Stack(children: [
               Container(
                 decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(12),
+                  borderRadius: BorderRadius.circular(16),
                   gradient: AppTheme.sageGradient,
                 ),
                 child: audio.coverArtUrl != null
                     ? ClipRRect(
-                        borderRadius: BorderRadius.circular(12),
+                        borderRadius: BorderRadius.circular(16),
                         child: Image.network(audio.coverArtUrl!,
                             fit: BoxFit.cover))
                     : const Icon(Icons.headphones,

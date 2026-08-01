@@ -214,9 +214,9 @@ class _CertificateCard extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
       decoration: BoxDecoration(
-        color: AppTheme.surfaceCream,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: AppTheme.sage, width: 1.5),
+        gradient: AppTheme.clayFill(AppTheme.surfaceCream),
+        borderRadius: BorderRadius.circular(28),
+        boxShadow: AppTheme.cardShadow,
       ),
       child: Column(
         children: [
@@ -363,7 +363,7 @@ class _TemplateCertificate extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return ClipRRect(
-      borderRadius: BorderRadius.circular(14),
+      borderRadius: BorderRadius.circular(20),
       child: LayoutBuilder(
         builder: (context, constraints) {
           final width = constraints.maxWidth;

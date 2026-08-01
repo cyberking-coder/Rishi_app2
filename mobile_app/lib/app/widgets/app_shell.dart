@@ -50,7 +50,7 @@ class _BottomNav extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       decoration: BoxDecoration(
-        color: AppTheme.surface,
+        gradient: AppTheme.clayFill(),
         boxShadow: AppTheme.navShadow,
       ),
       child: SafeArea(

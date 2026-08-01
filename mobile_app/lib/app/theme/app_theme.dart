@@ -63,11 +63,16 @@ class AppTheme {
   static const Color borderStrong = Color(0x2425332C);
 
   // ── Shape ───────────────────────────────────────────────────────────
-  static const double radiusCard = 20;
-  static const double radiusRow = 16;
+  // Claymorphism reads as a soft solid you could press a thumb into.
+  // That needs corners well past the flat-card scale — at 16 a "clay"
+  // card just looks like a card with an odd shadow — and it needs the
+  // radius to stay proportional as surfaces shrink, so a chip is as
+  // rounded relative to its size as a card is.
+  static const double radiusCard = 28;
+  static const double radiusRow = 22;
 
   /// Inner tiles: lesson leads, avatars, icon chips.
-  static const double radiusTile = 12;
+  static const double radiusTile = 18;
   static const double radiusPill = 999;
 
   // ── Type ────────────────────────────────────────────────────────────
@@ -141,43 +146,106 @@ class AppTheme {
 
   /// Soft lift for cards. Kept low-opacity and wide so cards feel like
   /// they rest on the page rather than float above it.
-  /// One soft down-light, never a stack of glows: the design's single
-  /// light source is what keeps cards resting on the page instead of
-  /// floating above it.
+  /// Clay lift: a dark shadow low-right and a light one high-left.
+  ///
+  /// The pair is what makes a surface read as a soft solid rather than a
+  /// card floating over a page — one light source above-left, and the
+  /// highlight is as load-bearing as the shadow. Dropping the light one
+  /// leaves an ordinary drop shadow.
+  ///
+  /// Flutter has no inset BoxShadow, so the inner light that completes the
+  /// effect is faked with a gradient in [clayFill] instead.
   static List<BoxShadow> get cardShadow => const [
         BoxShadow(
-          color: Color(0x0A25332C),
-          blurRadius: 2,
-          offset: Offset(0, 1),
+          color: Color(0x2225332C),
+          blurRadius: 28,
+          offset: Offset(8, 12),
         ),
         BoxShadow(
-          color: Color(0x3825332C),
-          blurRadius: 28,
-          spreadRadius: -16,
-          offset: Offset(0, 14),
+          color: Color(0xE6FFFFFF),
+          blurRadius: 22,
+          offset: Offset(-7, -9),
         ),
       ];
 
-  /// The same light, closer in — for rows and chips.
+  /// The same light, closer in — for rows, chips and small tiles.
   static List<BoxShadow> get rowShadow => const [
         BoxShadow(
-          color: Color(0x0D25332C),
-          blurRadius: 2,
-          offset: Offset(0, 1),
+          color: Color(0x1A25332C),
+          blurRadius: 16,
+          offset: Offset(4, 6),
         ),
         BoxShadow(
-          color: Color(0x3325332C),
-          blurRadius: 14,
-          spreadRadius: -10,
-          offset: Offset(0, 6),
+          color: Color(0xCCFFFFFF),
+          blurRadius: 12,
+          offset: Offset(-4, -5),
         ),
       ];
+
+  /// The top-left-lit gradient that stands in for an inner highlight.
+  ///
+  /// Subtle on purpose: at any real strength it reads as a gloss and the
+  /// surface stops looking like clay and starts looking like plastic.
+  static LinearGradient clayFill([Color? base]) {
+    final c = base ?? surface;
+    return LinearGradient(
+      begin: Alignment.topLeft,
+      end: Alignment.bottomRight,
+      colors: [
+        Color.alphaBlend(const Color(0x14FFFFFF), c),
+        c,
+        Color.alphaBlend(const Color(0x0A25332C), c),
+      ],
+      stops: const [0, 0.55, 1],
+    );
+  }
+
+  /// One clay surface. Every raised container in the app should use this
+  /// rather than assembling a colour, a radius and a shadow by hand —
+  /// three surfaces that each got it slightly differently is exactly how
+  /// a soft-UI style stops looking deliberate.
+  static BoxDecoration clay({
+    Color? color,
+    double? radius,
+    bool small = false,
+  }) {
+    return BoxDecoration(
+      gradient: clayFill(color),
+      borderRadius: BorderRadius.circular(radius ?? radiusCard),
+      boxShadow: small ? rowShadow : cardShadow,
+    );
+  }
+
+  /// A pressed-in well: search fields, progress tracks, empty slots.
+  /// Reverses the light so the surface reads as carved rather than
+  /// raised — the counterpart that makes the raised pieces legible.
+  static BoxDecoration clayInset({Color? color, double? radius}) {
+    final c = color ?? sageSoft;
+    return BoxDecoration(
+      gradient: LinearGradient(
+        begin: Alignment.topLeft,
+        end: Alignment.bottomRight,
+        colors: [
+          Color.alphaBlend(const Color(0x1425332C), c),
+          c,
+          Color.alphaBlend(const Color(0x14FFFFFF), c),
+        ],
+        stops: const [0, 0.5, 1],
+      ),
+      borderRadius: BorderRadius.circular(radius ?? radiusRow),
+    );
+  }
 
   static List<BoxShadow> get navShadow => const [
         BoxShadow(
-          color: Color(0x1425332C),
-          blurRadius: 24,
-          offset: Offset(0, -2),
+          color: Color(0x2225332C),
+          blurRadius: 30,
+          offset: Offset(0, -6),
+        ),
+        BoxShadow(
+          color: Color(0xB3FFFFFF),
+          blurRadius: 16,
+          offset: Offset(0, -14),
         ),
       ];
 
@@ -259,8 +327,14 @@ class AppTheme {
         style: FilledButton.styleFrom(
           backgroundColor: sage,
           foregroundColor: textOnSage,
-          padding: const EdgeInsets.symmetric(vertical: 15, horizontal: 22),
+          padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 24),
           textStyle: button,
+          // A clay button has to look like something you could press
+          // into. Flutter gives one shadow colour here rather than the
+          // dark/light pair, so the dark half carries it and the fill
+          // does the rest.
+          elevation: 6,
+          shadowColor: const Color(0x5544675C),
           // Buttons take the row radius, not the pill: the design's one
           // structural motif is the soft-cornered rectangle, and a
           // stadium button next to a 16px card reads as a stray widget.

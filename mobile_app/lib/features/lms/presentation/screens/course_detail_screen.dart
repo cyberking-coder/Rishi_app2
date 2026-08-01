@@ -419,7 +419,7 @@ class _MetaCard extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
-        color: AppTheme.surface,
+        gradient: AppTheme.clayFill(),
         borderRadius: BorderRadius.circular(AppTheme.radiusCard),
         boxShadow: AppTheme.cardShadow,
       ),
@@ -575,8 +575,9 @@ class _LessonTile extends StatelessWidget {
 
     return Container(
       decoration: BoxDecoration(
-        color: AppTheme.surfaceCream,
+        gradient: AppTheme.clayFill(AppTheme.surfaceCream),
         borderRadius: BorderRadius.circular(AppTheme.radiusRow),
+        boxShadow: AppTheme.cardShadow,
       ),
       clipBehavior: Clip.antiAlias,
       child: Column(children: [
@@ -597,7 +598,7 @@ class _LessonTile extends StatelessWidget {
                     : done
                         ? AppTheme.sage
                         : AppTheme.surface,
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: BorderRadius.circular(16),
               ),
               child: Icon(
                 locked
@@ -1006,7 +1007,7 @@ class _Banner extends StatelessWidget {
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: AppTheme.sageSoft,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(22),
       ),
       child: Column(
         children: [

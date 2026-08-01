@@ -181,7 +181,7 @@ class _VideoLessonScreenState extends ConsumerState<VideoLessonScreen> {
       context: context,
       backgroundColor: const Color(0xFF1C2522),
       shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
       ),
       builder: (sheetContext) => SafeArea(
         child: Column(

@@ -306,7 +306,7 @@ class _SearchBar extends StatelessWidget {
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
           decoration: BoxDecoration(
-            color: AppTheme.surface,
+            gradient: AppTheme.clayFill(),
             borderRadius: BorderRadius.circular(AppTheme.radiusPill),
             boxShadow: AppTheme.cardShadow,
           ),
@@ -393,7 +393,7 @@ class _ContinueCard extends ConsumerWidget {
               ),
               child: Row(children: [
                 ClipRRect(
-                  borderRadius: BorderRadius.circular(12),
+                  borderRadius: BorderRadius.circular(16),
                   child: SizedBox(
                     width: 54,
                     height: 54,
@@ -524,7 +524,7 @@ class _CategoriesRow extends ConsumerWidget {
                   alignment: Alignment.center,
                   padding: const EdgeInsets.symmetric(horizontal: 16),
                   decoration: BoxDecoration(
-                    color: AppTheme.surface,
+                    gradient: AppTheme.clayFill(),
                     borderRadius: BorderRadius.circular(AppTheme.radiusPill),
                     boxShadow: AppTheme.cardShadow,
                   ),
@@ -597,7 +597,7 @@ class _CourseMiniCard extends StatelessWidget {
       child: Container(
         width: 214,
         decoration: BoxDecoration(
-          color: AppTheme.surface,
+          gradient: AppTheme.clayFill(),
           borderRadius: BorderRadius.circular(AppTheme.radiusCard),
           boxShadow: AppTheme.cardShadow,
         ),
@@ -809,8 +809,9 @@ class _EmptyHint extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 18),
       decoration: BoxDecoration(
-        color: AppTheme.surface,
+        gradient: AppTheme.clayFill(),
         borderRadius: BorderRadius.circular(AppTheme.radiusCard),
+        boxShadow: AppTheme.cardShadow,
       ),
       child: Row(children: [
         Icon(icon, size: 19, color: AppTheme.textSecondary),
