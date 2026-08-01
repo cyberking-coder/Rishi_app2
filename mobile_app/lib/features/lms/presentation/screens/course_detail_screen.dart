@@ -432,7 +432,6 @@ class _MetaCard extends StatelessWidget {
             height: 26 / 22,
             fontWeight: FontWeight.w500,
             color: AppTheme.textPrimary,
-            height: 1.3,
           ),
         ),
         if (description != null && description!.trim().isNotEmpty) ...[

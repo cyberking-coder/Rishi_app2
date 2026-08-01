@@ -223,7 +223,7 @@ class _CertificateCard extends StatelessWidget {
           const Icon(Icons.workspace_premium_rounded,
               size: 46, color: AppTheme.gold),
           const SizedBox(height: 14),
-          const Text(
+          Text(
             'CERTIFICATE OF COMPLETION',
             textAlign: TextAlign.center,
             style: AppTheme.label.copyWith(color: AppTheme.sageDark),

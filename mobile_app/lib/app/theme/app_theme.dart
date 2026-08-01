@@ -191,7 +191,16 @@ class AppTheme {
   /// Maps the design's ramp onto Material's slots so a widget that asks
   /// for `titleMedium` gets the same type as one styled by hand.
   static TextTheme _textTheme(TextTheme base, Color onSurface) {
+    // Order matters. apply() sets the family on EVERY slot, so it has to
+    // run first — putting it last would overwrite the Fraunces on the
+    // display slots below and silently render the whole app in Mukta.
+    // The ramp is layered on top, and only it ever names Fraunces.
     return base
+        .apply(
+          fontFamily: text,
+          bodyColor: onSurface,
+          displayColor: onSurface,
+        )
         .copyWith(
           displayLarge: displayLarge,
           displayMedium: displayLarge,
@@ -207,8 +216,7 @@ class AppTheme {
           labelLarge: button,
           labelMedium: label,
           labelSmall: label.copyWith(fontSize: 11),
-        )
-        .apply(bodyColor: onSurface, displayColor: onSurface);
+        );
   }
 
   static ThemeData light() {
@@ -240,11 +248,11 @@ class AppTheme {
         ),
         iconTheme: IconThemeData(color: textPrimary),
       ),
-      // fontFamily on the theme covers every widget that doesn't name
-      // one; the ramp below is what the app's own screens reach for by
-      // name. Both point at Mukta, so an unstyled Text is never the odd
-      // one out.
-      fontFamily: text,
+      // The family is applied to the text theme rather than passed as
+      // ThemeData.fontFamily — that parameter exists on the constructor,
+      // not on copyWith. Applying it here has the same effect: an
+      // unstyled Text reads bodyMedium off this theme, so it is never
+      // the odd one out.
       textTheme: _textTheme(base.textTheme, textPrimary),
       iconTheme: const IconThemeData(color: textPrimary),
       filledButtonTheme: FilledButtonThemeData(
