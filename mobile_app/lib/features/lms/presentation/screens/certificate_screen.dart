@@ -250,6 +250,25 @@ class _Meta extends StatelessWidget {
   }
 }
 
+/// A soft contrasting outline behind the name, sized relative to the
+/// text so it scales with everything else.
+List<Shadow> _halo(Color color, double blur) {
+  // Rec. 601 luma is enough to decide "is this light or dark", and is
+  // cheaper and more predictable here than a full relative-luminance
+  // calculation.
+  final luma =
+      (0.299 * (color.r * 255) + 0.587 * (color.g * 255) + 0.114 * (color.b * 255)) /
+          255;
+  final halo = luma > 0.6
+      ? const Color(0x99000000)
+      : const Color(0xB3FFFFFF);
+
+  return [
+    Shadow(color: halo, blurRadius: blur),
+    Shadow(color: halo, blurRadius: blur * 2),
+  ];
+}
+
 /// The admin's certificate artwork with the recipient's name printed on
 /// it.
 ///
@@ -325,6 +344,18 @@ class _TemplateCertificate extends StatelessWidget {
                         fontWeight: FontWeight.w600,
                         color: Color(layout.colorValue),
                         height: 1.15,
+                        // Certificate artwork is often busy — a starfield,
+                        // a photograph, a gradient — and a name with no
+                        // separation from it becomes unreadable exactly
+                        // where the design is most detailed. The halo is
+                        // derived from the chosen colour rather than
+                        // configured: dark text gets a light halo and
+                        // light text a dark one, so it helps on any
+                        // artwork without another setting to get wrong.
+                        shadows: _halo(
+                          Color(layout.colorValue),
+                          width * (layout.sizePercent / 100) * 0.09,
+                        ),
                       ),
                     ),
                   ),

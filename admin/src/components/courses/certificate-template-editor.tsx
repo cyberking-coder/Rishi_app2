@@ -15,6 +15,28 @@ import {
 } from "@/app/actions/courses";
 import type { Course } from "@/lib/types";
 
+/**
+ * A soft contrasting outline behind the name.
+ *
+ * Certificate artwork is often busy — a starfield, a photograph, a
+ * gradient — and a name with no separation from it becomes unreadable
+ * exactly where the design is most detailed. Derived from the chosen
+ * colour rather than configured: dark text gets a light halo and light
+ * text a dark one, so it helps on any artwork without another setting to
+ * get wrong. Kept in step with _halo() in the app's certificate screen.
+ */
+function haloFor(hex: string, sizeCqw: number): string {
+  const clean = hex.replace("#", "");
+  const rgb =
+    clean.length === 6
+      ? [0, 2, 4].map((i) => parseInt(clean.slice(i, i + 2), 16))
+      : [26, 26, 26];
+  const luma = (0.299 * rgb[0] + 0.587 * rgb[1] + 0.114 * rgb[2]) / 255;
+  const halo = luma > 0.6 ? "rgba(0,0,0,0.6)" : "rgba(255,255,255,0.7)";
+  const blur = sizeCqw * 0.09;
+  return `0 0 ${blur}cqw ${halo}, 0 0 ${blur * 2}cqw ${halo}`;
+}
+
 function fileToBase64(f: File): Promise<string> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -178,6 +200,10 @@ export function CertificateTemplateEditor({ course }: { course: Course }) {
                   left: `${left}%`,
                   color,
                   fontSize: `${size}cqw`,
+                  // Mirrors the halo the app draws, derived from the
+                  // chosen colour the same way — the preview has to show
+                  // the readability aid, not a cleaner version of it.
+                  textShadow: haloFor(color, size),
                   // Kept off the artwork's edges, and the same bound the
                   // app applies — a name that wraps here wraps there.
                   maxWidth: "84cqw",
