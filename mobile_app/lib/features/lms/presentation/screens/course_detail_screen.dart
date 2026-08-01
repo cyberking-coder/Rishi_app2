@@ -427,8 +427,10 @@ class _MetaCard extends StatelessWidget {
         Text(
           title,
           style: const TextStyle(
-            fontSize: 19,
-            fontWeight: FontWeight.w800,
+            fontFamily: AppTheme.display,
+            fontSize: 22,
+            height: 26 / 22,
+            fontWeight: FontWeight.w500,
             color: AppTheme.textPrimary,
             height: 1.3,
           ),

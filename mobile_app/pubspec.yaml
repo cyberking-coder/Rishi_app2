@@ -45,3 +45,31 @@ flutter_launcher_icons:
 
 flutter:
   uses-material-design: true
+
+  assets:
+    - assets/fonts/
+
+  # Bundled, not fetched at runtime via google_fonts. This app is used
+  # offline — downloaded meditations play with no network — and a first
+  # launch on a plane that falls back to a system serif would undo the
+  # typography the whole design rests on.
+  fonts:
+    # Display: greetings, screen and cover titles, the certificate.
+    - family: Fraunces
+      fonts:
+        - asset: assets/fonts/Fraunces-Medium.ttf
+          weight: 500
+        - asset: assets/fonts/Fraunces-SemiBold.ttf
+          weight: 600
+    # Text: everything else. Covers Latin AND Devanagari, so Hinglish
+    # sits in one family instead of switching font mid-sentence.
+    - family: Mukta
+      fonts:
+        - asset: assets/fonts/Mukta-Regular.ttf
+          weight: 400
+        - asset: assets/fonts/Mukta-Medium.ttf
+          weight: 500
+        - asset: assets/fonts/Mukta-SemiBold.ttf
+          weight: 600
+        - asset: assets/fonts/Mukta-Bold.ttf
+          weight: 700

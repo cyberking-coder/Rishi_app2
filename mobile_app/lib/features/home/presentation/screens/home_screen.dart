@@ -218,23 +218,20 @@ class _Header extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  // Eyebrow above, display line below — the design puts
+                  // the time of day in small caps and the person's name
+                  // in the serif, rather than the other way round: the
+                  // greeting is context, the name is the moment.
                   Text(
-                    'Hi, $username 👋',
+                    greeting.toUpperCase(),
+                    style: AppTheme.label,
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'Hi, $username',
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      fontSize: 23,
-                      fontWeight: FontWeight.w800,
-                      color: AppTheme.textPrimary,
-                    ),
-                  ),
-                  const SizedBox(height: 3),
-                  Text(
-                    greeting,
-                    style: const TextStyle(
-                      fontSize: 13,
-                      color: AppTheme.textSecondary,
-                    ),
+                    style: AppTheme.displayLarge,
                   ),
                 ],
               ),

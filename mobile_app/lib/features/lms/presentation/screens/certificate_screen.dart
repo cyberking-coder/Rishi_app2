@@ -221,17 +221,12 @@ class _CertificateCard extends StatelessWidget {
       child: Column(
         children: [
           const Icon(Icons.workspace_premium_rounded,
-              size: 46, color: AppTheme.sage),
+              size: 46, color: AppTheme.gold),
           const SizedBox(height: 14),
           const Text(
             'CERTIFICATE OF COMPLETION',
             textAlign: TextAlign.center,
-            style: TextStyle(
-              fontSize: 12,
-              letterSpacing: 2,
-              fontWeight: FontWeight.w700,
-              color: AppTheme.sage,
-            ),
+            style: AppTheme.label.copyWith(color: AppTheme.sageDark),
           ),
           const SizedBox(height: 22),
           const Text(
@@ -244,11 +239,7 @@ class _CertificateCard extends StatelessWidget {
                 ? certificate.recipientName!
                 : 'Student',
             textAlign: TextAlign.center,
-            style: const TextStyle(
-              fontSize: 24,
-              fontWeight: FontWeight.w700,
-              color: AppTheme.textPrimary,
-            ),
+            style: AppTheme.displayLarge,
           ),
           const SizedBox(height: 14),
           const Text(
@@ -259,12 +250,7 @@ class _CertificateCard extends StatelessWidget {
           Text(
             certificate.courseTitle,
             textAlign: TextAlign.center,
-            style: const TextStyle(
-              fontSize: 19,
-              fontWeight: FontWeight.w600,
-              color: AppTheme.textPrimary,
-              height: 1.3,
-            ),
+            style: AppTheme.headline,
           ),
           const SizedBox(height: 24),
           Container(height: 1, color: AppTheme.border),
