@@ -13,6 +13,7 @@ import '../../../audio/application/audio_providers.dart';
 import '../../../audio/domain/entities/audio_track.dart';
 import '../../application/lms_providers.dart';
 import '../../domain/entities/lesson.dart';
+import '../../domain/entities/quiz.dart';
 import '../widgets/course_purchase_sheet.dart';
 
 class CourseDetailScreen extends ConsumerStatefulWidget {
@@ -292,6 +293,11 @@ class _CourseDetailScreenState extends ConsumerState<CourseDetailScreen>
                 ),
                 const SliverToBoxAdapter(child: SizedBox(height: 10)),
               ],
+
+              if (!locked)
+                SliverToBoxAdapter(
+                  child: _AssessmentSection(courseId: widget.courseId),
+                ),
 
               const SliverToBoxAdapter(child: SizedBox(height: 28)),
             ],
@@ -856,6 +862,333 @@ class _BackBar extends StatelessWidget {
           ),
         ),
       ]),
+    );
+  }
+}
+
+/// Quizzes and the certificate, shown once the course is unlocked.
+///
+/// Rendered as its own consumer rather than folded into the course
+/// screen's main provider: a course with no quizzes shouldn't pay for
+/// this query on every load, and a failure here must not take the
+/// curriculum down with it — the lesson list is the thing people came
+/// for.
+class _AssessmentSection extends ConsumerWidget {
+  const _AssessmentSection({required this.courseId});
+
+  final String courseId;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final quizzesAsync = ref.watch(courseQuizzesProvider(courseId));
+    final completion =
+        ref.watch(courseCompletionProvider(courseId)).valueOrNull;
+    final certificate =
+        ref.watch(courseCertificateProvider(courseId)).valueOrNull;
+
+    final quizzes = quizzesAsync.valueOrNull ?? const <Quiz>[];
+    if (quizzes.isEmpty && certificate == null && completion?.complete != true) {
+      return const SizedBox.shrink();
+    }
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 18, 20, 0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          if (quizzes.isNotEmpty) ...[
+            const Text(
+              'Assessments',
+              style: TextStyle(
+                fontSize: 17,
+                fontWeight: FontWeight.w800,
+                color: AppTheme.textPrimary,
+              ),
+            ),
+            const SizedBox(height: 12),
+            for (final quiz in quizzes) ...[
+              _QuizTile(quiz: quiz, courseId: courseId),
+              const SizedBox(height: 10),
+            ],
+            const SizedBox(height: 8),
+          ],
+          if (completion != null)
+            _CertificateBanner(
+              courseId: courseId,
+              completion: completion,
+              certificate: certificate,
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+class _QuizTile extends ConsumerWidget {
+  const _QuizTile({required this.quiz, required this.courseId});
+
+  final Quiz quiz;
+  final String courseId;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final locked = !quiz.hasAttemptsLeft && !quiz.passed;
+
+    return InkWell(
+      borderRadius: BorderRadius.circular(16),
+      onTap: locked
+          ? null
+          : () async {
+              await context.push<bool>('/quiz/${quiz.id}', extra: quiz);
+              // The attempt is graded server-side, so the only way to
+              // know the new state is to re-read it.
+              ref.invalidate(courseQuizzesProvider(courseId));
+              ref.invalidate(courseCompletionProvider(courseId));
+            },
+      child: Container(
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: AppTheme.surface,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: quiz.passed ? AppTheme.sage : AppTheme.border,
+          ),
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 38,
+              height: 38,
+              decoration: BoxDecoration(
+                color: quiz.passed ? AppTheme.sageSoft : AppTheme.surfaceCream,
+                borderRadius: BorderRadius.circular(11),
+              ),
+              child: Icon(
+                quiz.passed
+                    ? Icons.check_rounded
+                    : Icons.help_outline_rounded,
+                size: 20,
+                color: quiz.passed ? AppTheme.sage : AppTheme.textSecondary,
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    quiz.title,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w600,
+                      color: AppTheme.textPrimary,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    _subtitle(quiz, locked),
+                    style: const TextStyle(
+                      fontSize: 12,
+                      color: AppTheme.textSecondary,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            if (!locked)
+              const Icon(Icons.chevron_right_rounded,
+                  color: AppTheme.textSecondary),
+          ],
+        ),
+      ),
+    );
+  }
+
+  static String _subtitle(Quiz quiz, bool locked) {
+    if (quiz.passed) {
+      return 'Passed · best ${quiz.bestScorePercent ?? 0}%';
+    }
+    if (locked) {
+      return 'No attempts remaining · best ${quiz.bestScorePercent ?? 0}%';
+    }
+    final parts = <String>[
+      '${quiz.questions.length} '
+          '${quiz.questions.length == 1 ? "question" : "questions"}',
+      'pass at ${quiz.passPercent}%',
+    ];
+    if (quiz.attemptsUsed > 0) {
+      parts.add('best ${quiz.bestScorePercent ?? 0}%');
+    }
+    if (quiz.maxAttempts != null) {
+      parts.add('${quiz.maxAttempts! - quiz.attemptsUsed} tries left');
+    }
+    return parts.join(' · ');
+  }
+}
+
+/// Either progress toward the certificate, or the certificate itself.
+class _CertificateBanner extends ConsumerStatefulWidget {
+  const _CertificateBanner({
+    required this.courseId,
+    required this.completion,
+    this.certificate,
+  });
+
+  final String courseId;
+  final CourseCompletion completion;
+  final Certificate? certificate;
+
+  @override
+  ConsumerState<_CertificateBanner> createState() => _CertificateBannerState();
+}
+
+class _CertificateBannerState extends ConsumerState<_CertificateBanner> {
+  bool _claiming = false;
+
+  Future<void> _claim() async {
+    setState(() => _claiming = true);
+    try {
+      final certificate = await ref
+          .read(quizRemoteDataSourceProvider)
+          .issueCertificate(widget.courseId);
+
+      if (!mounted) return;
+      ref.invalidate(courseCertificateProvider(widget.courseId));
+      ref.invalidate(myCertificatesProvider);
+      context.push('/certificate/${certificate.id}', extra: certificate);
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text('$e')));
+    } finally {
+      if (mounted) setState(() => _claiming = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final certificate = widget.certificate;
+    final completion = widget.completion;
+
+    if (certificate != null) {
+      return _Banner(
+        icon: Icons.workspace_premium_rounded,
+        title: 'Certificate earned',
+        subtitle: certificate.certificateNumber,
+        actionLabel: 'View',
+        onAction: () => context.push(
+          '/certificate/${certificate.id}',
+          extra: certificate,
+        ),
+      );
+    }
+
+    if (completion.complete) {
+      return _Banner(
+        icon: Icons.workspace_premium_rounded,
+        title: 'Course complete',
+        subtitle: 'Claim your certificate of completion.',
+        actionLabel: _claiming ? 'Claiming…' : 'Claim',
+        onAction: _claiming ? null : _claim,
+      );
+    }
+
+    // Nothing to say until they've actually started — an untouched course
+    // showing "0 of 12" is just noise on top of the lesson list.
+    if (completion.completedSteps == 0) return const SizedBox.shrink();
+
+    return _Banner(
+      icon: Icons.timeline_rounded,
+      title: 'Certificate progress',
+      subtitle:
+          '${completion.completedSteps} of ${completion.totalSteps} complete'
+          '${completion.quizCount > 0 ? " · lessons and quizzes both count" : ""}',
+      progress: completion.fraction,
+    );
+  }
+}
+
+class _Banner extends StatelessWidget {
+  const _Banner({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    this.actionLabel,
+    this.onAction,
+    this.progress,
+  });
+
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final String? actionLabel;
+  final VoidCallback? onAction;
+  final double? progress;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppTheme.sageSoft,
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Column(
+        children: [
+          Row(
+            children: [
+              Icon(icon, size: 24, color: AppTheme.sage),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      style: const TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w700,
+                        color: AppTheme.textPrimary,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      subtitle,
+                      style: const TextStyle(
+                        fontSize: 12,
+                        color: AppTheme.textSecondary,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              if (actionLabel != null)
+                FilledButton(
+                  onPressed: onAction,
+                  style: FilledButton.styleFrom(
+                    backgroundColor: AppTheme.sage,
+                    padding: const EdgeInsets.symmetric(horizontal: 18),
+                  ),
+                  child: Text(actionLabel!),
+                ),
+            ],
+          ),
+          if (progress != null) ...[
+            const SizedBox(height: 12),
+            ClipRRect(
+              borderRadius: BorderRadius.circular(3),
+              child: LinearProgressIndicator(
+                value: progress,
+                minHeight: 6,
+                backgroundColor: Colors.white,
+                valueColor: const AlwaysStoppedAnimation<Color>(AppTheme.sage),
+              ),
+            ),
+          ],
+        ],
+      ),
     );
   }
 }

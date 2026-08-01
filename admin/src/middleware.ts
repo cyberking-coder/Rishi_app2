@@ -45,8 +45,12 @@ export async function middleware(request: NextRequest) {
   const isPublicCheckoutRoute =
     request.nextUrl.pathname.startsWith("/checkout") ||
     request.nextUrl.pathname.startsWith("/api/checkout");
+  // Certificate verification is public by definition — the whole point
+  // is that someone who was shown a certificate, and who has no account
+  // here at all, can confirm it.
+  const isPublicVerifyRoute = request.nextUrl.pathname.startsWith("/verify");
 
-  if (!user && !isLoginRoute && !isPublicCheckoutRoute) {
+  if (!user && !isLoginRoute && !isPublicCheckoutRoute && !isPublicVerifyRoute) {
     const url = request.nextUrl.clone();
     url.pathname = "/login";
     return NextResponse.redirect(url);
