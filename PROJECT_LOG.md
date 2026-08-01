@@ -2,7 +2,7 @@
 
 Complete record of everything built, fixed, and configured across the mobile app, admin dashboard, and Supabase backend.
 
-**If you are an AI picking up this project**: read this whole file before touching code. Section 7 explains the LMS/payments work added on top of the original app (also described in `README.md`, which is the forward-looking roadmap this log tracks progress against). Section 9 explains the folder structure in plain language. Section 10 lists exactly what's unfinished right now.
+**If you are an AI picking up this project**: read this whole file before touching code. Section 7 explains the LMS/payments work added on top of the original app (also described in `README.md`, which is the forward-looking roadmap this log tracks progress against) — and ends with a bug-fix chronology that is the most useful part of this document, because almost every entry in it is a trap the code alone does not reveal. Section 9 explains the folder structure in plain language. Section 10 lists exactly what's unfinished right now, including operational landmines that have each cost a full round of testing.
 
 ---
 
@@ -161,7 +161,7 @@ Complete record of everything built, fixed, and configured across the mobile app
 | Kotlin incremental cache crash on Windows | Project on `D:` drive, pub cache on `C:` drive → Kotlin cross-drive path error; fixed with `kotlin.incremental=false` in `gradle.properties` |
 | `_flushProgress` crashing offline | Network error on progress save was propagating; wrapped in try-catch (best-effort) |
 
-See Section 7 for the bug-fix chronology of the LMS/payments work (Phases 0-3a).
+See Section 7 for the bug-fix chronology of the LMS/payments work (Phases 0-5).
 
 ---
 
@@ -198,9 +198,9 @@ See Section 7 for the bug-fix chronology of the LMS/payments work (Phases 0-3a).
 
 ---
 
-## 7. LMS Integration — Phases 0 through 3a
+## 7. LMS Integration — Phases 0 through 5
 
-This is the work described in `README.md` (the LMS/payments roadmap). Everything below was built in one extended session, phase by phase, each one tested on a real device before moving to the next. All of it lives on the git branch `claude/repo-structure-overview-vt36iu` — **check whether this has been merged to `main` yet** before assuming it's live in production.
+This is the work described in `README.md` (the LMS/payments roadmap). Phases 0-3a were built in one extended session; phases 3b, 4 and 5 in a second. Each was tested on a real device before moving to the next, except Phase 5 — see Section 10. All of it lives on the git branch `claude/repo-structure-overview-vt36iu` — **check whether this has been merged to `main` yet** before assuming it's live in production.
 
 ### Phase 0 — Free / Retreat / Admin role resolution (no schema change)
 
@@ -282,6 +282,66 @@ Video content itself was left untouched — there's still no video playback UI a
 - Admin app (Vercel) environment variables: `RAZORPAY_KEY_ID`, `RAZORPAY_KEY_SECRET`, `CHECKOUT_TOKEN_SECRET`.
 - `mobile_app/lib/core/config/checkout_config.dart` — the admin app's public URL.
 
+### Phase 3b — Per-course commerce (replaces blanket subscriptions)
+
+**Scope decision, taken explicitly**: pricing is now **per course only**. The blanket "Rishi Mode" subscription still exists in schema and still works, but nothing sells it — `has_course_access(user, course)` is the single gate for course content, and a subscription no longer governs it.
+
+**New schema** (`20260731000001`, `20260731000002`, `20260731000003`):
+- `courses.price_amount` (paise), `currency`, `seat_limit`, `short_description`
+- `course_purchases` — one row per attempt, `status in (pending, paid, failed, refunded, revoked, duplicate)`
+- `has_course_access(user, course)` — free course, or admin, or a paid non-expired purchase
+- `has_media_access_via_course(user, type, id)` — lets a purchased course authorize its lessons' underlying audio/video rows in the license functions
+- `coupons` + `redeem_coupon()` — percent/flat, optionally course-scoped, with an atomic conditional UPDATE so a race for the last redemption has exactly one winner
+- `lesson_resources` — PDFs/images/files/links attached to a lesson. Added because handouts were originally modelled as lesson *types*, which made a PDF count as a step in the curriculum; they are attachments, so `lesson_type` was narrowed back to audio/video/text.
+
+**Notifications**: `_shared/n8n.ts` (edge) and `admin/src/lib/n8n.ts` (Node) post a payment payload to n8n, which fans out to WhatsApp via Wati and a Google Sheets log. Course and subscription payments route to separate workflow URLs (`N8N_COURSE_PAYMENT_WEBHOOK_URL`, falling back to `N8N_PAYMENT_WEBHOOK_URL`). The importable workflow lives in `n8n/course-payment-success.json` — kept in the repo so the payload contract and the automation consuming it move together.
+
+**Admin**: per-course price/seats, coupon management, an enrolled-students roster per course (name, email, amount paid, coupon, enrolment date, revenue total), Remove/Restore access per student, and a "duplicates to refund" badge.
+
+### Phase 4 — LMS core (courses, modules, lessons, video playback)
+
+Built as `20260730000003_lms_core.sql` plus the `lms` feature folder in the app and `(dashboard)/courses/` in admin. Deliberate deviations from the roadmap's sketch, each documented in the migration header: no unique index on `position` (reordering would violate it mid-swap), a single nullable `category_id` rather than a join table, and **no `course_enrollments` table** — "my courses" is derived from `lesson_progress`, since a denormalized table is a second write path that can drift from the rows it summarizes.
+
+**The video-playback gap is closed.** `video_player` + `chewie`, fed by the existing `issue-playback-license` function. Media is hosted on **Bunny Stream** (direct browser→Bunny TUS upload from the admin, no R2 staging), with a quality selector built from the master playlist's own variant list.
+
+### Phase 5 — Quizzes and completion certificates
+
+**Migration**: `20260801000003_quizzes_and_certificates.sql`.
+
+Tables: `quizzes` (attached to *either* a course or a lesson, enforced by check constraint), `quiz_questions`, `quiz_options`, `quiz_attempts`, `certificates`.
+
+**Two decisions here are load-bearing rather than stylistic, and should not be "simplified" later without understanding why they exist:**
+
+1. **The answer key never reaches the device.** RLS is row-level and cannot withhold a *column*, and a learner must be able to read the options in order to answer them — so `quiz_options.is_correct` is withheld with a **column-level GRANT**, which PostgREST enforces (selecting it errors rather than returning it). Grading therefore *has* to happen server-side, which is what `submit_quiz_attempt()` is for: the client sends what was chosen and is told what was right, in that order. There is no client-side scoring to keep in step with the server's, and no way to peek.
+
+2. **Certificates are records verified by number, not PDFs in a bucket** (a deliberate departure from §5.2 of the roadmap). A PDF is a file anyone can edit and re-share; a number that resolves against `verify_certificate()` can actually be checked by whoever is shown it. The app renders the certificate natively and a public `/verify` page (outside the admin login — a verifier has no account here by definition) resolves a number to name/course/date and nothing else: no user id, no email, no course id. Revoking sets `revoked_at` and keeps the row, because deleting would make a withdrawn credential indistinguishable from a forged number. Nothing forecloses adding a PDF export later.
+
+**Completion counts lessons *and* quizzes.** `course_completion_state()` is the single piece of arithmetic that both the app's progress bar and `issue_certificate()` read, so what a learner is shown and what they are granted cannot disagree. Lessons alone would certify someone who scrolled past the material; quizzes alone would certify someone who never opened it. `issue_certificate()` is idempotent, so the course screen can call it without tracking whether it already has.
+
+**Admin**: a quiz builder on every lesson (checkpoint) plus one course-level final assessment, and a Certificates page with revoke/reinstate.
+
+### Bug-fix chronology — Phases 3b through 5
+
+Every one of these was found by testing on a real device, not by review.
+
+| Bug | Root cause and fix |
+|---|---|
+| Video upload never arrived at Bunny | R2→Bunny server-side pull is a black box that fails silently. Replaced with direct browser→Bunny TUS upload. |
+| Modules invisible in the course builder despite a non-zero count | `lesson_resources(*)` was embedded in the modules select, and **one failing embed kills the entire PostgREST select**, returning null data. Split into a separate query. This trap recurs — every subsequent list query in this codebase fetches children flat and joins in code for the same reason. |
+| Course stayed locked after a successful payment; n8n never fired | `handleCoursePurchase` upserted with `onConflict: "razorpay_order_id"` against a **partial** unique index. Postgres refuses a partial index as an ON CONFLICT target unless the statement repeats the predicate, which PostgREST's `on_conflict` cannot express. One error, both symptoms. Replaced with update-then-insert. **This same trap has now been hit three times in this codebase** — the third was `create-order`'s pending row, whose error was never read, so abandoned checkouts had silently never been recorded at all. |
+| Payment succeeded but the app returned to a "Page not found" | `meditationapp://payment-success?...` parses with `payment-success` as the **host** and an empty path; go_router routes on the path, so it resolved to `/`. Reshaped to `meditationapp://app/payment-success`. Also proved go_router receives deep links natively via Flutter's Router API, making the `app_links` listener redundant — it was racing go_router and lost. Removed. |
+| Chrome interrupted the return with an "Open Know Thyself?" prompt | Custom-scheme navigations are confirmed by Chrome. The return link is now an `intent://` URI, which Chrome resolves itself. Matched on scheme alone, with no `package=`, because the debug build installs under a different application id. |
+| Course opened but stayed locked after paying | The landing screen was racing the webhook: access is granted by `razorpay-webhook`, called server-to-server, and the deep link usually wins. Invalidating a cache can't fix a value that is still correct. It now polls `has_course_access` for up to 20s before forwarding. |
+| Back from a course showed a black screen | `context.go()` replaces the navigation stack, so arriving via deep link made the course the only route; popping left the navigator empty. Both back controls now fall back to `/courses`. |
+| PDFs opened as a flat image with no page controls | The URL was handed to the browser, which rendered it inline. Resources are now downloaded and passed to the system "open with" chooser via `open_filex`. |
+| Video playback 409'd on a video Bunny had long since finished | Bunny sends no webhook, so `bunny_status` only advanced when an admin pressed Refresh. The license now asks Bunny directly and writes the answer back, and the admin Videos page syncs unfinished rows on load. A check that cannot reach Bunny returns "unknown" and **fails open** — an unverifiable status must not be permanently fatal. |
+| Video then failed with a bare ExoPlayer `Source error` | Three faults stacked. (a) `Deno.env.get(...)!` asserts nothing at runtime, so an unset `BUNNY_STREAM_PULL_ZONE` produced `https://undefined/...`. (b) The playback token omitted `token_path` from the signed message and rode in the query string; Bunny folds every `token_*` parameter into the HMAC, and a **directory token must live in the URL path** (`/bcdn_token=…`) because HLS segment URLs are relative — a query-string token is dropped at the first `.ts` request. Verified byte-for-byte against bunny.net's own signer. (c) The Stream library's **"Block direct URL file access"** overrides the pull zone's own toggle. |
+| The webhook silently stopped granting anything, logging only "already processed, skipping" | The idempotency claim was inserted **before** the work it guards and never released on failure. One failed delivery poisoned that payment permanently: every Razorpay retry took the skip branch and returned 200. The claim is now released on any non-2xx. |
+| A student whose access was removed could never buy the course again | Revocation originally dated `expires_at` in the past but left `status = 'paid'`, which still occupies `uq_course_purchases_paid`. Checkout refused them as already owning it, and had it not, the webhook's write would have violated the index **after** the card was charged. Withdrawal now moves the row to `status = 'revoked'`. A `duplicate` status covers the remaining race where someone genuinely pays twice — recorded, not lost, and flagged for refund. |
+| n8n received nothing | Three separate causes over as many attempts, each invisible because the notifier logged nothing: the URL wasn't set on the function; then a `/webhook-test/` URL nobody was listening on; then a production URL whose **workflow was not activated**. `notifyN8n` now logs every outcome — skipped (naming the missing variable), failed (quoting n8n's own response body), and succeeded (host and path, never the query string). |
+| Google Sheets logged Wati's API response instead of the payment | The Sheets node was left on **Map Automatically**, so it wrote whatever the previous node emitted. Manual mapping with `$('Normalise').item.json.*` reaches back past the Wati node to the payment data. |
+
+
 ---
 
 ## 8. Environment Variables & Secrets Reference
@@ -295,6 +355,13 @@ None of these are committed to the repo (correctly). Listed here so a fresh setu
 | `RAZORPAY_KEY_ID`, `RAZORPAY_KEY_SECRET` | `razorpay-webhook` | Used to fetch the Razorpay order directly (Basic Auth to `GET /v1/orders/{id}`) — the authoritative source for which user/plan a payment belongs to. Same credential pair as the admin app's, just also needed here now. |
 | `RAZORPAY_WEBHOOK_SECRET` | `razorpay-webhook` | Verifies the webhook signature Razorpay sends |
 | `CHECKOUT_TOKEN_SECRET` | `mint-checkout-token` | Signs the short-lived checkout token |
+| `BUNNY_STREAM_PULL_ZONE` | `issue-playback-license` | e.g. `vz-abc123.b-cdn.net`. **Required** — the function now throws with the variable named if it's missing, rather than building `https://undefined/...` |
+| `BUNNY_STREAM_TOKEN_KEY` | `issue-playback-license` | The pull zone's **Token Authentication key** (Pull Zone → Security), NOT the Stream API key. Leave UNSET unless token auth is on — see the note below |
+| `BUNNY_STREAM_API_KEY`, `BUNNY_STREAM_LIBRARY_ID` | `issue-playback-license` | Reads live encode status, since Bunny sends no webhook. Optional: absent, the status check returns "unknown" and fails open |
+| `N8N_COURSE_PAYMENT_WEBHOOK_URL` | `razorpay-webhook` | Course-payment automation. Falls back to `N8N_PAYMENT_WEBHOOK_URL` |
+| `N8N_PAYMENT_WEBHOOK_URL` | `razorpay-webhook` | Subscription-payment automation (not in active use) |
+
+> **Bunny token authentication is deliberately OFF.** A directory token cannot survive the jump from an HLS master playlist to its renditions on a native player — ExoPlayer and AVPlayer cannot re-attach a token to segment requests at runtime, and Bunny's own workaround is a JavaScript hook that only exists in web players. Setting `BUNNY_STREAM_TOKEN_KEY` again will break playback. Access is gated by `issue-playback-license` (purchase, device lock, access window), not by the CDN.
 
 ### Admin app (Vercel) environment variables
 | Variable | Purpose |
@@ -304,6 +371,8 @@ None of these are committed to the repo (correctly). Listed here so a fresh setu
 | `RAZORPAY_KEY_ID` | Public-safe, used client-side in the Checkout.js embed |
 | `RAZORPAY_KEY_SECRET` | Used server-side to create Razorpay orders |
 | `CHECKOUT_TOKEN_SECRET` | Verifies the token minted by `mint-checkout-token` — **must be the exact same value** as the Supabase secret of the same name |
+| `BUNNY_STREAM_API_KEY`, `BUNNY_STREAM_LIBRARY_ID` | Direct browser→Bunny video upload, and encode-status polling on the Videos page |
+| `N8N_COURSE_PAYMENT_WEBHOOK_URL` | Only fires for a 100%-off coupon, where `create-order` grants access itself and so must notify n8n itself. Easy to forget until a free enrolment silently sends nothing |
 
 ### Mobile app config files (Dart constants, not env vars — Flutter has no runtime env var mechanism for this)
 | File | What to set |
@@ -408,6 +477,17 @@ Rishi_app2/
         ├── mint-checkout-token/    Phase 3: mobile app calls this to start a purchase
         └── razorpay-webhook/       Phase 3: Razorpay calls this directly (not the app) —
                                    the only place a purchase actually grants access
+
+    (_shared also now holds bunny.ts — playback URL signing, encode-status
+     polling and manifest verification — and n8n.ts, the payment
+     notification fan-out.)
+
+n8n/                              Importable n8n workflow JSON. Kept in the repo
+                                  rather than only in n8n's own database, so the
+                                  payload contract in _shared/n8n.ts and the
+                                  automation consuming it move together — a
+                                  renamed field shows up here as a diff instead
+                                  of as a silently empty WhatsApp variable.
 ```
 
 ### Feature layering (mobile app)
@@ -425,20 +505,33 @@ The admin app doesn't use this layering — it's a much thinner app, and Next.js
 
 ## 10. Known Issues / Next Steps
 
-As of the end of this session, in priority order:
+As of the end of the Phase 5 session, in priority order:
 
-1. ~~**Unresolved bug**: content not unlocking after payment~~ — **Fixed** (see Phase 3a above): the webhook now fetches order notes directly from Razorpay's API instead of trusting `payment.notes`. **Not yet re-tested end-to-end after this fix** — next session should redeploy `razorpay-webhook`, set `RAZORPAY_KEY_ID` as an Edge Function secret, and run one more full test payment to confirm. If it's still broken after that:
-   - Did `razorpay-webhook` actually get called? (Supabase Dashboard → Edge Functions → razorpay-webhook → Logs)
-   - Did Razorpay actually deliver the webhook? (Razorpay Dashboard → Settings → Webhooks → click the webhook → delivery log/attempts)
-   - Is the webhook signature verifying correctly? (would show as a 400 "Invalid signature" in the function logs)
-   - Did `profiles.access_expires_at` actually get updated for the test user? (check directly in the `profiles` table)
-   - Does the mobile app's access-recheck-on-resume actually fire? (added in Phase 3, via a `WidgetsBindingObserver` in `home_screen.dart`)
-2. **The checkout URL is unstable.** `checkout_config.dart` currently points at a Vercel *preview* deployment URL, which changes on every push to this branch. Before this is genuinely done, either merge this branch to `main` (letting the stable production domain take over) or set this branch as the Vercel production branch, then update `checkout_config.dart` to the stable URL.
-3. **This whole branch (`claude/repo-structure-overview-vt36iu`) has not been merged to `main`.** Nothing in Section 7 is live for real users until that happens.
-4. **Phases 3b and 3c were never started**: an admin "Billing" page (payment history, refund button), and the account-deletion flow the original roadmap flagged as in-scope for the payments phase due to rising compliance stakes.
-5. **Per-item content purchases** (buying a single audio/video, not just the blanket subscription) were deliberately deferred — see Phase 3a's scope note above. The `entitlements` table is ready for this whenever it's picked up.
-6. Phases 4 onward (full LMS: courses/modules/lessons, quizzes, certificates, scaling work) haven't been started — see `README.md` for that roadmap.
+1. **This branch (`claude/repo-structure-overview-vt36iu`) still has not been merged to `main`.** Nothing in Section 7 is live for real users until that happens. `checkout_config.dart` now points at the stable production alias (`https://rishi-app2.vercel.app`) rather than a per-deployment preview URL, so that particular breakage is resolved either way.
+
+2. **Phase 5 has not been tested end-to-end on a device.** The code is written, both apps build clean, and the SQL is written but **migration `20260801000003` has not been applied**. Before anything else next session: apply it, build a quiz in the admin, take it on a phone, complete a course, and claim a certificate.
+
+3. **Operational landmines that have each cost a testing round.** Written down because they are not discoverable from the code:
+   - **"Verify JWT" resets to ON after every `supabase functions deploy`**, and must be OFF for `razorpay-webhook`. Razorpay's POST is rejected with 401 before any code runs. The durable fix is a `[functions.razorpay-webhook] verify_jwt = false` block in the local `supabase/config.toml` (untracked — it holds the project ref).
+   - **The Supabase CLI's migration history is empty** because migrations were applied by hand in the SQL editor. `supabase db push` therefore offers to replay all of them, which would fail partway. Either run `supabase migration repair --status applied <version>` for each existing migration once, or keep applying by hand.
+   - **Deploy after pulling.** Several rounds were lost to a deployed function predating the fix being tested.
+
+4. **Refunds owed.** At least one duplicate payment (`pay_TKA6LFBfAzXBiu`) bought nothing and needs refunding in Razorpay. The course page shows a "duplicates to refund" badge once `20260801000002` is applied.
+
+5. **Legacy revoked enrolments block repurchase.** Anyone revoked before the `status = 'revoked'` mechanism landed still has a lapsed-but-`paid` row occupying the unique index. One-time cleanup:
+   ```sql
+   update public.course_purchases set status = 'revoked', updated_at = now()
+   where status = 'paid' and expires_at is not null and expires_at <= now();
+   ```
+
+6. **Not started, from the original roadmap**: Stripe (non-India), the admin Billing page (payment history + refund button), the account-deletion flow, and per-item purchases of individual audios/videos (`entitlements` remains ready and unused — courses use `course_purchases` instead).
+
+7. **Phases 6 and 7 (scaling, load testing) have not been started** — see `README.md`.
+
+8. **Quiz question types are single-answer multiple choice only.** Multi-select, free text and ordering were not built. `submit_quiz_attempt` assumes exactly one correct option per question, and `saveQuestion` enforces it, so adding a type means changing both together.
+
+9. **Certificates have no PDF export.** Deliberate (see Phase 5 above), but if one is wanted later, the record and its number already exist — it is a rendering job, not a data-model change.
 
 ---
 
-*Last updated: 30 July 2026, after Phase 3a (Razorpay payments core).*
+*Last updated: 1 August 2026, after Phase 5 (quizzes and certificates). Phases 3b, 4 and 5 all landed in one extended session; see the bug-fix chronology at the end of Section 7 for what broke along the way and why.*
