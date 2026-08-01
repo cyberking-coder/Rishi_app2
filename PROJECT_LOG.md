@@ -534,7 +534,7 @@ As of the end of the Phase 5 session, in priority order:
 
 7. **Phases 6 and 7 (scaling, load testing) have not been started** — see `README.md`.
 
-8. **Certificates have no PDF export.** Deliberate (see Phase 5 above), but if one is wanted later, the record and its number already exist — it is a rendering job, not a data-model change.
+8. **Certificates download as a PNG, not a PDF.** The app renders the on-screen certificate to a ~2000px image via RepaintBoundary and hands it to the system share sheet, which is how it gets saved as well as shared. A PDF would need a layout engine and a font pipeline to reproduce what is already being drawn correctly; if one is ever wanted, the record and its number already exist, so it is a rendering job rather than a data-model change.
 
 ---
 

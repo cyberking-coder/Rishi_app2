@@ -1,5 +1,11 @@
+import 'dart:io';
+import 'dart:ui' as ui;
+
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:share_plus/share_plus.dart';
 
 import '../../../../app/theme/app_theme.dart';
 import '../../domain/entities/certificate.dart';
@@ -13,10 +19,71 @@ import '../../domain/entities/certificate.dart';
 /// verify_certificate() can actually be checked by whoever is shown it.
 /// Nothing here forecloses adding a PDF export later — the record and its
 /// number already exist.
-class CertificateScreen extends StatelessWidget {
+class CertificateScreen extends StatefulWidget {
   final Certificate certificate;
 
   const CertificateScreen({super.key, required this.certificate});
+
+  @override
+  State<CertificateScreen> createState() => _CertificateScreenState();
+}
+
+class _CertificateScreenState extends State<CertificateScreen> {
+  /// Wraps exactly the certificate — not the surrounding screen — so the
+  /// saved image is the credential and nothing else: no app bar, no
+  /// buttons, no page background.
+  final _certificateKey = GlobalKey();
+  bool _saving = false;
+
+  Certificate get certificate => widget.certificate;
+
+  /// Renders the certificate to a PNG and hands it to the system share
+  /// sheet, which is also how it gets saved — "Save to Files", "Save to
+  /// Photos" and sending it to someone are all the same gesture on both
+  /// platforms, so one action covers downloading and sharing.
+  Future<void> _saveOrShare() async {
+    if (_saving) return;
+    setState(() => _saving = true);
+
+    try {
+      final boundary = _certificateKey.currentContext?.findRenderObject()
+          as RenderRepaintBoundary?;
+      if (boundary == null) throw Exception('Certificate not ready');
+
+      // Captured at a fixed output width rather than the screen's pixel
+      // ratio: a certificate saved on a cheap phone should be the same
+      // resolution as one saved on a flagship, and 2000px is enough to
+      // print or attach to an email without looking soft.
+      final logicalWidth = boundary.size.width;
+      final pixelRatio =
+          logicalWidth > 0 ? (2000 / logicalWidth).clamp(1.0, 5.0) : 3.0;
+
+      final image = await boundary.toImage(pixelRatio: pixelRatio);
+      final bytes = await image.toByteData(format: ui.ImageByteFormat.png);
+      if (bytes == null) throw Exception('Could not render the certificate');
+
+      final dir = await getTemporaryDirectory();
+      final file = File('${dir.path}/${certificate.certificateNumber}.png');
+      await file.writeAsBytes(bytes.buffer.asUint8List());
+
+      if (!mounted) return;
+      await Share.shareXFiles(
+        [XFile(file.path, mimeType: 'image/png')],
+        text: '${certificate.courseTitle} — certificate '
+            '${certificate.certificateNumber}',
+        // iPad anchors the share popover to a rect and throws without
+        // one. Harmless everywhere else.
+        sharePositionOrigin: boundary.localToGlobal(Offset.zero) & boundary.size,
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Could not save the certificate: $e')),
+      );
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -50,18 +117,23 @@ class CertificateScreen extends StatelessWidget {
               child: ListView(
                 padding: const EdgeInsets.fromLTRB(20, 8, 20, 28),
                 children: [
-                  // The admin's own artwork when they've uploaded some,
-                  // otherwise the app's drawn design. A course with no
-                  // template still issues a presentable certificate.
-                  if (certificate.layout != null)
-                    _TemplateCertificate(
-                      layout: certificate.layout!,
-                      name: certificate.recipientName?.trim().isNotEmpty == true
-                          ? certificate.recipientName!
-                          : 'Student',
-                    )
-                  else
-                    _CertificateCard(certificate: certificate),
+                  RepaintBoundary(
+                    key: _certificateKey,
+                    // The admin's own artwork when they've uploaded some,
+                    // otherwise the app's drawn design. A course with no
+                    // template still issues a presentable certificate.
+                    child: certificate.layout != null
+                        ? _TemplateCertificate(
+                            layout: certificate.layout!,
+                            name: certificate.recipientName
+                                        ?.trim()
+                                        .isNotEmpty ==
+                                    true
+                                ? certificate.recipientName!
+                                : 'Student',
+                          )
+                        : _CertificateCard(certificate: certificate),
+                  ),
                   const SizedBox(height: 20),
                   if (!certificate.isValid)
                     const Padding(
@@ -73,6 +145,25 @@ class CertificateScreen extends StatelessWidget {
                         style: TextStyle(color: AppTheme.clay, fontSize: 13),
                       ),
                     ),
+                  FilledButton.icon(
+                    onPressed: _saving ? null : _saveOrShare,
+                    icon: _saving
+                        ? const SizedBox(
+                            width: 18,
+                            height: 18,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: Colors.white,
+                            ),
+                          )
+                        : const Icon(Icons.download_rounded, size: 18),
+                    label: Text(_saving ? 'Preparing…' : 'Download certificate'),
+                    style: FilledButton.styleFrom(
+                      backgroundColor: AppTheme.sage,
+                      minimumSize: const Size.fromHeight(48),
+                    ),
+                  ),
+                  const SizedBox(height: 10),
                   OutlinedButton.icon(
                     onPressed: () {
                       Clipboard.setData(

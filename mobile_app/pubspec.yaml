@@ -26,6 +26,7 @@ dependencies:
   video_player: ^2.9.1
   chewie: ^1.8.5
   open_filex: ^4.5.0
+  share_plus: ^10.0.2
 
 dev_dependencies:
   flutter_test:

@@ -207,6 +207,18 @@ Deno.serve(async (req) => {
       return jsonResponse({ error: manifest.problem }, 502);
     }
 
+    // Says outright how many renditions Bunny actually produced. Without
+    // this, "there's no quality selector" is indistinguishable between a
+    // stale deployment of this function, a parse that found nothing, and
+    // a video Bunny only ever encoded one rendition for — and the app
+    // hides the selector in all three cases, because one quality is no
+    // choice to offer.
+    console.log(
+      `[issue-playback-license] video ${videoId}: ` +
+        `${manifest.variants.length} rendition(s) ` +
+        `[${manifest.variants.map((v) => v.label).join(", ")}]`,
+    );
+
     const { data: bunnyHistory } = await supabase
       .from("watch_history")
       .select("progress_seconds")
