@@ -2,6 +2,9 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { PageHeader } from "@/components/page-header";
 import { CertificateRevokeButton } from "@/components/courses/certificate-revoke-button";
+import { CertificateNameCell } from "@/components/courses/certificate-name-cell";
+import { CertificateTemplateEditor } from "@/components/courses/certificate-template-editor";
+import { CourseDesignPicker } from "@/components/courses/course-design-picker";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import {
@@ -13,12 +16,33 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { formatDate } from "@/lib/utils";
-import type { Certificate } from "@/lib/types";
+import type { Certificate, Course } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
-export default async function CertificatesPage() {
+export default async function CertificatesPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ course?: string }>;
+}) {
+  const { course: selectedCourseId } = await searchParams;
   const supabase = createClient();
+
+  // Certificate artwork is per course, so designing it needs a course
+  // chosen. It lives here rather than on the course page because it is
+  // a certificate concern — an admin thinking about certificates
+  // shouldn't have to know which course page to open to change how they
+  // look.
+  const { data: courses } = await supabase
+    .from("courses")
+    .select("*")
+    .order("sort_order", { ascending: true })
+    .order("created_at", { ascending: false })
+    .returns<Course[]>();
+
+  const designCourse =
+    (courses ?? []).find((c) => c.id === selectedCourseId) ??
+    (courses ?? [])[0];
 
   const { data: certificates } = await supabase
     .from("certificates")
@@ -55,6 +79,22 @@ export default async function CertificatesPage() {
         description="Issued automatically when a learner finishes every lesson in a course."
       />
 
+      {designCourse ? (
+        <>
+          <CourseDesignPicker
+            courses={(courses ?? []).map((c) => ({ id: c.id, title: c.title }))}
+            selectedId={designCourse.id}
+          />
+          <CertificateTemplateEditor course={designCourse} />
+        </>
+      ) : (
+        <p className="mb-6 text-sm text-muted-foreground">
+          Create a course before designing a certificate.
+        </p>
+      )}
+
+      <h2 className="mb-3 mt-8 text-lg font-semibold">Issued certificates</h2>
+
       <Card>
         <CardContent className="p-0">
           <Table>
@@ -85,10 +125,11 @@ export default async function CertificatesPage() {
                       {c.certificate_number}
                     </TableCell>
                     <TableCell className="font-medium">
-                      <div>{c.recipient_name ?? "—"}</div>
-                      <div className="text-xs font-normal text-muted-foreground">
-                        {emailById.get(c.user_id) ?? "—"}
-                      </div>
+                      <CertificateNameCell
+                        certificateId={c.id}
+                        name={c.recipient_name}
+                        email={emailById.get(c.user_id) ?? "—"}
+                      />
                     </TableCell>
                     <TableCell>{c.course_title}</TableCell>
                     <TableCell className="text-muted-foreground">

@@ -258,6 +258,7 @@ async function createCourseOrder(
       status: "paid",
       coupon_id: couponId,
       discount_amount: discountAmount,
+      billing_name: billing.name,
     });
 
     if (grantError) {
@@ -335,6 +336,11 @@ async function createCourseOrder(
         razorpay_order_id: order.id,
         coupon_id: couponId,
         discount_amount: discountAmount,
+        // Kept because it's the only place a buyer's real name is
+        // reliably captured — most sign up without ever setting a
+        // profile display name, and the completion certificate has to
+        // be made out to someone.
+        billing_name: billing.name,
       });
 
     // Non-fatal: the webhook creates the row itself if it isn't there,

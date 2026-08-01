@@ -457,6 +457,12 @@ async function handleCoursePurchase(
     status,
     razorpay_order_id: payment.order_id,
     razorpay_payment_id: payment.id,
+    // The only reliable capture of the buyer's real name: most sign up
+    // without setting a profile display name, and the completion
+    // certificate has to be made out to someone. create-order writes it
+    // to the pending row too; repeating it here covers a payment whose
+    // pending row is missing.
+    billing_name: billing.name,
   };
 
   // One paid row per (user, course) is enforced by uq_course_purchases_paid,
@@ -582,6 +588,25 @@ async function handleCoursePurchase(
       email = authUser.user?.email ?? null;
     } catch {
       // non-fatal
+    }
+  }
+
+  // Give the account a display name if it has none. The buyer typed one
+  // at checkout, and an app that greets them by email while holding
+  // their name is just discarding what they told us. Never overwrites a
+  // name they set themselves.
+  if (status === "paid" && billing.name && billing.name.trim() !== "") {
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("display_name")
+      .eq("id", userId)
+      .maybeSingle<{ display_name: string | null }>();
+
+    if (!profile?.display_name || profile.display_name.trim() === "") {
+      await supabase
+        .from("profiles")
+        .update({ display_name: billing.name.trim() })
+        .eq("id", userId);
     }
   }
 

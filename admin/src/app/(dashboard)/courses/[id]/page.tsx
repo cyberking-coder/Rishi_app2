@@ -5,7 +5,6 @@ import { createClient } from "@/lib/supabase/server";
 import { PageHeader } from "@/components/page-header";
 import { CourseBuilder } from "@/components/courses/course-builder";
 import { CourseFormDialog } from "@/components/courses/course-form-dialog";
-import { CertificateTemplateEditor } from "@/components/courses/certificate-template-editor";
 import { EnrolledStudents } from "@/components/courses/enrolled-students";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -173,8 +172,6 @@ export default async function CourseBuilderPage({
         audioLibrary={audios ?? []}
         videoLibrary={playableVideos}
       />
-
-      <CertificateTemplateEditor course={course} />
 
       <EnrolledStudents courseId={course.id} />
     </div>

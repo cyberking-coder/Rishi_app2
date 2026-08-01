@@ -118,3 +118,34 @@ export async function awardCertificate(
   revalidatePath("/certificates");
   return { ok: true, number };
 }
+
+/**
+ * Corrects the name printed on a certificate.
+ *
+ * Needed for two cases the automatic resolution can't cover:
+ * certificates issued before billing names were kept, which carry no
+ * name at all, and a buyer who typed their name badly at checkout. The
+ * course title is NOT editable here — that is a claim about what was
+ * earned, and rewriting it would change what the certificate says
+ * happened.
+ */
+export async function updateCertificateRecipient(
+  certificateId: string,
+  recipientName: string,
+): Promise<ActionResult> {
+  await requireAdmin();
+
+  const name = recipientName.trim();
+  if (!name) return { ok: false, error: "The name can't be empty." };
+
+  const db = createAdminClient();
+  const { error } = await db
+    .from("certificates")
+    .update({ recipient_name: name })
+    .eq("id", certificateId);
+
+  if (error) return { ok: false, error: error.message };
+
+  revalidatePath("/certificates");
+  return { ok: true };
+}
