@@ -28,7 +28,6 @@ import {
 } from "@/app/actions/courses";
 import { AddLessonDialog } from "./add-lesson-dialog";
 import { AddResourceDialog } from "./add-resource-dialog";
-import { QuizEditor } from "./quiz-editor";
 import { deleteLessonResource } from "@/app/actions/courses";
 import type {
   Audio,
@@ -38,7 +37,6 @@ import type {
   LessonType,
   LessonWithMedia,
   ResourceType,
-  QuizWithQuestions,
   Video,
 } from "@/lib/types";
 
@@ -64,22 +62,12 @@ export function CourseBuilder({
   modules,
   audioLibrary,
   videoLibrary,
-  quizzes,
 }: {
   course: Course;
   modules: ModuleWithLessons[];
   audioLibrary: Audio[];
   videoLibrary: Video[];
-  /** Every quiz in this course, course-level and per-lesson alike.
-   *  Passed as a flat list and indexed here rather than embedded on the
-   *  module query — one failing embed takes the whole curriculum down
-   *  with it, which is how the module list vanished once before. */
-  quizzes: QuizWithQuestions[];
 }) {
-  const courseQuiz = quizzes.find((q) => q.course_id !== null);
-  const quizByLesson = new Map(
-    quizzes.filter((q) => q.lesson_id).map((q) => [q.lesson_id!, q]),
-  );
   const router = useRouter();
   const [newModuleTitle, setNewModuleTitle] = useState("");
   const [busy, setBusy] = useState(false);
@@ -342,15 +330,6 @@ export function CourseBuilder({
                       })}
                     </div>
                   )}
-
-                  <div className="border-t border-border/60 px-3 py-2">
-                    <QuizEditor
-                      courseId={course.id}
-                      lessonId={lesson.id}
-                      quiz={quizByLesson.get(lesson.id)}
-                      label="Lesson check"
-                    />
-                  </div>
                   </div>
                 );
               })}
@@ -366,24 +345,6 @@ export function CourseBuilder({
           </CardContent>
         </Card>
       ))}
-
-      <Card>
-        <CardContent className="space-y-3 p-4">
-          <div>
-            <h3 className="text-sm font-semibold">Final assessment</h3>
-            <p className="text-xs text-muted-foreground">
-              Optional. When set, a learner must pass this — as well as
-              finishing every lesson — before the course counts as complete
-              and a certificate is issued.
-            </p>
-          </div>
-          <QuizEditor
-            courseId={course.id}
-            quiz={courseQuiz}
-            label="Final assessment"
-          />
-        </CardContent>
-      </Card>
 
       <Card>
         <CardContent className="p-4">

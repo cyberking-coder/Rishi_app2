@@ -13,7 +13,7 @@ import '../../../audio/application/audio_providers.dart';
 import '../../../audio/domain/entities/audio_track.dart';
 import '../../application/lms_providers.dart';
 import '../../domain/entities/lesson.dart';
-import '../../domain/entities/quiz.dart';
+import '../../domain/entities/certificate.dart';
 import '../widgets/course_purchase_sheet.dart';
 
 class CourseDetailScreen extends ConsumerStatefulWidget {
@@ -296,7 +296,7 @@ class _CourseDetailScreenState extends ConsumerState<CourseDetailScreen>
 
               if (!locked)
                 SliverToBoxAdapter(
-                  child: _AssessmentSection(courseId: widget.courseId),
+                  child: _CertificateSection(courseId: widget.courseId),
                 ),
 
               const SliverToBoxAdapter(child: SizedBox(height: 28)),
@@ -866,165 +866,38 @@ class _BackBar extends StatelessWidget {
   }
 }
 
-/// Quizzes and the certificate, shown once the course is unlocked.
+/// Certificate progress, shown once the course is unlocked.
 ///
 /// Rendered as its own consumer rather than folded into the course
-/// screen's main provider: a course with no quizzes shouldn't pay for
-/// this query on every load, and a failure here must not take the
-/// curriculum down with it — the lesson list is the thing people came
-/// for.
-class _AssessmentSection extends ConsumerWidget {
-  const _AssessmentSection({required this.courseId});
+/// screen's main provider, so a failure here can't take the curriculum
+/// down with it — the lesson list is the thing people came for.
+class _CertificateSection extends ConsumerWidget {
+  const _CertificateSection({required this.courseId});
 
   final String courseId;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final quizzesAsync = ref.watch(courseQuizzesProvider(courseId));
     final completion =
         ref.watch(courseCompletionProvider(courseId)).valueOrNull;
     final certificate =
         ref.watch(courseCertificateProvider(courseId)).valueOrNull;
 
-    final quizzes = quizzesAsync.valueOrNull ?? const <Quiz>[];
-    if (quizzes.isEmpty && certificate == null && completion?.complete != true) {
-      return const SizedBox.shrink();
-    }
+    if (completion == null) return const SizedBox.shrink();
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(20, 18, 20, 0),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          if (quizzes.isNotEmpty) ...[
-            const Text(
-              'Assessments',
-              style: TextStyle(
-                fontSize: 17,
-                fontWeight: FontWeight.w800,
-                color: AppTheme.textPrimary,
-              ),
-            ),
-            const SizedBox(height: 12),
-            for (final quiz in quizzes) ...[
-              _QuizTile(quiz: quiz, courseId: courseId),
-              const SizedBox(height: 10),
-            ],
-            const SizedBox(height: 8),
-          ],
-          if (completion != null)
-            _CertificateBanner(
-              courseId: courseId,
-              completion: completion,
-              certificate: certificate,
-            ),
+          _CertificateBanner(
+            courseId: courseId,
+            completion: completion,
+            certificate: certificate,
+          ),
         ],
       ),
     );
-  }
-}
-
-class _QuizTile extends ConsumerWidget {
-  const _QuizTile({required this.quiz, required this.courseId});
-
-  final Quiz quiz;
-  final String courseId;
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final locked = !quiz.hasAttemptsLeft && !quiz.passed;
-
-    return InkWell(
-      borderRadius: BorderRadius.circular(16),
-      onTap: locked
-          ? null
-          : () async {
-              await context.push<bool>('/quiz/${quiz.id}', extra: quiz);
-              // The attempt is graded server-side, so the only way to
-              // know the new state is to re-read it.
-              ref.invalidate(courseQuizzesProvider(courseId));
-              ref.invalidate(courseCompletionProvider(courseId));
-            },
-      child: Container(
-        padding: const EdgeInsets.all(14),
-        decoration: BoxDecoration(
-          color: AppTheme.surface,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(
-            color: quiz.passed ? AppTheme.sage : AppTheme.border,
-          ),
-        ),
-        child: Row(
-          children: [
-            Container(
-              width: 38,
-              height: 38,
-              decoration: BoxDecoration(
-                color: quiz.passed ? AppTheme.sageSoft : AppTheme.surfaceCream,
-                borderRadius: BorderRadius.circular(11),
-              ),
-              child: Icon(
-                quiz.passed
-                    ? Icons.check_rounded
-                    : Icons.help_outline_rounded,
-                size: 20,
-                color: quiz.passed ? AppTheme.sage : AppTheme.textSecondary,
-              ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    quiz.title,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      fontSize: 15,
-                      fontWeight: FontWeight.w600,
-                      color: AppTheme.textPrimary,
-                    ),
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    _subtitle(quiz, locked),
-                    style: const TextStyle(
-                      fontSize: 12,
-                      color: AppTheme.textSecondary,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            if (!locked)
-              const Icon(Icons.chevron_right_rounded,
-                  color: AppTheme.textSecondary),
-          ],
-        ),
-      ),
-    );
-  }
-
-  static String _subtitle(Quiz quiz, bool locked) {
-    if (quiz.passed) {
-      return 'Passed · best ${quiz.bestScorePercent ?? 0}%';
-    }
-    if (locked) {
-      return 'No attempts remaining · best ${quiz.bestScorePercent ?? 0}%';
-    }
-    final parts = <String>[
-      '${quiz.questions.length} '
-          '${quiz.questions.length == 1 ? "question" : "questions"}',
-      'pass at ${quiz.passPercent}%',
-    ];
-    if (quiz.attemptsUsed > 0) {
-      parts.add('best ${quiz.bestScorePercent ?? 0}%');
-    }
-    if (quiz.maxAttempts != null) {
-      parts.add('${quiz.maxAttempts! - quiz.attemptsUsed} tries left');
-    }
-    return parts.join(' · ');
   }
 }
 
@@ -1051,7 +924,7 @@ class _CertificateBannerState extends ConsumerState<_CertificateBanner> {
     setState(() => _claiming = true);
     try {
       final certificate = await ref
-          .read(quizRemoteDataSourceProvider)
+          .read(certificateDataSourceProvider)
           .issueCertificate(widget.courseId);
 
       if (!mounted) return;
@@ -1102,9 +975,8 @@ class _CertificateBannerState extends ConsumerState<_CertificateBanner> {
     return _Banner(
       icon: Icons.timeline_rounded,
       title: 'Certificate progress',
-      subtitle:
-          '${completion.completedSteps} of ${completion.totalSteps} complete'
-          '${completion.quizCount > 0 ? " · lessons and quizzes both count" : ""}',
+      subtitle: '${completion.completedSteps} of ${completion.totalSteps} '
+          'lessons complete',
       progress: completion.fraction,
     );
   }

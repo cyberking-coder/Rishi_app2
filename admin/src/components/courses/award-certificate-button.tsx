@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { Award } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { awardCertificate } from "@/app/actions/quizzes";
+import { awardCertificate } from "@/app/actions/certificates";
 
 /**
  * Awards a certificate to one student for this course, regardless of

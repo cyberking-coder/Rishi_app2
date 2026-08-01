@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
-import { setCertificateRevoked } from "@/app/actions/quizzes";
+import { setCertificateRevoked } from "@/app/actions/certificates";
 
 export function CertificateRevokeButton({
   certificateId,

@@ -216,52 +216,7 @@ export interface YoutubeVideo {
   updated_at: string;
 }
 
-// ── Quizzes & certificates (Phase 5) ─────────────────────────────────────
-
-export interface Quiz {
-  id: string;
-  /** Exactly one of these is set: a course-level final assessment, or a
-   *  checkpoint attached to one lesson. */
-  course_id: string | null;
-  lesson_id: string | null;
-  title: string;
-  description: string | null;
-  pass_percent: number;
-  /** null = unlimited retakes. */
-  max_attempts: number | null;
-  position: number;
-  created_at: string;
-  updated_at: string;
-}
-
-export interface QuizOption {
-  id: string;
-  question_id: string;
-  label: string;
-  /** Only ever present for admins — a column-level grant withholds it
-   *  from learners, so the answer key never reaches the app. */
-  is_correct: boolean;
-  position: number;
-  created_at: string;
-}
-
-export interface QuizQuestion {
-  id: string;
-  quiz_id: string;
-  prompt: string;
-  explanation: string | null;
-  position: number;
-  created_at: string;
-  updated_at: string;
-}
-
-export interface QuizQuestionWithOptions extends QuizQuestion {
-  quiz_options: QuizOption[];
-}
-
-export interface QuizWithQuestions extends Quiz {
-  quiz_questions: QuizQuestionWithOptions[];
-}
+// ── Certificates ─────────────────────────────────────────────────────────
 
 export interface Certificate {
   id: string;

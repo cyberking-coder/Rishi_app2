@@ -2,12 +2,12 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/network/supabase_client_provider.dart';
 import '../data/datasources/lms_remote_datasource.dart';
-import '../data/datasources/quiz_remote_datasource.dart';
+import '../data/datasources/certificate_remote_datasource.dart';
 import '../data/datasources/video_remote_datasource.dart';
 import '../data/repositories/lms_repository_impl.dart';
 import '../domain/entities/course_summary.dart';
 import '../domain/entities/lesson.dart';
-import '../domain/entities/quiz.dart';
+import '../domain/entities/certificate.dart';
 import '../domain/repositories/lms_repository.dart';
 
 final lmsRemoteDataSourceProvider = Provider<LmsRemoteDataSource>((ref) {
@@ -31,47 +31,29 @@ final courseDetailProvider =
   (ref, courseId) => ref.watch(lmsRepositoryProvider).getCourseDetail(courseId),
 );
 
-// ── Quizzes & certificates (Phase 5) ─────────────────────────────────────
+// ── Certificates ─────────────────────────────────────────────────────────
 
-final quizRemoteDataSourceProvider = Provider<QuizRemoteDataSource>((ref) {
-  return QuizRemoteDataSource(ref.watch(supabaseClientProvider));
+final certificateDataSourceProvider =
+    Provider<CertificateRemoteDataSource>((ref) {
+  return CertificateRemoteDataSource(ref.watch(supabaseClientProvider));
 });
 
-/// Every quiz in a course, with the caller's attempt history folded in.
-///
-/// Depends on courseDetailProvider for the lesson ids rather than
-/// re-querying them: a quiz can hang off a lesson, and the course detail
-/// already knows which lessons exist.
-final courseQuizzesProvider =
-    FutureProvider.autoDispose.family<List<Quiz>, String>(
-  (ref, courseId) async {
-    final detail = await ref.watch(courseDetailProvider(courseId).future);
-    final lessonIds = [
-      for (final module in detail.modules)
-        for (final lesson in module.lessons) lesson.id,
-    ];
-    return ref
-        .watch(quizRemoteDataSourceProvider)
-        .getCourseQuizzes(courseId, lessonIds);
-  },
-);
-
-/// How far through a course the learner is, counting lessons AND quizzes
-/// — the same arithmetic issue_certificate() applies server-side, so the
-/// progress shown and the certificate granted can never disagree.
+/// How far through a course the learner is — the same arithmetic
+/// issue_certificate() applies server-side, so the progress shown and
+/// the certificate granted can never disagree.
 final courseCompletionProvider =
     FutureProvider.autoDispose.family<CourseCompletion, String>(
   (ref, courseId) =>
-      ref.watch(quizRemoteDataSourceProvider).getCompletion(courseId),
+      ref.watch(certificateDataSourceProvider).getCompletion(courseId),
 );
 
 final courseCertificateProvider =
     FutureProvider.autoDispose.family<Certificate?, String>(
   (ref, courseId) =>
-      ref.watch(quizRemoteDataSourceProvider).getCertificate(courseId),
+      ref.watch(certificateDataSourceProvider).getCertificate(courseId),
 );
 
 final myCertificatesProvider =
     FutureProvider.autoDispose<List<Certificate>>(
-  (ref) => ref.watch(quizRemoteDataSourceProvider).getMyCertificates(),
+  (ref) => ref.watch(certificateDataSourceProvider).getMyCertificates(),
 );

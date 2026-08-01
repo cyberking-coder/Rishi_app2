@@ -16,7 +16,6 @@ import type {
   CourseModule,
   LessonResource,
   LessonWithMedia,
-  QuizWithQuestions,
   Video,
 } from "@/lib/types";
 
@@ -106,38 +105,6 @@ export default async function CourseBuilderPage({
         .returns<LessonResource[]>()
     : { data: [] as LessonResource[] };
 
-  // Quizzes for the whole course in one flat query, keyed up in the
-  // builder. Fetched separately from the modules for the same reason
-  // lesson_resources is: an embed that fails takes the entire curriculum
-  // query down with it.
-  const { data: quizzes } = await supabase
-    .from("quizzes")
-    .select(
-      "*, quiz_questions(*, quiz_options(id, question_id, label, is_correct, position, created_at))",
-    )
-    .or(
-      lessonIds.length > 0
-        ? `course_id.eq.${id},lesson_id.in.(${lessonIds.join(",")})`
-        : `course_id.eq.${id}`,
-    )
-    .order("position", { ascending: true })
-    .returns<QuizWithQuestions[]>();
-
-  // PostgREST returns embedded rows in primary-key order, not by our
-  // `position` column, so questions and options would render in creation
-  // order rather than the order the admin arranged them in.
-  const orderedQuizzes = (quizzes ?? []).map((q) => ({
-    ...q,
-    quiz_questions: [...(q.quiz_questions ?? [])]
-      .sort((a, b) => a.position - b.position)
-      .map((question) => ({
-        ...question,
-        quiz_options: [...(question.quiz_options ?? [])].sort(
-          (a, b) => a.position - b.position,
-        ),
-      })),
-  }));
-
   const resourcesByLesson = new Map<string, LessonResource[]>();
   for (const r of resources ?? []) {
     const list = resourcesByLesson.get(r.lesson_id) ?? [];
@@ -205,7 +172,6 @@ export default async function CourseBuilderPage({
         modules={orderedModules}
         audioLibrary={audios ?? []}
         videoLibrary={playableVideos}
-        quizzes={orderedQuizzes}
       />
 
       <CertificateTemplateEditor course={course} />

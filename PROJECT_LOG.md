@@ -304,23 +304,21 @@ Built as `20260730000003_lms_core.sql` plus the `lms` feature folder in the app 
 
 **The video-playback gap is closed.** `video_player` + `chewie`, fed by the existing `issue-playback-license` function. Media is hosted on **Bunny Stream** (direct browser→Bunny TUS upload from the admin, no R2 staging), with a quality selector built from the master playlist's own variant list.
 
-### Phase 5 — Quizzes and completion certificates
+### Phase 5 — Completion certificates
 
-**Migration**: `20260801000003_quizzes_and_certificates.sql`.
+**Migrations**: `20260801000003_quizzes_and_certificates.sql`, then `20260801000004_certificate_templates.sql` and `20260801000005_completion_without_quizzes.sql`.
 
-Tables: `quizzes` (attached to *either* a course or a lesson, enforced by check constraint), `quiz_questions`, `quiz_options`, `quiz_attempts`, `certificates`.
+**Quizzes were built and then removed.** `20260801000003` created `quizzes`, `quiz_questions`, `quiz_options` and `quiz_attempts` alongside `certificates`, with server-side grading and the answer key withheld from clients by a column-level GRANT. Authoring questions turned out to be more work than these courses need, so the whole feature was taken out of the admin and the app: `20260801000005` redefines `course_completion_state()` to count lessons only.
 
-**Two decisions here are load-bearing rather than stylistic, and should not be "simplified" later without understanding why they exist:**
+The quiz **tables are deliberately still there**, empty and unreferenced. They cost nothing dormant, and dropping them is irreversible whereas re-enabling is a UI change plus restoring the quiz half of that function. Do not "tidy them up" without meaning to make that decision permanent.
 
-1. **The answer key never reaches the device.** RLS is row-level and cannot withhold a *column*, and a learner must be able to read the options in order to answer them — so `quiz_options.is_correct` is withheld with a **column-level GRANT**, which PostgREST enforces (selecting it errors rather than returning it). Grading therefore *has* to happen server-side, which is what `submit_quiz_attempt()` is for: the client sends what was chosen and is told what was right, in that order. There is no client-side scoring to keep in step with the server's, and no way to peek.
+**Certificates are records verified by number, not PDFs in a bucket** (a deliberate departure from §5.2 of the roadmap). A PDF is a file anyone can edit and re-share; a number that resolves against `verify_certificate()` can actually be checked by whoever is shown it. The app renders the certificate natively and a public `/verify` page (outside the admin login — a verifier has no account here by definition) resolves a number to name/course/date and nothing else: no user id, no email, no course id. Revoking sets `revoked_at` and keeps the row, because deleting would make a withdrawn credential indistinguishable from a forged number. Nothing forecloses adding a PDF export later.
 
-2. **Certificates are records verified by number, not PDFs in a bucket** (a deliberate departure from §5.2 of the roadmap). A PDF is a file anyone can edit and re-share; a number that resolves against `verify_certificate()` can actually be checked by whoever is shown it. The app renders the certificate natively and a public `/verify` page (outside the admin login — a verifier has no account here by definition) resolves a number to name/course/date and nothing else: no user id, no email, no course id. Revoking sets `revoked_at` and keeps the row, because deleting would make a withdrawn credential indistinguishable from a forged number. Nothing forecloses adding a PDF export later.
+**Completion is finishing every lesson.** `course_completion_state()` is the single piece of arithmetic that both the app's progress bar and `issue_certificate()` read, so what a learner is shown and what they are granted cannot disagree. A course with no lessons is never complete, so an empty draft can't hand out certificates. `issue_certificate()` is idempotent, so the course screen can call it without tracking whether it already has.
 
-**Completion counts lessons *and* quizzes.** `course_completion_state()` is the single piece of arithmetic that both the app's progress bar and `issue_certificate()` read, so what a learner is shown and what they are granted cannot disagree. Lessons alone would certify someone who scrolled past the material; quizzes alone would certify someone who never opened it. `issue_certificate()` is idempotent, so the course screen can call it without tracking whether it already has.
+**Admin**: a Certificates page with revoke/reinstate.
 
-**Admin**: a quiz builder on every lesson (checkpoint) plus one course-level final assessment, and a Certificates page with revoke/reinstate.
-
-**Admin-designed certificate artwork**: the app originally drew the certificate itself, which guarantees a consistent result but gives the admin no say in how a branded, shareable artefact looks. So `courses` gained `certificate_template_url` plus four layout columns (`20260801000004`): the admin uploads finished artwork with the name area left blank, and the only thing the system adds is the name.
+**Admin-designed certificate artwork**: the app originally drew the certificate itself, which guarantees a consistent result but gives the admin no say in how a branded, shareable artefact looks. So `courses` gained `certificate_template_url` plus four layout columns: the admin uploads finished artwork with the name area left blank, and the only thing the system adds is the name.
 
 Position is stored as **percentages of the image, never pixels** — the same template has to land correctly in the admin's preview pane, on a phone, and at whatever resolution the artwork was exported at, and a pixel offset would be right in exactly one of those. The admin preview uses CSS container-query units against the artwork's own width and the app uses `LayoutBuilder` against its rendered width, so the two agree by construction. A course with no template still gets the app's drawn design, so this is additive and a half-configured course degrades to something presentable.
 
@@ -517,7 +515,7 @@ As of the end of the Phase 5 session, in priority order:
 
 1. **This branch (`claude/repo-structure-overview-vt36iu`) still has not been merged to `main`.** Nothing in Section 7 is live for real users until that happens. `checkout_config.dart` now points at the stable production alias (`https://rishi-app2.vercel.app`) rather than a per-deployment preview URL, so that particular breakage is resolved either way.
 
-2. **Phase 5 has not been tested end-to-end on a device.** The code is written, both apps build clean, and the SQL is written but **migration `20260801000003` has not been applied**. Before anything else next session: apply it, build a quiz in the admin, take it on a phone, complete a course, and claim a certificate.
+2. **Phase 5 has not been tested end-to-end on a device.** Both apps build clean. Migrations `20260801000003` and `20260801000004` are applied; **`20260801000005` is not**. Before anything else next session: apply it, upload certificate artwork on a course, position the name, complete every lesson on a phone, and claim the certificate.
 
 3. **Operational landmines that have each cost a testing round.** Written down because they are not discoverable from the code:
    - **"Verify JWT" resets to ON after every `supabase functions deploy`**, and must be OFF for `razorpay-webhook`. Razorpay's POST is rejected with 401 before any code runs. The durable fix is a `[functions.razorpay-webhook] verify_jwt = false` block in the local `supabase/config.toml` (untracked — it holds the project ref).
@@ -536,9 +534,7 @@ As of the end of the Phase 5 session, in priority order:
 
 7. **Phases 6 and 7 (scaling, load testing) have not been started** — see `README.md`.
 
-8. **Quiz question types are single-answer multiple choice only.** Multi-select, free text and ordering were not built. `submit_quiz_attempt` assumes exactly one correct option per question, and `saveQuestion` enforces it, so adding a type means changing both together.
-
-9. **Certificates have no PDF export.** Deliberate (see Phase 5 above), but if one is wanted later, the record and its number already exist — it is a rendering job, not a data-model change.
+8. **Certificates have no PDF export.** Deliberate (see Phase 5 above), but if one is wanted later, the record and its number already exist — it is a rendering job, not a data-model change.
 
 ---
 

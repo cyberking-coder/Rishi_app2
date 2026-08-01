@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../../../../app/theme/app_theme.dart';
-import '../../domain/entities/quiz.dart';
+import '../../domain/entities/certificate.dart';
 
 /// The certificate itself, rendered natively rather than as a PDF.
 ///
