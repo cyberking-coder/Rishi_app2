@@ -200,11 +200,15 @@ class AppTheme {
     );
   }
 
-  /// One clay surface. Every raised container in the app should use this
+  /// One clay surface. Named claySurface, not clay, because [clay] is
+  /// already the colour — brand vocabulary that predates this and is used
+  /// across the app, so the newcomer yields.
+  ///
+  /// Every raised container in the app should use this
   /// rather than assembling a colour, a radius and a shadow by hand —
   /// three surfaces that each got it slightly differently is exactly how
   /// a soft-UI style stops looking deliberate.
-  static BoxDecoration clay({
+  static BoxDecoration claySurface({
     Color? color,
     double? radius,
     bool small = false,

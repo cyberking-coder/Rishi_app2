@@ -89,7 +89,7 @@ class _CoursePurchaseSheetState extends ConsumerState<_CoursePurchaseSheet> {
         22,
         22 + MediaQuery.of(context).viewInsets.bottom,
       ),
-      decoration: const BoxDecoration(
+      decoration: BoxDecoration(
         gradient: AppTheme.clayFill(),
         borderRadius: BorderRadius.vertical(top: Radius.circular(26)),
         boxShadow: AppTheme.cardShadow,
