@@ -11,6 +11,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { formatDate } from "@/lib/utils";
+import { AwardCertificateButton } from "./award-certificate-button";
 import { EnrolmentAccessButton } from "./enrolment-access-button";
 
 interface PurchaseRow {
@@ -72,6 +73,25 @@ export async function EnrolledStudents({ courseId }: { courseId: string }) {
     seen.add(r.user_id);
     return true;
   });
+
+  // Certificates already held for this course, so the roster shows the
+  // number instead of offering to award a second one.
+  const { data: certificates } = await supabase
+    .from("certificates")
+    .select("user_id, certificate_number, revoked_at")
+    .eq("course_id", courseId)
+    .returns<
+      { user_id: string; certificate_number: string; revoked_at: string | null }[]
+    >();
+
+  const certificateByUser = new Map(
+    (certificates ?? [])
+      // A revoked certificate is deliberately NOT counted as held — the
+      // Award button reinstates it, which is what an admin means by
+      // awarding again after having withdrawn it.
+      .filter((c) => c.revoked_at === null)
+      .map((c) => [c.user_id, c.certificate_number]),
+  );
 
   const nameById = new Map<string, string>();
   const emailById = new Map<string, string>();
@@ -143,6 +163,7 @@ export async function EnrolledStudents({ courseId }: { courseId: string }) {
               <TableHead>Paid</TableHead>
               <TableHead>Enrolled</TableHead>
               <TableHead>Access</TableHead>
+              <TableHead>Certificate</TableHead>
               <TableHead className="w-32" />
             </TableRow>
           </TableHeader>
@@ -150,7 +171,7 @@ export async function EnrolledStudents({ courseId }: { courseId: string }) {
             {unique.length === 0 ? (
               <TableRow>
                 <TableCell
-                  colSpan={5}
+                  colSpan={6}
                   className="py-8 text-center text-muted-foreground"
                 >
                   Nobody has bought this course yet.
@@ -182,6 +203,18 @@ export async function EnrolledStudents({ courseId }: { courseId: string }) {
                     ) : (
                       <Badge variant="success">Active</Badge>
                     )}
+                  </TableCell>
+                  <TableCell>
+                    <AwardCertificateButton
+                      userId={r.user_id}
+                      courseId={courseId}
+                      studentLabel={
+                        nameById.get(r.user_id) ??
+                        emailById.get(r.user_id) ??
+                        "this student"
+                      }
+                      existingNumber={certificateByUser.get(r.user_id)}
+                    />
                   </TableCell>
                   <TableCell className="text-right">
                     <EnrolmentAccessButton

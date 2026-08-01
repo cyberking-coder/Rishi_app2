@@ -320,6 +320,8 @@ Tables: `quizzes` (attached to *either* a course or a lesson, enforced by check 
 
 **Admin**: a quiz builder on every lesson (checkpoint) plus one course-level final assessment, and a Certificates page with revoke/reinstate.
 
+**Manual award**: there is deliberately no "create certificate" form — a certificate is earned, and the Certificates page only lists what has been issued. But the enrolled-students roster on each course has an **Award** button per student, which bypasses the completion check for the cases that check cannot see (offline cohorts, migrated students, progress lost to a bug). It mints the same number format `issue_certificate()` does, so a manual award is indistinguishable to a verifier — that is the point, not an oversight: it is a real credential, not a marked-down one. Awarding someone who holds a revoked certificate reinstates it rather than minting a second.
+
 ### Bug-fix chronology — Phases 3b through 5
 
 Every one of these was found by testing on a real device, not by review.
