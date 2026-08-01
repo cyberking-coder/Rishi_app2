@@ -133,9 +133,9 @@ export function CertificateTemplateEditor({ course }: { course: Course }) {
       <CardContent className="space-y-5">
         <p className="text-sm text-muted-foreground">
           Upload your own certificate artwork with the name area left blank.
-          The learner&apos;s name is printed onto it when they finish every
-          lesson and pass every quiz. Leave this empty and the app draws its
-          own certificate instead.
+          The learner&apos;s name is printed onto it once they finish every
+          lesson in this course. Leave this empty and the app draws its own
+          certificate instead.
         </p>
 
         <div className="flex flex-wrap items-center gap-2">

@@ -52,7 +52,7 @@ export default async function CertificatesPage() {
     <div>
       <PageHeader
         title="Certificates"
-        description="Issued automatically when a learner finishes every lesson and passes every quiz in a course."
+        description="Issued automatically when a learner finishes every lesson in a course."
       />
 
       <Card>
