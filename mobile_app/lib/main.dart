@@ -88,11 +88,52 @@ Future<void> main() async {
   );
 }
 
-class MeditationApp extends ConsumerWidget {
+class MeditationApp extends ConsumerStatefulWidget {
   const MeditationApp({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<MeditationApp> createState() => _MeditationAppState();
+}
+
+class _MeditationAppState extends ConsumerState<MeditationApp> {
+  StreamSubscription<String>? _deepLinkSubscription;
+
+  @override
+  void initState() {
+    super.initState();
+
+    // Notification taps. Two sources, one destination: a tap while the
+    // app was backgrounded arrives on the stream, and a tap that launched
+    // it from cold was parked in pendingDeepLink before any widget
+    // existed to hear it.
+    _deepLinkSubscription = PushService.deepLinks.listen(_follow);
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final pending = PushService.pendingDeepLink;
+      if (pending != null) {
+        PushService.pendingDeepLink = null;
+        _follow(pending);
+      }
+    });
+  }
+
+  void _follow(String link) {
+    if (!mounted) return;
+    // push(), not go(): the notification is a detour, and replacing the
+    // stack would leave nothing behind the back button when someone
+    // taps through mid-session. The router's own redirect still sends
+    // them to login first if they are signed out.
+    ref.read(goRouterProvider).push(link);
+  }
+
+  @override
+  void dispose() {
+    _deepLinkSubscription?.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final router = ref.watch(goRouterProvider);
     final themeMode = ref.watch(themeModeProvider);
 

@@ -21,6 +21,7 @@ import '../../features/lms/presentation/screens/payment_success_screen.dart';
 import '../../features/lms/presentation/screens/text_lesson_screen.dart';
 import '../../features/lms/presentation/screens/video_lesson_screen.dart';
 import '../../features/profile/presentation/screens/profile_screen.dart';
+import '../../features/audio/presentation/screens/audio_link_screen.dart';
 import '../../features/watch/presentation/screens/watch_screen.dart';
 import '../widgets/app_shell.dart';
 
@@ -120,6 +121,14 @@ final goRouterProvider = Provider<GoRouter>((ref) {
             TextLessonScreen(lesson: state.extra as Lesson),
       ),
       GoRoute(path: '/watch', builder: (_, __) => const WatchScreen()),
+      // Where a "start your day" notification lands. Takes only an id,
+      // because a notification payload is strings and nothing else — no
+      // `extra` object to lean on, unlike every route above.
+      GoRoute(
+        path: '/audio/:id',
+        builder: (_, state) =>
+            AudioLinkScreen(audioId: state.pathParameters['id']!),
+      ),
       GoRoute(
         path: '/search',
         builder: (_, __) => const BrowseScreen(title: 'Search'),

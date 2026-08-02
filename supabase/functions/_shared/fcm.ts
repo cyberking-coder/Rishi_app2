@@ -131,6 +131,12 @@ export interface PushMessage {
   /** Delivered to the app as message.data — strings only, FCM rejects
    *  anything else. */
   data?: Record<string, string>;
+  /** Android channel. Must match a channel PushService creates in the
+   *  app, or Android files the notification under a default one and the
+   *  importance settings are silently lost. Reminders about something
+   *  starting and announcements about something new are separate
+   *  channels so a user can mute one without losing the other. */
+  channelId?: "session_reminders" | "content_updates";
 }
 
 /// Sends one message to many tokens.
@@ -175,7 +181,7 @@ export async function sendToTokens(
               android: {
                 priority: "high",
                 notification: {
-                  channel_id: "session_reminders",
+                  channel_id: message.channelId ?? "session_reminders",
                   // Tapping opens the launcher activity; the app then
                   // routes on the data payload.
                   click_action: "FLUTTER_NOTIFICATION_CLICK",

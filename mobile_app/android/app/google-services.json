@@ -1,0 +1,39 @@
+{
+  "project_info": {
+    "project_number": "232193403156",
+    "project_id": "anurag-rishi-1c479",
+    "storage_bucket": "anurag-rishi-1c479.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:232193403156:android:1ec0c69a7d799476ddba01",
+        "android_client_info": {
+          "package_name": "com.knowthyself.app"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "232193403156-8t8cgulhnfgbaqns4aa1kcqqlenqkar9.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyC-UGZ4_jebxyFhdR8krzpr41PFHUs2PNA"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "232193403156-8t8cgulhnfgbaqns4aa1kcqqlenqkar9.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

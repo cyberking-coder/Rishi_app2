@@ -352,6 +352,24 @@ Not a roadmap phase — the roadmap's Phase 6 is scaling hardening. This was ask
 
 **Also fixed here**: the mini-player's progress bar never moved. It read `PlaybackState.position`, which only emits on play/pause/seek — the bar was drawn correctly and simply sat frozen in between. It now reads the player's continuous `positionStream`, the same fix the Now Playing screen had already needed, and shows elapsed/total in tabular figures so the text doesn't jiggle every second.
 
+### Content notifications — new content, and a daily audio
+
+**Migration**: `20260801000008_content_notifications.sql`.
+
+Three reasons to open the app, three notifications: something is starting soon (live sessions, above), something new arrived, and it's morning.
+
+**"New" means newly published, not newly created.** Courses and audios are drafted and published later, sometimes weeks later, so `created_at` was the wrong signal in both directions — a course drafted in June and published today would never be announced, and one created and published in the same minute would be announced by accident. Both tables gained `published_at`, stamped by a trigger on the transition into `published`. The trigger uses `is distinct from` rather than `<>`, because `OLD.status` is null on insert and `null <> 'published'` is null, not true — the straight-to-published insert would silently never stamp.
+
+**The back catalogue is pre-marked as announced.** The migration seeds `notification_log` with every already-published course and audio. Without that, the first cron run after deploy would push a notification for every piece of content ever published — the single worst thing this feature could do, and irreversible. A 48-hour lookback window sits behind that as a second net: something published a month ago but somehow missing from the log is not news, and announcing it would be worse than staying quiet.
+
+**`notification_log` is the general form of `session_reminders`** — unique on `(kind, key)`, claimed before the send, released if the send fails. Deliberately a second table rather than a merge: the two carry different keys (a session plus a minute mark, versus a content id or a date), and rewriting an applied migration to unify them would trade a small duplication for a real risk of a broken chain.
+
+**The daily nudge is keyed on the date**, which is what makes "once a day" hold however often the cron fires, and makes a retry free. UTC deliberately — the job runs at one moment for everybody, and a local date would make "today" ambiguous at exactly the point the guard needs to be unambiguous. The track is picked least-recently-featured first, never-featured before that, ties broken at random, so the library rotates on its own: no curation list to maintain, no "featured" flag for someone to forget to move, and a newly added track surfaces within a day. An empty library does **not** claim the day — if audio is published later, that evening's run still sends.
+
+**Two Android channels, not one**: `session_reminders` (high importance) and `content_updates` (default). Someone who wants the morning nudge muted should not lose the reminder that a session they signed up for is starting. Each id is written in three places — the manifest, `PushService`, and the sending function's payload — and if any two disagree Android quietly files the notification under a default channel and the importance is lost.
+
+**Tapping a notification goes somewhere.** Every payload carries a `deep_link` go_router path, and `PushService` funnels all three tap sources into one stream: FCM's `onMessageOpenedApp` (backgrounded), `getInitialMessage` (cold start, parked in `pendingDeepLink` because nothing is listening that early), and the local plugin's own response callback (foreground, where FCM posts nothing itself). A new audio needed a destination that didn't exist, so `/audio/:id` was added — it resolves the id, starts playback, and replaces itself with Now Playing, so back goes where the user was rather than to a loading screen they'd have to escape twice.
+
 ### Bug-fix chronology — Phases 3b through 5
 
 Every one of these was found by testing on a real device, not by review.
@@ -392,7 +410,7 @@ None of these are committed to the repo (correctly). Listed here so a fresh setu
 | `BUNNY_STREAM_API_KEY`, `BUNNY_STREAM_LIBRARY_ID` | `issue-playback-license` | Reads live encode status, since Bunny sends no webhook. Optional: absent, the status check returns "unknown" and fails open |
 | `N8N_COURSE_PAYMENT_WEBHOOK_URL` | `razorpay-webhook` | Course-payment automation. Falls back to `N8N_PAYMENT_WEBHOOK_URL` |
 | `N8N_PAYMENT_WEBHOOK_URL` | `razorpay-webhook` | Subscription-payment automation (not in active use) |
-| `FCM_SERVICE_ACCOUNT` | `send-session-reminders` | The **entire** service-account JSON from Firebase console → Project settings → Service accounts → Generate new private key. Not a path, not a key id. Absent, the function returns a config error naming it and releases its reminder claim so nothing is silently marked sent |
+| `FCM_SERVICE_ACCOUNT` | `send-session-reminders`, `send-content-notifications` | The **entire** service-account JSON from Firebase console → Project settings → Service accounts → Generate new private key. Not a path, not a key id. Absent, the function returns a config error naming it and releases its reminder claim so nothing is silently marked sent |
 
 > **Bunny token authentication is deliberately OFF.** A directory token cannot survive the jump from an HLS master playlist to its renditions on a native player — ExoPlayer and AVPlayer cannot re-attach a token to segment requests at runtime, and Bunny's own workaround is a JavaScript hook that only exists in web players. Setting `BUNNY_STREAM_TOKEN_KEY` again will break playback. Access is gated by `issue-playback-license` (purchase, device lock, access window), not by the CDN.
 
@@ -413,7 +431,7 @@ None of these are committed to the repo (correctly). Listed here so a fresh setu
 | `lib/core/config/google_auth_config.dart` | Google OAuth Web Client ID |
 | `lib/core/config/checkout_config.dart` | The admin app's public URL |
 | `ios/Runner/Info.plist` | `GIDClientID` + `CFBundleURLSchemes` (Google OAuth iOS client) |
-| `android/app/google-services.json` | Downloaded from the Firebase console. Gitignored-by-absence — not in the repo, and the Gradle plugin is applied only when it exists, so a checkout without it still builds (with push inert). **Register a second Android app for `com.knowthyself.app.debug`** in the same Firebase project, or push won't work in debug builds — the same suffix trap that broke Google Sign-In earlier |
+| `android/app/google-services.json` | Firebase project `anurag-rishi-1c479`. **In the repo** — it is client config, restricted by package name and shipped inside every APK anyway, so keeping it out would only mean a build that silently has no push. The Gradle plugin is still applied conditionally, so a checkout without the file builds fine. **Only `com.knowthyself.app` is registered so far — add a second Android app for `com.knowthyself.app.debug`** or push won't work in debug builds, the same suffix trap that broke Google Sign-In earlier |
 
 ---
 

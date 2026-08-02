@@ -8,6 +8,9 @@ abstract class AudioRepository {
 
   Future<List<AudioTrack>> getPlaylistTracks(String playlistId);
 
+  /// One track by id, or null if it isn't published (or doesn't exist).
+  Future<AudioTrack?> getTrack(String audioId);
+
   Future<void> updateListenProgress({
     required String audioId,
     required int progressSeconds,

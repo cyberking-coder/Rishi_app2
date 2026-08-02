@@ -15,7 +15,12 @@
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { handlePreflight, jsonResponse } from "../_shared/cors.ts";
-import { FcmConfigError, sendToTokens } from "../_shared/fcm.ts";
+import { FcmConfigError } from "../_shared/fcm.ts";
+import {
+  allPushTokens,
+  broadcast,
+  roleFromAuthHeader,
+} from "../_shared/push_audience.ts";
 
 interface DueReminder {
   session_id: string;
@@ -31,25 +36,6 @@ interface DueReminder {
 function whenPhrase(minutes: number): string {
   if (minutes >= 60) return "in an hour";
   return `in ${minutes} minutes`;
-}
-
-/// Returns the caller's role claim, or null if the token is unreadable.
-/// Signature verification has already happened at the gateway; this only
-/// needs to read what was verified.
-function roleFromAuthHeader(header: string | null): string | null {
-  if (!header?.startsWith("Bearer ")) return null;
-  const parts = header.slice(7).split(".");
-  if (parts.length !== 3) return null;
-  try {
-    const payload = parts[1].replace(/-/g, "+").replace(/_/g, "/");
-    const padded = payload.padEnd(
-      payload.length + ((4 - (payload.length % 4)) % 4),
-      "=",
-    );
-    return (JSON.parse(atob(padded)) as { role?: string }).role ?? null;
-  } catch {
-    return null;
-  }
 }
 
 Deno.serve(async (req) => {
@@ -82,17 +68,14 @@ Deno.serve(async (req) => {
     return jsonResponse({ ok: true, due: 0, sent: 0 });
   }
 
-  const { data: tokenRows, error: tokenError } = await supabase
-    .from("push_tokens")
-    .select("token")
-    .returns<{ token: string }[]>();
-
-  if (tokenError) {
-    console.error(`Could not read push tokens: ${tokenError.message}`);
-    return jsonResponse({ error: tokenError.message }, 500);
+  let tokens: string[];
+  try {
+    tokens = await allPushTokens(supabase);
+  } catch (e) {
+    console.error(String(e));
+    return jsonResponse({ error: String(e) }, 500);
   }
 
-  const tokens = (tokenRows ?? []).map((r) => r.token);
   const outcomes: Record<string, unknown>[] = [];
 
   for (const reminder of due) {
@@ -129,7 +112,7 @@ Deno.serve(async (req) => {
 
     let result;
     try {
-      result = await sendToTokens(tokens, {
+      result = await broadcast(supabase, tokens, {
         title: reminder.title,
         body: `Starts ${whenPhrase(reminder.minutes_before)}. ` +
           `Open the app and tap to join.`,
@@ -137,7 +120,9 @@ Deno.serve(async (req) => {
           type: "live_session",
           session_id: reminder.session_id,
           join_url: reminder.join_url,
+          deep_link: "/watch",
         },
+        channelId: "session_reminders",
       });
     } catch (e) {
       // Release the claim so the next run retries, rather than leaving a
@@ -162,13 +147,6 @@ Deno.serve(async (req) => {
       continue;
     }
 
-    if (result.invalidTokens.length > 0) {
-      await supabase
-        .from("push_tokens")
-        .delete()
-        .in("token", result.invalidTokens);
-    }
-
     // The claim was written before the recipient count was known; correct
     // it now that it is, so the dashboard shows what actually landed.
     await supabase
@@ -180,7 +158,7 @@ Deno.serve(async (req) => {
     console.log(
       `Reminder sent: "${reminder.title}" ${reminder.minutes_before}m — ` +
         `${result.sent} delivered, ${result.failed} failed, ` +
-        `${result.invalidTokens.length} tokens pruned`,
+        `${result.pruned} tokens pruned`,
     );
 
     outcomes.push({
@@ -188,7 +166,7 @@ Deno.serve(async (req) => {
       minutes_before: reminder.minutes_before,
       sent: result.sent,
       failed: result.failed,
-      pruned: result.invalidTokens.length,
+      pruned: result.pruned,
     });
   }
 

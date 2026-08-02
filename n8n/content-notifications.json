@@ -1,0 +1,210 @@
+{
+  "name": "Rishi App — Content notifications (new content + daily audio)",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "minutes",
+              "minutesInterval": 15
+            }
+          ]
+        }
+      },
+      "id": "c1000000-0000-4000-8000-000000000001",
+      "name": "Every 15 minutes",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [-460, -120],
+      "notes": "New courses and audios. Most runs find nothing — that is the expected state, not a misconfiguration."
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "30 1 * * *"
+            }
+          ]
+        }
+      },
+      "id": "c1000000-0000-4000-8000-000000000002",
+      "name": "Daily at 7am IST",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [-460, 120],
+      "notes": "01:30 UTC = 07:00 IST. n8n evaluates cron in UTC unless the workflow's timezone is set, so this is written in UTC deliberately. Change the hour here to change when the morning nudge goes out — the app and the function have no opinion about the time."
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "d1000000-0000-4000-8000-000000000001",
+              "name": "job",
+              "value": "new_content",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "c1000000-0000-4000-8000-000000000003",
+      "name": "Job: new_content",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [-220, -120]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "d1000000-0000-4000-8000-000000000002",
+              "name": "job",
+              "value": "daily_audio",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "c1000000-0000-4000-8000-000000000004",
+      "name": "Job: daily_audio",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [-220, 120]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://YOUR-PROJECT-REF.supabase.co/functions/v1/send-content-notifications",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "Bearer YOUR_SUPABASE_SERVICE_ROLE_KEY"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ job: $json.job }) }}",
+        "options": {
+          "response": {
+            "response": {
+              "neverError": true,
+              "fullResponse": true
+            }
+          }
+        }
+      },
+      "id": "c1000000-0000-4000-8000-000000000005",
+      "name": "Send notifications",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [20, 0],
+      "notes": "One function, two jobs. Both are idempotent through notification_log, so a retry or an overlapping run sends nothing twice."
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "typeValidation": "loose"
+          },
+          "conditions": [
+            {
+              "id": "e1000000-0000-4000-8000-000000000001",
+              "leftValue": "={{ $json.statusCode }}",
+              "rightValue": 200,
+              "operator": {
+                "type": "number",
+                "operation": "notEquals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "c1000000-0000-4000-8000-000000000006",
+      "name": "Did it fail?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [240, 0],
+      "notes": "neverError is on above so a bad run arrives here as data rather than killing the execution — otherwise a 500 shows up only as a red execution nobody is watching."
+    },
+    {
+      "parameters": {
+        "message": "=Content notifications failed: HTTP {{ $json.statusCode }} — {{ JSON.stringify($json.body).slice(0, 400) }}",
+        "options": {}
+      },
+      "id": "c1000000-0000-4000-8000-000000000007",
+      "name": "Raise the failure",
+      "type": "n8n-nodes-base.stopAndError",
+      "typeVersion": 1,
+      "position": [480, -100]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "d1000000-0000-4000-8000-000000000003",
+              "name": "job",
+              "value": "={{ $json.body.job }}",
+              "type": "string"
+            },
+            {
+              "id": "d1000000-0000-4000-8000-000000000004",
+              "name": "summary",
+              "value": "={{ JSON.stringify($json.body) }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "c1000000-0000-4000-8000-000000000008",
+      "name": "Run summary",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [480, 100]
+    }
+  ],
+  "connections": {
+    "Every 15 minutes": {
+      "main": [[{ "node": "Job: new_content", "type": "main", "index": 0 }]]
+    },
+    "Daily at 7am IST": {
+      "main": [[{ "node": "Job: daily_audio", "type": "main", "index": 0 }]]
+    },
+    "Job: new_content": {
+      "main": [[{ "node": "Send notifications", "type": "main", "index": 0 }]]
+    },
+    "Job: daily_audio": {
+      "main": [[{ "node": "Send notifications", "type": "main", "index": 0 }]]
+    },
+    "Send notifications": {
+      "main": [[{ "node": "Did it fail?", "type": "main", "index": 0 }]]
+    },
+    "Did it fail?": {
+      "main": [
+        [{ "node": "Raise the failure", "type": "main", "index": 0 }],
+        [{ "node": "Run summary", "type": "main", "index": 0 }]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "pinData": {}
+}
