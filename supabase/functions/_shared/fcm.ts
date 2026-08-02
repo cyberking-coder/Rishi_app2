@@ -198,13 +198,19 @@ export async function sendToTokens(
 
         result.failed++;
         const detail = await res.text().catch(() => "");
-        // UNREGISTERED means the app was uninstalled or the token was
-        // reissued; INVALID_ARGUMENT on a token field means it was never
-        // valid. Both are permanent, so the row should go. Anything else
-        // (429, 503) is transient and the token must be kept.
+        // Permanent failures, all of which mean the row is dead:
+        //   404 UNREGISTERED     — app uninstalled, or the token reissued
+        //   400 INVALID_ARGUMENT — the token was never valid
+        //   403 SENDER_ID_MISMATCH — the token belongs to a different
+        //     Firebase project. Happens whenever the app is repointed at
+        //     a new project, and the old rows would otherwise fail on
+        //     every send forever, because nothing else ever removes them.
+        // Anything else (429, 503) is transient and the token must be
+        // kept — pruning on a momentary outage would delete live devices.
         if (
           res.status === 404 ||
-          (res.status === 400 && detail.includes("INVALID_ARGUMENT"))
+          (res.status === 400 && detail.includes("INVALID_ARGUMENT")) ||
+          (res.status === 403 && detail.includes("SENDER_ID_MISMATCH"))
         ) {
           result.invalidTokens.push(deviceToken);
         } else {
