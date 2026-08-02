@@ -2,7 +2,7 @@
 
 Complete record of everything built, fixed, and configured across the mobile app, admin dashboard, and Supabase backend.
 
-**If you are an AI picking up this project**: read this whole file before touching code. Section 7 explains the LMS/payments work added on top of the original app (also described in `README.md`, which is the forward-looking roadmap this log tracks progress against) — and ends with a bug-fix chronology that is the most useful part of this document, because almost every entry in it is a trap the code alone does not reveal. Section 9 explains the folder structure in plain language. Section 10 lists exactly what's unfinished right now, including operational landmines that have each cost a full round of testing.
+**If you are an AI picking up this project**: read this whole file before touching code. Section 7 explains the LMS/payments work added on top of the original app (also described in `README.md`, which is the forward-looking roadmap this log tracks progress against) — and ends with a bug-fix chronology that is the most useful part of this document, because almost every entry in it is a trap the code alone does not reveal. Section 9 explains the folder structure in plain language. Section 10 lists exactly what's unfinished right now, including operational landmines that have each cost a full round of testing. Section 11 says how many users this can carry as it stands, and which limit gives way first.
 
 ---
 
@@ -575,31 +575,74 @@ The admin app doesn't use this layering — it's a much thinner app, and Next.js
 
 ## 10. Known Issues / Next Steps
 
-As of the end of the Phase 5 session, in priority order:
+As of the end of the push-notification session, in priority order:
 
 1. **This branch (`claude/repo-structure-overview-vt36iu`) still has not been merged to `main`.** Nothing in Section 7 is live for real users until that happens. `checkout_config.dart` now points at the stable production alias (`https://rishi-app2.vercel.app`) rather than a per-deployment preview URL, so that particular breakage is resolved either way.
 
-2. **Phase 5 has not been tested end-to-end on a device.** Both apps build clean. Migrations `20260801000003` and `20260801000004` are applied; **`20260801000005` is not**. Before anything else next session: apply it, upload certificate artwork on a course, position the name, complete every lesson on a phone, and claim the certificate.
+2. **Phase 5 (certificates) has still not been tested end-to-end on a device.** Both apps build clean and migrations `20260801000003` through `20260801000006` are applied. Upload certificate artwork on a course, position the name, complete every lesson on a phone, and claim the certificate. This is the largest untested surface left.
 
-3. **Operational landmines that have each cost a testing round.** Written down because they are not discoverable from the code:
+   **Push and live sessions ARE tested on a device** — token registration, the daily audio nudge, notification tap-through, and a 60-minute session reminder have all been confirmed working end to end. Untested: the 30- and 5-minute marks, new-course and new-audio announcements, and any resumed (`complete: false`) delivery, which needs an audience larger than one invocation to trigger.
+
+3. **Firebase and Google Sign-In share one project — keep it that way.** The app briefly carried a `google-services.json` for a *different* Google Cloud project than the one `googleWebClientId` points at, and Google Sign-In failed with `DEVELOPER_ERROR` until they were consolidated onto `rishi-503917` / project number `395908400723`. Anything that touches either — a new SHA-1, a new OAuth client, a rotated service-account key — must be done in that project and nowhere else.
+
+   Two SHA-1s are registered: release `E7:D2:10:CC:FC:8C:18:B4:D3:80:CA:0C:69:E9:D6:92:92:41:DF:FC` and debug `79:C4:CB:7E:09:2E:5D:33:11:FF:AD:F2:D7:AD:63:D0:C6:82:D5:CC`. **`com.knowthyself.app.debug` is not yet registered as a Firebase app**, so debug builds get no push and no Google Sign-In. And if the app is ever distributed through Play with App Signing, Play re-signs it with a third key whose SHA-1 must also be registered — otherwise sign-in works in local release builds and fails for everyone who installs from the store.
+
+4. **Operational landmines that have each cost a testing round.** Written down because they are not discoverable from the code:
    - **"Verify JWT" resets to ON after every `supabase functions deploy`**, and must be OFF for `razorpay-webhook`. Razorpay's POST is rejected with 401 before any code runs. The durable fix is a `[functions.razorpay-webhook] verify_jwt = false` block in the local `supabase/config.toml` (untracked — it holds the project ref).
    - **The Supabase CLI's migration history is empty** because migrations were applied by hand in the SQL editor. `supabase db push` therefore offers to replay all of them, which would fail partway. Either run `supabase migration repair --status applied <version>` for each existing migration once, or keep applying by hand.
    - **Deploy after pulling.** Several rounds were lost to a deployed function predating the fix being tested.
+   - **An n8n workflow that is saved, correct and tested still does nothing until it is activated**, and gives no indication it isn't running. This has now cost rounds on both the payments workflow and the reminders workflow. The check is n8n's Executions list: regular runs returning `due: 0` are the proof it is alive.
+   - **Verify JWT must stay ON for `send-session-reminders` and `send-content-notifications`** — the opposite of `razorpay-webhook`, and easy to get backwards out of habit. Both check the `service_role` claim themselves.
+   - **Times are pinned to IST in two places that must agree**: `formatDateTime` in the admin, and the session form's `istInputToIso`/`isoToIstInput`. The admin pages are server components and the server runs in UTC, so an unpinned format renders five and a half hours off what the client-side form accepted. The n8n daily schedule pins the same zone in `settings.timezone`.
 
-4. **Refunds owed.** At least one duplicate payment (`pay_TKA6LFBfAzXBiu`) bought nothing and needs refunding in Razorpay. The course page shows a "duplicates to refund" badge once `20260801000002` is applied.
+5. **Refunds owed.** At least one duplicate payment (`pay_TKA6LFBfAzXBiu`) bought nothing and needs refunding in Razorpay. The course page shows a "duplicates to refund" badge once `20260801000002` is applied.
 
-5. **Legacy revoked enrolments block repurchase.** Anyone revoked before the `status = 'revoked'` mechanism landed still has a lapsed-but-`paid` row occupying the unique index. One-time cleanup:
+6. **Legacy revoked enrolments block repurchase.** Anyone revoked before the `status = 'revoked'` mechanism landed still has a lapsed-but-`paid` row occupying the unique index. One-time cleanup:
    ```sql
    update public.course_purchases set status = 'revoked', updated_at = now()
    where status = 'paid' and expires_at is not null and expires_at <= now();
    ```
 
-6. **Not started, from the original roadmap**: Stripe (non-India), the admin Billing page (payment history + refund button), the account-deletion flow, and per-item purchases of individual audios/videos (`entitlements` remains ready and unused — courses use `course_purchases` instead).
+7. **Not started, from the original roadmap**: Stripe (non-India), the admin Billing page (payment history + refund button), the account-deletion flow, and per-item purchases of individual audios/videos (`entitlements` remains ready and unused — courses use `course_purchases` instead).
 
-7. **Phases 6 and 7 (scaling, load testing) have not been started** — see `README.md`.
+8. **Phases 6 and 7 (scaling, load testing) have not been started** — see `README.md` and Section 11 below, which sets out what actually binds first.
 
-8. **Certificates download as a PNG, not a PDF.** The app renders the on-screen certificate to a ~2000px image via RepaintBoundary and hands it to the system share sheet, which is how it gets saved as well as shared. A PDF would need a layout engine and a font pipeline to reproduce what is already being drawn correctly; if one is ever wanted, the record and its number already exist, so it is a rendering job rather than a data-model change.
+9. **Certificates download as a PNG, not a PDF.** The app renders the on-screen certificate to a ~2000px image via RepaintBoundary and hands it to the system share sheet, which is how it gets saved as well as shared. A PDF would need a layout engine and a font pipeline to reproduce what is already being drawn correctly; if one is ever wanted, the record and its number already exist, so it is a rendering job rather than a data-model change.
 
 ---
 
-*Last updated: 1 August 2026, after Phase 5 (quizzes and certificates). Phases 3b, 4 and 5 all landed in one extended session; see the bug-fix chronology at the end of Section 7 for what broke along the way and why.*
+## 11. Capacity — what this can carry today
+
+Assumes Supabase **Pro**, Cloudflare R2, and Bunny Stream, with the usage shape of a meditation app: people open it once or twice a day for ten to twenty minutes. Verify the Supabase quotas against their current pricing page before betting on them — plan limits change.
+
+**Headline: roughly 50,000 registered users / 10,000 daily actives before anything has to be touched.**
+
+### What breaks, in order
+
+| # | Limit | Breaks at | How you'd find out |
+|---|---|---|---|
+| 1 | Postgres compute (Pro defaults to a Micro instance) | ~10,000 daily actives | Slow queries, then timeouts |
+| 2 | Edge function invocations (2M/month included) | ~35,000–65,000 users | A billed overage, ~$2 per extra million |
+| 3 | Auth MAU (100,000 included) | 100,000 monthly actives | Billed per MAU |
+| 4 | Push fan-out | ~500,000 devices per invocation, and past that it simply takes more cron runs | Nothing breaks; deliveries report `complete: false` and resume |
+| 5 | Bunny video egress | No ceiling — cost only | Your invoice |
+
+**Compute is the one you will actually feel**, and it is a slider in the Supabase dashboard, not an architecture change: Micro → Small → Medium, minutes of downtime, $15–60/month. Opening the app fires roughly eight queries (home, categories, courses, continue-listening, live sessions, access, profile), all indexed.
+
+**Edge functions are the metered resource.** Every audio play calls `issue-audio-license`, every video calls `issue-playback-license`. At 30 plays per user per month, 2M invocations covers about 65,000 users; at 60 plays, about 33,000. The notification crons contribute roughly 11,500 invocations a month combined — negligible.
+
+**Audio costs nothing to serve.** R2 has no egress fees, which is the single best property of this stack.
+
+**Video is where the money goes.** A thousand people watching a 30-minute HD lesson is on the order of 1–2 TB through Bunny. That is a pricing question to model before a launch push, and it is unrelated to how much load the system can carry.
+
+**Paid vs free makes no meaningful difference to load.** A paid user hits `has_course_access` and the license functions slightly more often; that is one indexed lookup. Razorpay absorbs payment volume, and the webhook is a single write per purchase. The device lock (one account, one device) caps concurrent streams per account at one, which helps.
+
+**Storage will not bind.** 100,000 users with full progress history sits well under the 8 GB included.
+
+### What was already fixed to get here
+
+The push fan-out originally broke at about **1,000 devices, silently** — an unbounded token read that PostgREST truncated with no error, so the function reported success while most of the audience heard nothing. See "Push fan-out at scale" in Section 7. That was the only limit standing between this app and every other number on this page.
+
+---
+
+*Last updated: 2 August 2026, after live sessions, push notifications, and the fan-out scaling work. Phases 3b, 4 and 5 landed in one extended session before that; see the bug-fix chronology at the end of Section 7 for what broke along the way and why.*
