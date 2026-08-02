@@ -123,7 +123,16 @@ class AudioPlayerHandler extends BaseAudioHandler
       // Listening) resumes at a saved position. This prevents a newly-tapped
       // track from inheriting any other track's position.
       await _player.seek(resumeAt ?? Duration.zero);
-      await _player.play();
+      // Deliberately NOT awaited. just_audio's play() completes when
+      // playback ENDS — not when it starts — so awaiting it means "block
+      // until the track finishes." Everything after this line, and every
+      // caller of loadPlaylist, was waiting out the whole track: the
+      // _loading guard below stayed set, silently swallowing a tap on a
+      // different track, and the /audio/:id screen sat on its spinner
+      // until the audio it had already started stopped playing.
+      unawaited(_player.play().catchError((Object e) {
+        debugPrint('Playback failed after starting: $e');
+      }));
       _startProgressTimer();
     } catch (e) {
       // Playback couldn't start (expired access, device lock, network,
