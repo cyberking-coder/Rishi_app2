@@ -159,8 +159,14 @@ export async function sendToTokens(
 
   // Bounded concurrency. Unbounded would open a socket per device and
   // trip Deno's limits on a large list; serial would time the function
-  // out. 20 is comfortably inside both.
-  const CONCURRENCY = 20;
+  // out.
+  //
+  // 100, not 20: these all go to one host over HTTP/2, so they share
+  // connections rather than opening a socket each, and the round trip
+  // dominates. At 20 a hundred thousand devices took long enough that
+  // the invocation's wall clock became the real limit rather than a
+  // theoretical one.
+  const CONCURRENCY = 100;
   let cursor = 0;
 
   async function worker() {

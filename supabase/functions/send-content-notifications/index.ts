@@ -10,17 +10,17 @@
 //                             no-op, which is what makes a retry safe.
 //
 // One function rather than two because they share the whole shape —
-// claim, fan out, release on failure — and the only thing that differs is
-// what gets claimed and what the message says.
+// claim, fan out, resume, release on failure — and the only thing that
+// differs is what gets claimed and what the message says.
+//
+// Deliveries are resumable: the claim carries how far the send got, so an
+// audience too large for one invocation is finished by the next run
+// instead of being half-delivered and marked done.
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { handlePreflight, jsonResponse } from "../_shared/cors.ts";
-import { FcmConfigError } from "../_shared/fcm.ts";
-import {
-  allPushTokens,
-  broadcast,
-  roleFromAuthHeader,
-} from "../_shared/push_audience.ts";
+import { FcmConfigError, type PushMessage } from "../_shared/fcm.ts";
+import { fanOut, roleFromAuthHeader } from "../_shared/push_audience.ts";
 
 interface DueAnnouncement {
   kind: string;
@@ -35,6 +35,14 @@ interface AudioPick {
   title: string;
   description: string | null;
   cover_art_url: string | null;
+}
+
+interface OpenClaim {
+  kind: string;
+  key: string;
+  delivery_cursor: string | null;
+  recipient_count: number;
+  payload: PushMessage | null;
 }
 
 /// A description is written to be read on a screen, next to a title, with
@@ -80,108 +88,118 @@ Deno.serve(async (req) => {
     Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
   );
 
-  let tokens: string[];
-  try {
-    tokens = await allPushTokens(supabase);
-  } catch (e) {
-    console.error(String(e));
-    return jsonResponse({ error: String(e) }, 500);
+  // Unfinished deliveries first, whichever job asked. They are already
+  // claimed, so due_content_announcements() will never surface them again
+  // — without this pass, an announcement interrupted by the wall clock
+  // would sit half-delivered forever.
+  const resumed = await resumeOpenClaims(supabase);
+
+  const result = job === "daily_audio"
+    ? await runDailyAudio(supabase)
+    : await runNewContent(supabase);
+
+  return jsonResponse({ ...result, resumed });
+});
+
+// ---------------------------------------------------------------------------
+// Resume
+// ---------------------------------------------------------------------------
+// deno-lint-ignore no-explicit-any
+async function resumeOpenClaims(supabase: any): Promise<unknown[]> {
+  const { data: open } = await supabase
+    .from("notification_log")
+    .select("kind, key, delivery_cursor, recipient_count, payload")
+    .is("completed_at", null)
+    .order("sent_at", { ascending: true })
+    .returns<OpenClaim[]>();
+
+  const outcomes: unknown[] = [];
+
+  for (const claim of (open ?? []) as OpenClaim[]) {
+    if (!claim.payload) {
+      // Claimed before payloads were stored. Nothing can reconstruct what
+      // it was meant to say, and guessing is worse than closing it.
+      await supabase
+        .from("notification_log")
+        .update({ completed_at: new Date().toISOString() })
+        .eq("kind", claim.kind)
+        .eq("key", claim.key);
+      continue;
+    }
+
+    outcomes.push(
+      await deliver(supabase, claim.payload, {
+        kind: claim.kind,
+        key: claim.key,
+        startCursor: claim.delivery_cursor,
+        alreadySent: claim.recipient_count,
+        label: `${claim.payload.title} (resumed)`,
+      }),
+    );
   }
 
-  return job === "daily_audio"
-    ? await runDailyAudio(supabase, tokens)
-    : await runNewContent(supabase, tokens);
-});
+  return outcomes;
+}
 
 // ---------------------------------------------------------------------------
 // new_content
 // ---------------------------------------------------------------------------
-async function runNewContent(
-  // deno-lint-ignore no-explicit-any
-  supabase: any,
-  tokens: string[],
-): Promise<Response> {
+// deno-lint-ignore no-explicit-any
+async function runNewContent(supabase: any) {
   const { data: due, error } = await supabase
     .rpc("due_content_announcements", { p_lookback_hours: 48 })
     .returns<DueAnnouncement[]>();
 
   if (error) {
     console.error(`due_content_announcements failed: ${error.message}`);
-    return jsonResponse({ error: error.message }, 500);
+    return { ok: false, job: "new_content", error: error.message };
   }
 
-  if (!due || due.length === 0) {
-    return jsonResponse({ ok: true, job: "new_content", due: 0 });
-  }
+  const outcomes: unknown[] = [];
 
-  const outcomes: Record<string, unknown>[] = [];
-
-  for (const item of due) {
+  for (const item of (due ?? []) as DueAnnouncement[]) {
     const isCourse = item.kind === "new_course";
+    const payload: PushMessage = {
+      title: isCourse ? `New course: ${item.title}` : item.title,
+      body: oneLine(
+        item.subtitle,
+        isCourse
+          ? "Just added. Tap to take a look."
+          : "A new meditation is waiting for you.",
+      ),
+      data: {
+        type: item.kind,
+        target_id: item.target_id,
+        deep_link: item.deep_link,
+      },
+      channelId: "content_updates",
+    };
 
-    const claimed = await claim(supabase, {
-      kind: item.kind,
-      key: item.target_id,
-      targetId: item.target_id,
-      recipientCount: tokens.length,
-    });
+    const claimed = await claim(supabase, item.kind, item.target_id, payload);
     if (claimed !== "claimed") {
       outcomes.push({ title: item.title, skipped: claimed });
       continue;
     }
 
-    try {
-      const result = await broadcast(supabase, tokens, {
-        title: isCourse ? `New course: ${item.title}` : item.title,
-        body: oneLine(
-          item.subtitle,
-          isCourse
-            ? "Just added. Tap to take a look."
-            : "A new meditation is waiting for you.",
-        ),
-        data: {
-          type: item.kind,
-          target_id: item.target_id,
-          deep_link: item.deep_link,
-        },
-        channelId: "content_updates",
-      });
-
-      await supabase
-        .from("notification_log")
-        .update({ recipient_count: result.sent })
-        .eq("kind", item.kind)
-        .eq("key", item.target_id);
-
-      console.log(
-        `Announced ${item.kind} "${item.title}" — ${result.sent} delivered, ` +
-          `${result.failed} failed, ${result.pruned} pruned`,
-      );
-      outcomes.push({ title: item.title, ...result });
-    } catch (e) {
-      await release(supabase, item.kind, item.target_id);
-      const message = describe(e);
-      console.error(`Announcing "${item.title}" failed: ${message}`);
-      outcomes.push({ title: item.title, error: message });
-    }
+    outcomes.push(
+      await deliver(supabase, payload, {
+        kind: item.kind,
+        key: item.target_id,
+        startCursor: null,
+        alreadySent: 0,
+        label: item.title,
+      }),
+    );
   }
 
-  return jsonResponse({
-    ok: true,
-    job: "new_content",
-    due: due.length,
-    outcomes,
-  });
+  return { ok: true, job: "new_content", due: (due ?? []).length, outcomes };
 }
 
 // ---------------------------------------------------------------------------
 // daily_audio
 // ---------------------------------------------------------------------------
-async function runDailyAudio(
-  // deno-lint-ignore no-explicit-any
-  supabase: any,
-  tokens: string[],
-): Promise<Response> {
+// deno-lint-ignore no-explicit-any
+async function runDailyAudio(supabase: any) {
   // The key is a date, so "once a day" holds however often the cron
   // fires. UTC deliberately: the job runs at one moment for everybody,
   // and a per-viewer local date would make "today" ambiguous at exactly
@@ -194,108 +212,150 @@ async function runDailyAudio(
 
   if (error) {
     console.error(`daily_audio_pick failed: ${error.message}`);
-    return jsonResponse({ error: error.message }, 500);
+    return { ok: false, job: "daily_audio", error: error.message };
   }
 
-  const pick = picks?.[0];
+  const pick = (picks ?? [])[0] as AudioPick | undefined;
   if (!pick) {
     // An empty library is not a failure — it is a morning with nothing to
     // recommend. Claiming the day anyway would waste it, so it isn't
     // claimed: if audio is published later today, tonight's run sends.
     console.log("No published audio to feature today.");
-    return jsonResponse({ ok: true, job: "daily_audio", sent: 0 });
+    return { ok: true, job: "daily_audio", sent: 0 };
   }
 
-  const claimed = await claim(supabase, {
+  const payload: PushMessage = {
+    title: "Start your day",
+    body: `${pick.title} — tap to listen.`,
+    data: {
+      type: "daily_audio",
+      target_id: pick.id,
+      deep_link: `/audio/${pick.id}`,
+    },
+    channelId: "content_updates",
+  };
+
+  const claimed = await claim(
+    supabase,
+    "daily_audio",
+    today,
+    payload,
+    pick.id,
+  );
+  if (claimed !== "claimed") {
+    return { ok: true, job: "daily_audio", skipped: claimed };
+  }
+
+  const outcome = await deliver(supabase, payload, {
     kind: "daily_audio",
     key: today,
-    targetId: pick.id,
-    recipientCount: tokens.length,
+    startCursor: null,
+    alreadySent: 0,
+    label: pick.title,
   });
-  if (claimed !== "claimed") {
-    return jsonResponse({ ok: true, job: "daily_audio", skipped: claimed });
-  }
 
-  try {
-    const result = await broadcast(supabase, tokens, {
-      title: "Start your day",
-      body: `${pick.title} — tap to listen.`,
-      data: {
-        type: "daily_audio",
-        target_id: pick.id,
-        deep_link: `/audio/${pick.id}`,
-      },
-      channelId: "content_updates",
-    });
-
-    await supabase
-      .from("notification_log")
-      .update({ recipient_count: result.sent })
-      .eq("kind", "daily_audio")
-      .eq("key", today);
-
-    console.log(
-      `Daily audio "${pick.title}" — ${result.sent} delivered, ` +
-        `${result.failed} failed, ${result.pruned} pruned`,
-    );
-    return jsonResponse({
-      ok: true,
-      job: "daily_audio",
-      featured: pick.title,
-      ...result,
-    });
-  } catch (e) {
-    await release(supabase, "daily_audio", today);
-    const message = describe(e);
-    console.error(`Daily audio send failed: ${message}`);
-    return jsonResponse({ error: message }, 500);
-  }
+  return { ok: true, job: "daily_audio", featured: pick.title, ...outcome };
 }
 
 // ---------------------------------------------------------------------------
-// Shared claim / release
+// Shared claim / deliver
 // ---------------------------------------------------------------------------
 /// Claims BEFORE sending, so two overlapping runs produce one
-/// notification rather than two. The unique constraint on
-/// (kind, key) is what actually enforces it; this just reports which side
-/// of the race we were on.
+/// notification rather than two. The unique constraint on (kind, key) is
+/// what actually enforces it; this just reports which side of the race we
+/// were on.
 async function claim(
   // deno-lint-ignore no-explicit-any
   supabase: any,
-  args: {
-    kind: string;
-    key: string;
-    targetId: string | null;
-    recipientCount: number;
-  },
+  kind: string,
+  key: string,
+  payload: PushMessage,
+  targetId?: string,
 ): Promise<"claimed" | string> {
   const { error } = await supabase.from("notification_log").insert({
-    kind: args.kind,
-    key: args.key,
-    target_id: args.targetId,
-    recipient_count: args.recipientCount,
+    kind,
+    key,
+    target_id: targetId ?? key,
+    recipient_count: 0,
+    payload,
   });
 
   if (!error) return "claimed";
   if (error.code === "23505") return "already sent";
 
-  console.error(`Could not claim ${args.kind}/${args.key}: ${error.message}`);
+  console.error(`Could not claim ${kind}/${key}: ${error.message}`);
   return error.message;
 }
 
-/// Releases a claim whose send failed, so the next run retries rather
-/// than leaving something marked announced that nobody was told about.
-// deno-lint-ignore no-explicit-any
-async function release(supabase: any, kind: string, key: string) {
-  await supabase
-    .from("notification_log")
-    .delete()
-    .eq("kind", kind)
-    .eq("key", key);
-}
+async function deliver(
+  // deno-lint-ignore no-explicit-any
+  supabase: any,
+  payload: PushMessage,
+  args: {
+    kind: string;
+    key: string;
+    startCursor: string | null;
+    alreadySent: number;
+    label: string;
+  },
+): Promise<Record<string, unknown>> {
+  try {
+    const result = await fanOut(supabase, payload, {
+      startCursor: args.startCursor,
+      onProgress: async (cursor, sentSoFar) => {
+        await supabase
+          .from("notification_log")
+          .update({
+            delivery_cursor: cursor,
+            recipient_count: args.alreadySent + sentSoFar,
+          })
+          .eq("kind", args.kind)
+          .eq("key", args.key);
+      },
+    });
 
-function describe(e: unknown): string {
-  return e instanceof FcmConfigError
-    ? `Push is not configured: ${e.message}`
-    : String(e);
+    await supabase
+      .from("notification_log")
+      .update({
+        delivery_cursor: result.cursor,
+        recipient_count: args.alreadySent + result.sent,
+        completed_at: result.complete ? new Date().toISOString() : null,
+      })
+      .eq("kind", args.kind)
+      .eq("key", args.key);
+
+    console.log(
+      `Announced ${args.kind} "${args.label}" — ${result.sent} delivered, ` +
+        `${result.failed} failed, ${result.pruned} pruned, ` +
+        `${result.complete ? "complete" : "paused, will resume"}`,
+    );
+
+    return {
+      title: args.label,
+      sent: result.sent,
+      failed: result.failed,
+      pruned: result.pruned,
+      complete: result.complete,
+    };
+  } catch (e) {
+    // Release the claim so the next run retries from the start, rather
+    // than leaving something marked announced that nobody was told about.
+    // Only safe when nothing was delivered — a failure here is the token
+    // read or the FCM credentials, both of which fail before the first
+    // send rather than partway through. A claim that already has a cursor
+    // keeps it and resumes instead.
+    if (args.startCursor === null) {
+      await supabase
+        .from("notification_log")
+        .delete()
+        .eq("kind", args.kind)
+        .eq("key", args.key);
+    }
+
+    const message = e instanceof FcmConfigError
+      ? `Push is not configured: ${e.message}`
+      : String(e);
+    console.error(`Announcing "${args.label}" failed: ${message}`);
+    return { title: args.label, error: message };
+  }
 }

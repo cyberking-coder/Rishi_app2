@@ -370,6 +370,24 @@ Three reasons to open the app, three notifications: something is starting soon (
 
 **Tapping a notification goes somewhere.** Every payload carries a `deep_link` go_router path, and `PushService` funnels all three tap sources into one stream: FCM's `onMessageOpenedApp` (backgrounded), `getInitialMessage` (cold start, parked in `pendingDeepLink` because nothing is listening that early), and the local plugin's own response callback (foreground, where FCM posts nothing itself). A new audio needed a destination that didn't exist, so `/audio/:id` was added — it resolves the id, starts playback, and replaces itself with Now Playing, so back goes where the user was rather than to a loading screen they'd have to escape twice.
 
+### Push fan-out at scale
+
+**Migration**: `20260801000009_push_fanout_progress.sql`.
+
+The first version of the fan-out read the whole token list in one query and sent it in one invocation. Both halves had a ceiling, and both failed silently — the worst property a limit can have.
+
+**The unbounded read.** PostgREST enforces a server-side row cap, so past it the token list came back truncated with no error. The function would report `sent: 1000, failed: 0`, look completely healthy, and most of the audience would hear nothing. Replaced with a **keyset walk**: tokens are read in sorted chunks and the cursor is the last token, not a row offset. That matters because dead tokens are deleted mid-walk, and an offset would skip a device every time a pruned row ahead of it shifted the rest backwards. A key cannot be invalidated by a deletion elsewhere in the list.
+
+A short page is deliberately **not** treated as the end of the table. If the server's cap is lower than the requested chunk size, every page comes back short — which would read as "finished" after the first one and reintroduce exactly the truncation this replaced. Only an empty page ends the walk. Verified by simulation against caps of 1000, 500, 100 and 25 with heavy concurrent pruning: every surviving token receives exactly one send, and no token outside the original set is ever contacted.
+
+**The wall clock.** A send is claimed *before* it goes out, so an invocation that timed out mid-fan-out left the notification marked sent with only part of the audience reached, and nothing would retry it. Deliveries are now resumable: the claim row carries `delivery_cursor`, `recipient_count` and `completed_at`, progress is written after every chunk, and both functions finish any open claim before looking for new work. `due_session_reminders()` and `due_content_announcements()` both exclude claimed rows, so without that resume pass an interrupted delivery would sit half-sent forever.
+
+The rendered notification is stored on the claim as `payload`. A resume must not reconstruct the message from a session or course that may have been edited in between — the second half of an audience has to receive the same text as the first half.
+
+**Concurrency raised from 20 to 100.** All the requests go to one host over HTTP/2, so they share connections rather than opening a socket each, and the round trip dominates. At 20, a large audience made the wall clock the binding constraint rather than a theoretical one.
+
+Failure handling distinguishes the two cases: a claim that has never delivered anything is released so the next run retries from scratch (a failure there is the token read or the FCM credentials, both of which fail before the first send), while a claim that already has a cursor keeps it and resumes.
+
 ### Bug-fix chronology — Phases 3b through 5
 
 Every one of these was found by testing on a real device, not by review.

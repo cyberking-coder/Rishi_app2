@@ -8,6 +8,12 @@
 // in due_session_reminders(), so "when does a reminder fire" has one
 // answer in one place and this file only has to deliver.
 //
+// Deliveries are resumable. A reminder is claimed before it is sent (so
+// two overlapping runs can't both notify everybody), and the claim
+// carries how far the send got — an audience too large for one
+// invocation is finished by the next run rather than half-delivered and
+// marked done.
+//
 // Caller must present the service-role key. verify_jwt is left ON for
 // this function (it accepts any valid project JWT), so the role check
 // below is what actually restricts it — without it, any signed-in user
@@ -15,12 +21,8 @@
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { handlePreflight, jsonResponse } from "../_shared/cors.ts";
-import { FcmConfigError } from "../_shared/fcm.ts";
-import {
-  allPushTokens,
-  broadcast,
-  roleFromAuthHeader,
-} from "../_shared/push_audience.ts";
+import { FcmConfigError, type PushMessage } from "../_shared/fcm.ts";
+import { fanOut, roleFromAuthHeader } from "../_shared/push_audience.ts";
 
 interface DueReminder {
   session_id: string;
@@ -30,12 +32,35 @@ interface DueReminder {
   minutes_before: number;
 }
 
+interface OpenClaim {
+  session_id: string;
+  minutes_before: number;
+  delivery_cursor: string | null;
+  recipient_count: number;
+  payload: PushMessage | null;
+}
+
 /// "in an hour" / "in 30 minutes" / "in 5 minutes". Written out rather
 /// than templated from the number so the 60 case doesn't read as "in 60
 /// minutes", which nobody says.
 function whenPhrase(minutes: number): string {
   if (minutes >= 60) return "in an hour";
   return `in ${minutes} minutes`;
+}
+
+function messageFor(reminder: DueReminder): PushMessage {
+  return {
+    title: reminder.title,
+    body: `Starts ${whenPhrase(reminder.minutes_before)}. ` +
+      `Open the app and tap to join.`,
+    data: {
+      type: "live_session",
+      session_id: reminder.session_id,
+      join_url: reminder.join_url,
+      deep_link: "/watch",
+    },
+    channelId: "session_reminders",
+  };
 }
 
 Deno.serve(async (req) => {
@@ -55,6 +80,37 @@ Deno.serve(async (req) => {
     Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
   );
 
+  const outcomes: Record<string, unknown>[] = [];
+
+  // Unfinished deliveries first. They are already claimed, so
+  // due_session_reminders() will never surface them again — if this pass
+  // didn't exist, a reminder interrupted by the wall clock would sit
+  // half-delivered forever.
+  const { data: open } = await supabase
+    .from("session_reminders")
+    .select("session_id, minutes_before, delivery_cursor, recipient_count, payload")
+    .is("completed_at", null)
+    .order("sent_at", { ascending: true })
+    .returns<OpenClaim[]>();
+
+  for (const claim of open ?? []) {
+    if (!claim.payload) {
+      // Claimed before payloads were stored. Nothing can reconstruct what
+      // it was meant to say, and guessing is worse than closing it.
+      await markComplete(supabase, claim.session_id, claim.minutes_before);
+      continue;
+    }
+    outcomes.push(
+      await deliver(supabase, claim.payload, {
+        sessionId: claim.session_id,
+        minutesBefore: claim.minutes_before,
+        startCursor: claim.delivery_cursor,
+        alreadySent: claim.recipient_count,
+        label: `${claim.payload.title} (resumed)`,
+      }),
+    );
+  }
+
   const { data: due, error: dueError } = await supabase
     .rpc("due_session_reminders", { p_window_minutes: 10 })
     .returns<DueReminder[]>();
@@ -64,21 +120,9 @@ Deno.serve(async (req) => {
     return jsonResponse({ error: dueError.message }, 500);
   }
 
-  if (!due || due.length === 0) {
-    return jsonResponse({ ok: true, due: 0, sent: 0 });
-  }
+  for (const reminder of due ?? []) {
+    const payload = messageFor(reminder);
 
-  let tokens: string[];
-  try {
-    tokens = await allPushTokens(supabase);
-  } catch (e) {
-    console.error(String(e));
-    return jsonResponse({ error: String(e) }, 500);
-  }
-
-  const outcomes: Record<string, unknown>[] = [];
-
-  for (const reminder of due) {
     // Claim BEFORE sending. Two overlapping cron runs both see the same
     // due row, and the unique constraint is what makes only one of them
     // send. Claiming afterwards would let both through and double-notify
@@ -88,7 +132,8 @@ Deno.serve(async (req) => {
       .insert({
         session_id: reminder.session_id,
         minutes_before: reminder.minutes_before,
-        recipient_count: tokens.length,
+        recipient_count: 0,
+        payload,
       });
 
     if (claimError) {
@@ -110,65 +155,108 @@ Deno.serve(async (req) => {
       continue;
     }
 
-    let result;
-    try {
-      result = await broadcast(supabase, tokens, {
-        title: reminder.title,
-        body: `Starts ${whenPhrase(reminder.minutes_before)}. ` +
-          `Open the app and tap to join.`,
-        data: {
-          type: "live_session",
-          session_id: reminder.session_id,
-          join_url: reminder.join_url,
-          deep_link: "/watch",
-        },
-        channelId: "session_reminders",
-      });
-    } catch (e) {
-      // Release the claim so the next run retries, rather than leaving a
-      // reminder permanently marked sent when nothing was sent. A config
-      // error is the one exception: retrying it just burns runs, so it
-      // stays claimed only if it isn't a config problem.
-      await supabase
-        .from("session_reminders")
-        .delete()
-        .eq("session_id", reminder.session_id)
-        .eq("minutes_before", reminder.minutes_before);
+    outcomes.push(
+      await deliver(supabase, payload, {
+        sessionId: reminder.session_id,
+        minutesBefore: reminder.minutes_before,
+        startCursor: null,
+        alreadySent: 0,
+        label: reminder.title,
+      }),
+    );
+  }
 
-      const message = e instanceof FcmConfigError
-        ? `Push is not configured: ${e.message}`
-        : `Send failed: ${e}`;
-      console.error(message);
-      outcomes.push({
-        session: reminder.title,
-        minutes_before: reminder.minutes_before,
-        error: message,
-      });
-      continue;
-    }
+  return jsonResponse({
+    ok: true,
+    due: (due ?? []).length,
+    resumed: (open ?? []).length,
+    outcomes,
+  });
+});
 
-    // The claim was written before the recipient count was known; correct
-    // it now that it is, so the dashboard shows what actually landed.
+async function deliver(
+  // deno-lint-ignore no-explicit-any
+  supabase: any,
+  payload: PushMessage,
+  args: {
+    sessionId: string;
+    minutesBefore: number;
+    startCursor: string | null;
+    alreadySent: number;
+    label: string;
+  },
+): Promise<Record<string, unknown>> {
+  try {
+    const result = await fanOut(supabase, payload, {
+      startCursor: args.startCursor,
+      onProgress: async (cursor, sentSoFar) => {
+        await supabase
+          .from("session_reminders")
+          .update({
+            delivery_cursor: cursor,
+            recipient_count: args.alreadySent + sentSoFar,
+          })
+          .eq("session_id", args.sessionId)
+          .eq("minutes_before", args.minutesBefore);
+      },
+    });
+
     await supabase
       .from("session_reminders")
-      .update({ recipient_count: result.sent })
-      .eq("session_id", reminder.session_id)
-      .eq("minutes_before", reminder.minutes_before);
+      .update({
+        delivery_cursor: result.cursor,
+        recipient_count: args.alreadySent + result.sent,
+        completed_at: result.complete ? new Date().toISOString() : null,
+      })
+      .eq("session_id", args.sessionId)
+      .eq("minutes_before", args.minutesBefore);
 
     console.log(
-      `Reminder sent: "${reminder.title}" ${reminder.minutes_before}m — ` +
+      `Reminder "${args.label}" ${args.minutesBefore}m — ` +
         `${result.sent} delivered, ${result.failed} failed, ` +
-        `${result.pruned} tokens pruned`,
+        `${result.pruned} pruned, ` +
+        `${result.complete ? "complete" : "paused, will resume"}`,
     );
 
-    outcomes.push({
-      session: reminder.title,
-      minutes_before: reminder.minutes_before,
+    return {
+      session: args.label,
+      minutes_before: args.minutesBefore,
       sent: result.sent,
       failed: result.failed,
       pruned: result.pruned,
-    });
-  }
+      complete: result.complete,
+    };
+  } catch (e) {
+    // Release the claim so the next run retries from the start, rather
+    // than leaving a reminder marked sent that nobody received. Safe to
+    // restart only because nothing was delivered: a failure here is the
+    // token read or the FCM credentials, both of which fail before the
+    // first send rather than partway through.
+    if (args.startCursor === null) {
+      await supabase
+        .from("session_reminders")
+        .delete()
+        .eq("session_id", args.sessionId)
+        .eq("minutes_before", args.minutesBefore);
+    }
 
-  return jsonResponse({ ok: true, due: due.length, outcomes });
-});
+    const message = e instanceof FcmConfigError
+      ? `Push is not configured: ${e.message}`
+      : `Send failed: ${e}`;
+    console.error(message);
+    return {
+      session: args.label,
+      minutes_before: args.minutesBefore,
+      error: message,
+    };
+  }
+}
+
+// deno-lint-ignore no-explicit-any
+async function markComplete(supabase: any, sessionId: string, minutes: number) {
+  await supabase
+    .from("session_reminders")
+    .update({ completed_at: new Date().toISOString() })
+    .eq("session_id", sessionId)
+    .eq("minutes_before", minutes);
+}
