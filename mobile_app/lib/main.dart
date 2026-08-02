@@ -9,6 +9,7 @@ import 'app/router/app_router.dart';
 import 'app/theme/app_theme.dart';
 import 'features/profile/application/profile_providers.dart';
 import 'core/config/app_config.dart';
+import 'core/push/push_service.dart';
 import 'features/audio/application/audio_player_handler.dart';
 import 'features/audio/application/audio_providers.dart';
 import 'features/audio/data/datasources/audio_remote_datasource.dart';
@@ -33,6 +34,12 @@ Future<void> main() async {
     url: AppConfig.supabaseUrl,
     anonKey: AppConfig.supabaseAnonKey,
   );
+
+  // Push is optional at boot for the same reason audio and downloads are:
+  // it can fail (no google-services.json, no Play Services) and the app
+  // must still reach the login screen. PushService.init swallows its own
+  // failures and reports isAvailable = false.
+  await PushService.init();
 
   final audioRepository =
       AudioRepositoryImpl(AudioRemoteDataSource(Supabase.instance.client));

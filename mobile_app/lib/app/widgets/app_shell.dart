@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../theme/app_theme.dart';
 import '../../features/audio/presentation/widgets/mini_player.dart';
+import '../../features/live/application/live_providers.dart';
 
 /// One of the app's four top-level destinations. Courses is a peer of
 /// Home rather than a row buried inside it — learning is its own mode of
@@ -20,14 +22,21 @@ const _tabRoutes = {
 /// navigation. Screens pushed on top (now playing, a lesson, a category)
 /// deliberately don't use this — they're a drill-down, and keeping the
 /// nav visible there would invite tapping "Home" mid-lesson.
-class AppShell extends StatelessWidget {
+class AppShell extends ConsumerWidget {
   final Widget child;
   final AppTab tab;
 
   const AppShell({super.key, required this.child, required this.tab});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    // Registering for reminders hangs off the shell because the shell is
+    // exactly "a signed-in user is looking at the app" — which is both
+    // when a token is obtainable and when asking for notification
+    // permission makes sense. Doing it in main() would ask before the
+    // login screen, with no context for why.
+    ref.watch(pushRegistrationProvider);
+
     return Scaffold(
       backgroundColor: AppTheme.background,
       body: Column(

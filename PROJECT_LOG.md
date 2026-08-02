@@ -328,6 +328,30 @@ The artwork is **not** snapshotted onto the certificate record, unlike the cours
 
 **Manual award**: there is deliberately no "create certificate" form — a certificate is earned, and the Certificates page only lists what has been issued. But the enrolled-students roster on each course has an **Award** button per student, which bypasses the completion check for the cases that check cannot see (offline cohorts, migrated students, progress lost to a bug). It mints the same number format `issue_certificate()` does, so a manual award is indistinguishable to a verifier — that is the point, not an oversight: it is a real credential, not a marked-down one. Awarding someone who holds a revoked certificate reinstates it rather than minting a second.
 
+### Live sessions + push notifications (outside the numbered rollout)
+
+**Migration**: `20260801000007_live_sessions_and_push.sql`.
+
+Not a roadmap phase — the roadmap's Phase 6 is scaling hardening. This was asked for directly: announce a Zoom meeting in the app, remind people an hour, 30 minutes and 5 minutes before it starts, and let them tap through to join.
+
+**Where it lives**: the Watch tab, above the YouTube list. They are the same thing to the person using the app — free, open, played outside it — and splitting them would mean someone had to already know which tab a session lived under to find out whether one was on.
+
+**A session is a link, a picture and a time.** `live_sessions` deliberately does not validate that `join_url` is a Zoom URL: Zoom is what's used today, but a Meet or Teams link works identically in the app and rejecting one would be a rule with nothing behind it. `duration_minutes` is a display hint — it decides when the card stops reading as "live now" — not something anything enforces, because sessions overrun and that's normal.
+
+**All the timing logic is in one function.** `due_session_reminders()` answers exactly one question: which sessions have crossed a 60/30/5-minute mark that hasn't been sent? The edge function is a fan-out and the n8n workflow is a clock; neither knows what "due" means. The window it accepts is deliberately generous — the mark, plus anything up to ten minutes past it — so a scheduler that runs every five minutes, or misses a beat entirely, still catches the mark rather than stepping over it. Sending a 30-minute reminder at 27 minutes is fine; sending nothing is not.
+
+**`session_reminders` is what makes polling safe.** A unique constraint on `(session_id, minutes_before)` is the guard, and the send function **claims before it sends** — the reverse of the mistake the payment webhook made, where claiming afterwards would have let two overlapping cron runs both notify everybody. If the send then fails, the claim is released so the next run retries, rather than leaving a reminder permanently marked sent when nothing was sent.
+
+**Editing a session does not clear its reminders.** Moving a session an hour later must not re-send the "starts in an hour" people already got; a second one reads as a bug, and the reschedule itself is what needs announcing, not the countdown. Cancel and recreate if the reminders should genuinely run again.
+
+**`push_tokens` is keyed on the token**, not on the user and not on a device id. The token is what FCM actually addresses and what it invalidates — a user key would lose someone's second device, and a device key would go stale the moment the OS reissued a token for the same install. FCM's HTTP v1 API has no multicast send, so a fan-out is N requests at a bounded concurrency of 20; every token is attempted even when earlier ones fail, because one dead handset must not stop a reminder reaching everybody else. Tokens FCM reports as permanently dead (404, or `INVALID_ARGUMENT` on the token) are deleted; transient failures (429, 503) are kept, since pruning on those would delete a live device over a momentary outage. Signing out unregisters the token, or reminders would follow the handset to whoever signs in next.
+
+**Push is optional at boot**, for the same reason audio and downloads are. A missing `google-services.json`, a denied permission or a handset with no Play Services must all end with the app running normally and no reminders — never a crash on a screen someone was trying to reach. `PushService` swallows its own failures and reports `isAvailable = false`; the Gradle plugin is applied only when `google-services.json` is actually present, so a checkout without it still builds.
+
+**The notification channel id `session_reminders` is written in three places** — the manifest's `default_notification_channel_id`, the channel `PushService` creates, and the `channel_id` the send function puts on the FCM payload. If any two disagree, Android quietly files the notification under a default channel and the high-importance setting is silently lost. FCM also posts nothing of its own while the app is in the foreground, which is exactly when a reminder is most likely to get someone into the call, so foreground messages are re-posted through `flutter_local_notifications`.
+
+**Also fixed here**: the mini-player's progress bar never moved. It read `PlaybackState.position`, which only emits on play/pause/seek — the bar was drawn correctly and simply sat frozen in between. It now reads the player's continuous `positionStream`, the same fix the Now Playing screen had already needed, and shows elapsed/total in tabular figures so the text doesn't jiggle every second.
+
 ### Bug-fix chronology — Phases 3b through 5
 
 Every one of these was found by testing on a real device, not by review.
@@ -368,6 +392,7 @@ None of these are committed to the repo (correctly). Listed here so a fresh setu
 | `BUNNY_STREAM_API_KEY`, `BUNNY_STREAM_LIBRARY_ID` | `issue-playback-license` | Reads live encode status, since Bunny sends no webhook. Optional: absent, the status check returns "unknown" and fails open |
 | `N8N_COURSE_PAYMENT_WEBHOOK_URL` | `razorpay-webhook` | Course-payment automation. Falls back to `N8N_PAYMENT_WEBHOOK_URL` |
 | `N8N_PAYMENT_WEBHOOK_URL` | `razorpay-webhook` | Subscription-payment automation (not in active use) |
+| `FCM_SERVICE_ACCOUNT` | `send-session-reminders` | The **entire** service-account JSON from Firebase console → Project settings → Service accounts → Generate new private key. Not a path, not a key id. Absent, the function returns a config error naming it and releases its reminder claim so nothing is silently marked sent |
 
 > **Bunny token authentication is deliberately OFF.** A directory token cannot survive the jump from an HLS master playlist to its renditions on a native player — ExoPlayer and AVPlayer cannot re-attach a token to segment requests at runtime, and Bunny's own workaround is a JavaScript hook that only exists in web players. Setting `BUNNY_STREAM_TOKEN_KEY` again will break playback. Access is gated by `issue-playback-license` (purchase, device lock, access window), not by the CDN.
 
@@ -388,6 +413,7 @@ None of these are committed to the repo (correctly). Listed here so a fresh setu
 | `lib/core/config/google_auth_config.dart` | Google OAuth Web Client ID |
 | `lib/core/config/checkout_config.dart` | The admin app's public URL |
 | `ios/Runner/Info.plist` | `GIDClientID` + `CFBundleURLSchemes` (Google OAuth iOS client) |
+| `android/app/google-services.json` | Downloaded from the Firebase console. Gitignored-by-absence — not in the repo, and the Gradle plugin is applied only when it exists, so a checkout without it still builds (with push inert). **Register a second Android app for `com.knowthyself.app.debug`** in the same Firebase project, or push won't work in debug builds — the same suffix trap that broke Google Sign-In earlier |
 
 ---
 

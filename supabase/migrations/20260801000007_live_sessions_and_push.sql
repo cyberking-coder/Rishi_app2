@@ -34,6 +34,7 @@ create index if not exists idx_live_sessions_upcoming
   on public.live_sessions (starts_at)
   where status = 'scheduled';
 
+drop trigger if exists trg_live_sessions_updated_at on public.live_sessions;
 create trigger trg_live_sessions_updated_at
   before update on public.live_sessions
   for each row execute function public.set_updated_at();
@@ -149,4 +150,10 @@ as $$
     );
 $$;
 
+-- Nobody but the scheduler asks this question, and the answer contains
+-- join links for sessions that haven't started. Revoking from PUBLIC
+-- removes the default grant every role inherits, so the grant to
+-- service_role is restated explicitly rather than left to whichever
+-- default privilege happened to fire when the function was created.
 revoke execute on function public.due_session_reminders(int) from public, anon, authenticated;
+grant execute on function public.due_session_reminders(int) to service_role;

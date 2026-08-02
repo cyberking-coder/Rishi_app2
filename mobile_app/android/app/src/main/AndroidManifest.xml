@@ -79,7 +79,16 @@
             </intent-filter>
         </receiver>
 
-        <!-- flutter_secure_storage: hardware-backed keystore -->
+        <!-- Firebase Messaging: the channel a reminder lands in when the
+             app is in the background and FCM posts the notification
+             itself. Must match the channel_id the send-session-reminders
+             function sets, and the channel PushService creates — if the
+             three disagree, Android quietly files the notification under
+             a default channel and the high-importance setting is lost. -->
+        <meta-data
+            android:name="com.google.firebase.messaging.default_notification_channel_id"
+            android:value="session_reminders" />
+
         <meta-data
             android:name="flutterEmbedding"
             android:value="2" />

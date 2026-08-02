@@ -216,6 +216,30 @@ export interface YoutubeVideo {
   updated_at: string;
 }
 
+// ── Live sessions ────────────────────────────────────────────────────────
+
+export interface LiveSession {
+  id: string;
+  title: string;
+  description: string | null;
+  join_url: string;
+  thumbnail_url: string | null;
+  starts_at: string;
+  duration_minutes: number;
+  status: "scheduled" | "cancelled";
+  created_at: string;
+  updated_at: string;
+}
+
+export interface SessionReminder {
+  id: string;
+  session_id: string;
+  /** 60, 30 or 5. */
+  minutes_before: number;
+  sent_at: string;
+  recipient_count: number;
+}
+
 // ── Certificates ─────────────────────────────────────────────────────────
 
 export interface Certificate {
