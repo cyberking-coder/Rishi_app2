@@ -25,7 +25,7 @@
           "interval": [
             {
               "field": "cronExpression",
-              "expression": "30 1 * * *"
+              "expression": "0 7 * * *"
             }
           ]
         }
@@ -35,7 +35,7 @@
       "type": "n8n-nodes-base.scheduleTrigger",
       "typeVersion": 1.2,
       "position": [-460, 120],
-      "notes": "01:30 UTC = 07:00 IST. n8n evaluates cron in UTC unless the workflow's timezone is set, so this is written in UTC deliberately. Change the hour here to change when the morning nudge goes out — the app and the function have no opinion about the time."
+      "notes": "07:00 in the workflow's own timezone, which settings.timezone below pins to Asia/Kolkata. Pinned rather than left to inherit: n8n falls back to the instance timezone, which is whatever the host was configured with, so an unpinned schedule silently means a different hour on a different instance. Change the hour here to change when the morning nudge goes out — the app and the function have no opinion about the time."
     },
     {
       "parameters": {
@@ -204,7 +204,8 @@
     }
   },
   "settings": {
-    "executionOrder": "v1"
+    "executionOrder": "v1",
+    "timezone": "Asia/Kolkata"
   },
   "pinData": {}
 }
