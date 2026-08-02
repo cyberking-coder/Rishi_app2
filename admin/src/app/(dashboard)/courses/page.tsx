@@ -86,8 +86,12 @@ export default async function CoursesPage() {
       // vanished once before.
       supabase
         .from("course_purchases")
-        .select("course_id, user_id")
+        .select("course_id, user_id, expires_at")
+        // Revoked enrolments are dated in the past, not deleted, so they
+        // have to be excluded here or a course would keep reporting a
+        // seat as taken after its student lost access.
         .eq("status", "paid")
+        .or(`expires_at.is.null,expires_at.gt.${new Date().toISOString()}`)
         .returns<{ course_id: string; user_id: string }[]>(),
     ]);
 

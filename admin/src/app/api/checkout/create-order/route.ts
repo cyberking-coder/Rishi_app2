@@ -166,12 +166,19 @@ async function createCourseOrder(
   // Already owned: paying twice for the same course is never what the
   // buyer meant, and the unique index would reject the second grant
   // anyway — better to say so before taking money.
+  //
+  // Only CURRENT access counts. A revoked enrolment keeps its row (as
+  // 'revoked') and a time-limited one keeps its lapsed expires_at, and
+  // treating either as ownership would leave the student unable to buy
+  // the course back — refused at checkout for access they no longer
+  // have.
   const { data: existing } = await db
     .from("course_purchases")
     .select("id")
     .eq("user_id", userId)
     .eq("course_id", courseId)
     .eq("status", "paid")
+    .or(`expires_at.is.null,expires_at.gt.${new Date().toISOString()}`)
     .maybeSingle();
 
   if (existing) {
@@ -251,6 +258,7 @@ async function createCourseOrder(
       status: "paid",
       coupon_id: couponId,
       discount_amount: discountAmount,
+      billing_name: billing.name,
     });
 
     if (grantError) {
@@ -308,8 +316,18 @@ async function createCourseOrder(
 
     // Recorded as pending so an abandoned checkout is still visible to
     // the admin; the webhook flips it to paid on the same order id.
-    await db.from("course_purchases").upsert(
-      {
+    //
+    // A plain insert, not an upsert. uq_course_purchases_order is
+    // PARTIAL (... where razorpay_order_id is not null), and Postgres
+    // rejects a partial index as an ON CONFLICT target unless the
+    // statement repeats its predicate — which PostgREST's on_conflict
+    // parameter cannot express. The upsert that used to be here failed
+    // on every call, and because its error was never read, the pending
+    // row this comment promises was silently never written. The order id
+    // is freshly minted, so there is nothing to conflict with anyway.
+    const { error: pendingError } = await db
+      .from("course_purchases")
+      .insert({
         user_id: userId,
         course_id: course.id,
         amount: payable,
@@ -318,9 +336,19 @@ async function createCourseOrder(
         razorpay_order_id: order.id,
         coupon_id: couponId,
         discount_amount: discountAmount,
-      },
-      { onConflict: "razorpay_order_id" },
-    );
+        // Kept because it's the only place a buyer's real name is
+        // reliably captured — most sign up without ever setting a
+        // profile display name, and the completion certificate has to
+        // be made out to someone.
+        billing_name: billing.name,
+      });
+
+    // Non-fatal: the webhook creates the row itself if it isn't there,
+    // so a failure here costs visibility of an abandoned checkout, not
+    // the purchase.
+    if (pendingError) {
+      console.error("Could not record pending purchase:", pendingError.message);
+    }
 
     return NextResponse.json({
       order_id: order.id,

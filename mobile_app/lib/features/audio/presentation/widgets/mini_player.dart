@@ -1,3 +1,5 @@
+import 'dart:ui' show FontFeature;
+
 import 'package:audio_service/audio_service.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -26,9 +28,21 @@ class MiniPlayer extends ConsumerWidget {
           stream: handler.playbackState,
           builder: (context, stateSnapshot) {
             final playing = stateSnapshot.data?.playing ?? false;
-            final progress = _progressFraction(mediaItem, stateSnapshot.data);
 
-            return GestureDetector(
+            return StreamBuilder<Duration>(
+              // The position comes from the player's own continuous
+              // stream, NOT from PlaybackState. PlaybackState only emits
+              // on play/pause/seek, so the bar sat frozen between those —
+              // it was drawn correctly and simply never moved. The Now
+              // Playing screen hit the same trap and was fixed the same
+              // way.
+              stream: handler.positionStream,
+              builder: (context, positionSnapshot) {
+                final position = positionSnapshot.data ?? Duration.zero;
+                final duration = mediaItem.duration;
+                final progress = _progressFraction(duration, position);
+
+                return GestureDetector(
               onTap: () => context.push('/now-playing'),
               child: Material(
                 color: AppTheme.sageDark,
@@ -88,6 +102,24 @@ class MiniPlayer extends ConsumerWidget {
                               ],
                             ),
                           ),
+                          // Elapsed / total, so the bar is readable as a
+                          // time rather than only as a proportion.
+                          if (duration != null)
+                            Padding(
+                              padding: const EdgeInsets.only(left: 8),
+                              child: Text(
+                                '${_clock(position)} / ${_clock(duration)}',
+                                style: const TextStyle(
+                                  color: Color(0xCCFFFFFF),
+                                  fontSize: 11,
+                                  fontFeatures: [
+                                    // Tabular digits, or the text jiggles
+                                    // every second as glyph widths change.
+                                    FontFeature.tabularFigures(),
+                                  ],
+                                ),
+                              ),
+                            ),
                           IconButton(
                             icon: Icon(playing ? Icons.pause : Icons.play_arrow,
                                 color: Colors.white),
@@ -101,18 +133,27 @@ class MiniPlayer extends ConsumerWidget {
                 ),
               ),
             );
+              },
+            );
           },
         );
       },
     );
   }
 
-  double _progressFraction(MediaItem mediaItem, PlaybackState? state) {
-    final duration = mediaItem.duration;
-    final position = state?.position;
-    if (duration == null || position == null || duration.inMilliseconds == 0) {
-      return 0;
-    }
+  double _progressFraction(Duration? duration, Duration position) {
+    if (duration == null || duration.inMilliseconds == 0) return 0;
     return (position.inMilliseconds / duration.inMilliseconds).clamp(0, 1);
+  }
+
+  /// mm:ss, or h:mm:ss once a track passes an hour — a leading "00:" on
+  /// an eight-minute meditation is noise.
+  static String _clock(Duration d) {
+    String two(int n) => n.toString().padLeft(2, '0');
+    final minutes = two(d.inMinutes.remainder(60));
+    final seconds = two(d.inSeconds.remainder(60));
+    return d.inHours > 0
+        ? '${d.inHours}:$minutes:$seconds'
+        : '$minutes:$seconds';
   }
 }

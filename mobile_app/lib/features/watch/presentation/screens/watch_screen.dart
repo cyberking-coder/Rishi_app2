@@ -2,17 +2,32 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../app/theme/app_theme.dart';
+import '../../../live/application/live_providers.dart';
+import '../../../live/domain/entities/live_session.dart';
+import '../../../live/presentation/widgets/live_session_card.dart';
 import '../../application/watch_providers.dart';
 import '../widgets/youtube_card.dart';
 
-/// Free videos, played on YouTube. Separate from Courses because this is
-/// open content used to bring people in, not something anyone pays for.
+/// Free video in one place: live Zoom sessions at the top, then the
+/// YouTube library.
+///
+/// They share a screen because they are the same thing to the person
+/// using the app — free, open, and played outside it. Splitting them
+/// would mean someone had to already know which tab a session lived
+/// under to find out whether one was on.
 class WatchScreen extends ConsumerWidget {
   const WatchScreen({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final async = ref.watch(youtubeVideosProvider);
+    final videosAsync = ref.watch(youtubeVideosProvider);
+    final sessionsAsync = ref.watch(upcomingSessionsProvider);
+
+    // A failed session fetch shows nothing rather than an error: the
+    // YouTube list below is the bulk of the screen and must not be
+    // replaced by a message about a section that may well be empty
+    // anyway.
+    final sessions = sessionsAsync.asData?.value ?? const <LiveSession>[];
 
     return Scaffold(
       backgroundColor: AppTheme.background,
@@ -27,28 +42,27 @@ class WatchScreen extends ConsumerWidget {
                   icon: const Icon(Icons.arrow_back_rounded, size: 20),
                   onPressed: () => Navigator.of(context).pop(),
                 ),
-                const Expanded(
+                Expanded(
                   child: Text(
                     'Watch',
-                    style: TextStyle(
-                      fontSize: 22,
-                      fontWeight: FontWeight.w800,
-                      color: AppTheme.textPrimary,
-                    ),
+                    style: Theme.of(context).textTheme.headlineSmall,
                   ),
                 ),
               ]),
             ),
-            const Padding(
-              padding: EdgeInsets.fromLTRB(20, 0, 20, 12),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 0, 20, 12),
               child: Text(
-                'Free talks and guided sessions on YouTube.',
-                style: TextStyle(fontSize: 13, color: AppTheme.textSecondary),
+                'Live sessions and free talks.',
+                style: Theme.of(context)
+                    .textTheme
+                    .bodySmall
+                    ?.copyWith(color: AppTheme.textSecondary),
               ),
             ),
 
             Expanded(
-              child: async.when(
+              child: videosAsync.when(
                 loading: () => const Center(
                   child: CircularProgressIndicator(
                       color: AppTheme.sage, strokeWidth: 2),
@@ -65,12 +79,12 @@ class WatchScreen extends ConsumerWidget {
                   ),
                 ),
                 data: (videos) {
-                  if (videos.isEmpty) {
+                  if (videos.isEmpty && sessions.isEmpty) {
                     return const Center(
                       child: Padding(
                         padding: EdgeInsets.all(32),
                         child: Text(
-                          'No videos yet.\nCheck back soon.',
+                          'Nothing on right now.\nCheck back soon.',
                           textAlign: TextAlign.center,
                           style: TextStyle(
                               color: AppTheme.textSecondary, height: 1.5),
@@ -81,50 +95,67 @@ class WatchScreen extends ConsumerWidget {
 
                   return RefreshIndicator(
                     color: AppTheme.sage,
-                    onRefresh: () async =>
-                        ref.invalidate(youtubeVideosProvider),
-                    child: ListView.separated(
+                    onRefresh: () async {
+                      ref.invalidate(youtubeVideosProvider);
+                      ref.invalidate(upcomingSessionsProvider);
+                    },
+                    child: ListView(
                       padding: const EdgeInsets.fromLTRB(20, 4, 20, 28),
-                      itemCount: videos.length,
-                      separatorBuilder: (_, __) => const SizedBox(height: 18),
-                      itemBuilder: (_, i) {
-                        final video = videos[i];
-                        return GestureDetector(
-                          onTap: () => openYoutube(context, video),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              YoutubeThumbnail(video: video),
-                              const SizedBox(height: 10),
-                              Text(
-                                video.title,
-                                maxLines: 2,
-                                overflow: TextOverflow.ellipsis,
-                                style: const TextStyle(
-                                  fontSize: 14.5,
-                                  fontWeight: FontWeight.w700,
-                                  height: 1.3,
-                                  color: AppTheme.textPrimary,
-                                ),
-                              ),
-                              if (video.description != null &&
-                                  video.description!.trim().isNotEmpty) ...[
-                                const SizedBox(height: 4),
-                                Text(
-                                  video.description!,
-                                  maxLines: 2,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: const TextStyle(
-                                    fontSize: 12.5,
-                                    color: AppTheme.textSecondary,
-                                    height: 1.45,
+                      children: [
+                        if (sessions.isNotEmpty) ...[
+                          const _SectionLabel('Live sessions'),
+                          const SizedBox(height: 12),
+                          for (final session in sessions) ...[
+                            LiveSessionCard(session: session),
+                            const SizedBox(height: 14),
+                          ],
+                          const SizedBox(height: 10),
+                        ],
+                        if (videos.isNotEmpty) ...[
+                          if (sessions.isNotEmpty) ...[
+                            const _SectionLabel('On YouTube'),
+                            const SizedBox(height: 12),
+                          ],
+                          for (var i = 0; i < videos.length; i++) ...[
+                            GestureDetector(
+                              onTap: () => openYoutube(context, videos[i]),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  YoutubeThumbnail(video: videos[i]),
+                                  const SizedBox(height: 10),
+                                  Text(
+                                    videos[i].title,
+                                    maxLines: 2,
+                                    overflow: TextOverflow.ellipsis,
+                                    style:
+                                        Theme.of(context).textTheme.titleMedium,
                                   ),
-                                ),
-                              ],
-                            ],
-                          ),
-                        );
-                      },
+                                  if (videos[i].description != null &&
+                                      videos[i]
+                                          .description!
+                                          .trim()
+                                          .isNotEmpty) ...[
+                                    const SizedBox(height: 4),
+                                    Text(
+                                      videos[i].description!,
+                                      maxLines: 2,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: Theme.of(context)
+                                          .textTheme
+                                          .bodySmall
+                                          ?.copyWith(
+                                              color: AppTheme.textSecondary),
+                                    ),
+                                  ],
+                                ],
+                              ),
+                            ),
+                            if (i != videos.length - 1)
+                              const SizedBox(height: 18),
+                          ],
+                        ],
+                      ],
                     ),
                   );
                 },
@@ -132,6 +163,25 @@ class WatchScreen extends ConsumerWidget {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+class _SectionLabel extends StatelessWidget {
+  final String text;
+
+  const _SectionLabel(this.text);
+
+  @override
+  Widget build(BuildContext context) {
+    return Text(
+      text.toUpperCase(),
+      style: const TextStyle(
+        fontSize: 11,
+        fontWeight: FontWeight.w700,
+        letterSpacing: 1.1,
+        color: AppTheme.textSecondary,
       ),
     );
   }

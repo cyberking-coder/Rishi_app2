@@ -11,6 +11,8 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { formatDate } from "@/lib/utils";
+import { AwardCertificateButton } from "./award-certificate-button";
+import { EnrolmentAccessButton } from "./enrolment-access-button";
 
 interface PurchaseRow {
   user_id: string;
@@ -18,6 +20,10 @@ interface PurchaseRow {
   currency: string;
   discount_amount: number | null;
   created_at: string;
+  status: "paid" | "revoked";
+  /** Time-limited access that lapses on its own. null = permanent.
+   *  Independent of `status`, which is what an admin withdrawal sets. */
+  expires_at: string | null;
 }
 
 /**
@@ -32,23 +38,60 @@ export async function EnrolledStudents({ courseId }: { courseId: string }) {
 
   const { data: purchases } = await supabase
     .from("course_purchases")
-    .select("user_id, amount, currency, discount_amount, created_at")
+    .select(
+      "user_id, amount, currency, discount_amount, created_at, status, expires_at",
+    )
     .eq("course_id", courseId)
-    .eq("status", "paid")
+    // Withdrawn enrolments are 'revoked', not deleted — they belong on
+    // the roster so the removal can be undone and the payment stays
+    // visible.
+    .in("status", ["paid", "revoked"])
     .order("created_at", { ascending: false })
     .returns<PurchaseRow[]>();
 
   const rows = purchases ?? [];
 
-  // One person can hold more than one paid row (a rebuy after a refund),
-  // and they're one student either way. Keep the earliest-listed row,
-  // which is the most recent purchase given the ordering above.
+  // Payments taken for a course the buyer already owned. Deliberately
+  // counted apart from the roster rather than folded into it: they
+  // enrolled nobody, and the dedupe below keeps one row per student, so
+  // a duplicate listed alongside would hide the real enrolment it
+  // duplicates. Surfacing the count is what makes the refund owed
+  // visible at all.
+  const { count: duplicateCount } = await supabase
+    .from("course_purchases")
+    .select("id", { count: "exact", head: true })
+    .eq("course_id", courseId)
+    .eq("status", "duplicate");
+
+  // One person can hold more than one row — a rebuy after being removed
+  // leaves the revoked one behind — and they're one student either way.
+  // Keep the earliest-listed, which is the most recent purchase given
+  // the ordering above, so a student who rebought reads as active.
   const seen = new Set<string>();
   const unique = rows.filter((r) => {
     if (seen.has(r.user_id)) return false;
     seen.add(r.user_id);
     return true;
   });
+
+  // Certificates already held for this course, so the roster shows the
+  // number instead of offering to award a second one.
+  const { data: certificates } = await supabase
+    .from("certificates")
+    .select("user_id, certificate_number, revoked_at")
+    .eq("course_id", courseId)
+    .returns<
+      { user_id: string; certificate_number: string; revoked_at: string | null }[]
+    >();
+
+  const certificateByUser = new Map(
+    (certificates ?? [])
+      // A revoked certificate is deliberately NOT counted as held — the
+      // Award button reinstates it, which is what an admin means by
+      // awarding again after having withdrawn it.
+      .filter((c) => c.revoked_at === null)
+      .map((c) => [c.user_id, c.certificate_number]),
+  );
 
   const nameById = new Map<string, string>();
   const emailById = new Map<string, string>();
@@ -80,7 +123,11 @@ export async function EnrolledStudents({ courseId }: { courseId: string }) {
     }
   }
 
+  // Revenue counts revoked enrolments too — the money was received, and
+  // a total that silently shrank when access was withdrawn would stop
+  // matching what Razorpay settled.
   const revenue = unique.reduce((sum, r) => sum + r.amount, 0);
+  const active = unique.filter((r) => !isRevoked(r)).length;
 
   return (
     <Card className="mt-6">
@@ -88,10 +135,23 @@ export async function EnrolledStudents({ courseId }: { courseId: string }) {
         <CardTitle>Enrolled students</CardTitle>
         <div className="flex items-center gap-2">
           <Badge variant="outline">
-            {unique.length} {unique.length === 1 ? "student" : "students"}
+            {active} {active === 1 ? "student" : "students"}
           </Badge>
+          {active !== unique.length && (
+            <Badge variant="secondary">
+              {unique.length - active} revoked
+            </Badge>
+          )}
           {revenue > 0 && (
             <Badge variant="success">{formatMoney(revenue)} collected</Badge>
+          )}
+          {(duplicateCount ?? 0) > 0 && (
+            <Badge
+              variant="destructive"
+              title="Paid for a course the buyer already owned — no access was granted and a refund is owed."
+            >
+              {duplicateCount} duplicate{duplicateCount === 1 ? "" : "s"} to refund
+            </Badge>
           )}
         </div>
       </CardHeader>
@@ -102,13 +162,16 @@ export async function EnrolledStudents({ courseId }: { courseId: string }) {
               <TableHead>Student</TableHead>
               <TableHead>Paid</TableHead>
               <TableHead>Enrolled</TableHead>
+              <TableHead>Access</TableHead>
+              <TableHead>Certificate</TableHead>
+              <TableHead className="w-32" />
             </TableRow>
           </TableHeader>
           <TableBody>
             {unique.length === 0 ? (
               <TableRow>
                 <TableCell
-                  colSpan={3}
+                  colSpan={6}
                   className="py-8 text-center text-muted-foreground"
                 >
                   Nobody has bought this course yet.
@@ -134,6 +197,37 @@ export async function EnrolledStudents({ courseId }: { courseId: string }) {
                   <TableCell className="text-muted-foreground">
                     {formatDate(r.created_at)}
                   </TableCell>
+                  <TableCell>
+                    {isRevoked(r) ? (
+                      <Badge variant="destructive">Revoked</Badge>
+                    ) : (
+                      <Badge variant="success">Active</Badge>
+                    )}
+                  </TableCell>
+                  <TableCell>
+                    <AwardCertificateButton
+                      userId={r.user_id}
+                      courseId={courseId}
+                      studentLabel={
+                        nameById.get(r.user_id) ??
+                        emailById.get(r.user_id) ??
+                        "this student"
+                      }
+                      existingNumber={certificateByUser.get(r.user_id)}
+                    />
+                  </TableCell>
+                  <TableCell className="text-right">
+                    <EnrolmentAccessButton
+                      userId={r.user_id}
+                      courseId={courseId}
+                      studentLabel={
+                        nameById.get(r.user_id) ??
+                        emailById.get(r.user_id) ??
+                        "this student"
+                      }
+                      revoked={isRevoked(r)}
+                    />
+                  </TableCell>
                 </TableRow>
               ))
             )}
@@ -142,6 +236,15 @@ export async function EnrolledStudents({ courseId }: { courseId: string }) {
       </CardContent>
     </Card>
   );
+}
+
+/** No current access, whether an admin withdrew it or a time-limited
+ *  enrolment simply ran out. */
+function isRevoked(row: PurchaseRow): boolean {
+  if (row.status === "revoked") return true;
+  // A time-limited enrolment that has run out is equally "no access",
+  // even though no admin touched it.
+  return row.expires_at !== null && new Date(row.expires_at) <= new Date();
 }
 
 /** Amounts are stored in paise, the unit Razorpay charges in. */

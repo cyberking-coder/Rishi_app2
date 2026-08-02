@@ -47,8 +47,15 @@ class LmsRemoteDataSource {
     return List<Map<String, dynamic>>.from(rows as List);
   }
 
-  /// Course ids this user has paid for. RLS scopes course_purchases to
-  /// their own rows, so no explicit user filter is needed.
+  /// Course ids this user currently has access to by purchase. RLS
+  /// scopes course_purchases to their own rows, so no explicit user
+  /// filter is needed.
+  ///
+  /// An admin can withdraw access to a single course, which dates
+  /// `expires_at` in the past rather than deleting the sale. Filtering on
+  /// status alone therefore left the course looking unlocked in the app
+  /// long after has_course_access() had stopped agreeing — the lock UI
+  /// said open, and playback then refused.
   Future<Set<String>> getPurchasedCourseIds() async {
     final userId = _client.auth.currentUser?.id;
     if (userId == null) return {};
@@ -56,7 +63,8 @@ class LmsRemoteDataSource {
     final rows = await _client
         .from('course_purchases')
         .select('course_id')
-        .eq('status', 'paid');
+        .eq('status', 'paid')
+        .or('expires_at.is.null,expires_at.gt.${DateTime.now().toUtc().toIso8601String()}');
 
     return {
       for (final row in rows as List) (row as Map)['course_id'] as String,

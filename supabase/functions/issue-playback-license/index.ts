@@ -11,7 +11,12 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { handlePreflight, jsonResponse } from "../_shared/cors.ts";
 import { DEFAULT_DOWNLOAD_TTL_SECONDS, presignGet } from "../_shared/r2.ts";
-import { fetchBunnyStatus, signBunnyPlayback } from "../_shared/bunny.ts";
+import type { BunnyPlayback } from "../_shared/bunny.ts";
+import {
+  inspectBunnyManifest,
+  fetchBunnyStatus,
+  signBunnyPlayback,
+} from "../_shared/bunny.ts";
 
 const SIGNED_URL_TTL_SECONDS = DEFAULT_DOWNLOAD_TTL_SECONDS; // 10 minutes
 
@@ -174,9 +179,44 @@ Deno.serve(async (req) => {
       }
     }
 
-    const playback = await signBunnyPlayback(
-      video.bunny_video_id,
-      SIGNED_URL_TTL_SECONDS,
+    let playback: BunnyPlayback;
+    try {
+      playback = await signBunnyPlayback(
+        video.bunny_video_id,
+        SIGNED_URL_TTL_SECONDS,
+      );
+    } catch (e) {
+      console.error("Bunny playback signing failed:", e);
+      return jsonResponse(
+        { error: e instanceof Error ? e.message : "Playback is misconfigured." },
+        500,
+      );
+    }
+
+    // Handing the phone a URL the CDN won't serve produces a bare
+    // "Source error" in the player, which is the same message for a
+    // wrong hostname, a rejected token, and an unfinished encode.
+    // Checking here costs one small request and turns all three into
+    // something the message actually names.
+    const manifest = await inspectBunnyManifest(
+      playback.hlsUrl,
+      playback.signed,
+    );
+    if (manifest.problem) {
+      console.error(`${manifest.problem} (video ${videoId})`);
+      return jsonResponse({ error: manifest.problem }, 502);
+    }
+
+    // Says outright how many renditions Bunny actually produced. Without
+    // this, "there's no quality selector" is indistinguishable between a
+    // stale deployment of this function, a parse that found nothing, and
+    // a video Bunny only ever encoded one rendition for — and the app
+    // hides the selector in all three cases, because one quality is no
+    // choice to offer.
+    console.log(
+      `[issue-playback-license] video ${videoId}: ` +
+        `${manifest.variants.length} rendition(s) ` +
+        `[${manifest.variants.map((v) => v.label).join(", ")}]`,
     );
 
     const { data: bunnyHistory } = await supabase
@@ -188,10 +228,17 @@ Deno.serve(async (req) => {
 
     return jsonResponse({
       video_id: videoId,
-      // One adaptive stream rather than a quality list — the player picks
-      // a rendition per segment, so there is nothing for the client to
-      // choose between.
-      qualities: [{ label: "auto", bitrate: null, url: playback.hlsUrl }],
+      // Auto first — an adaptive stream is the right default, since the
+      // player switches rendition per segment as the connection moves.
+      // The fixed renditions follow so a viewer on a metered or flaky
+      // connection can pin one, which adaptive streaming alone gives
+      // them no way to do. Read from the master playlist rather than
+      // guessed from a URL pattern, so this stays correct whatever
+      // ladder Bunny encoded.
+      qualities: [
+        { label: "Auto", bitrate: null, url: playback.hlsUrl },
+        ...manifest.variants,
+      ],
       hls_url: playback.hlsUrl,
       resume_position_seconds: bunnyHistory?.progress_seconds ?? 0,
       expires_in_seconds: SIGNED_URL_TTL_SECONDS,

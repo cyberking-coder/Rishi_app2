@@ -4,6 +4,19 @@ plugins {
     id "dev.flutter.flutter-gradle-plugin"
 }
 
+// google-services.json carries the project's Firebase keys and is not in
+// the repository, so the plugin is applied only when the file is there.
+// Applying it unconditionally would fail the build outright for anyone
+// who hasn't downloaded it yet — the same reasoning as the release
+// signing block below, which falls back rather than breaking.
+//
+// The consequence of it being absent is that push is inert, not that the
+// app breaks: FirebaseMessagingService checks for initialisation before
+// asking for a token.
+if (file("google-services.json").exists()) {
+    apply plugin: "com.google.gms.google-services"
+}
+
 def localProperties = new Properties()
 def localPropertiesFile = rootProject.file("local.properties")
 if (localPropertiesFile.exists()) {

@@ -122,6 +122,52 @@ Deno.serve(async (req) => {
     return jsonResponse({ error: dedupeError.message }, 500);
   }
 
+  // The claim above is staked BEFORE the work it guards, so it has to be
+  // given back when that work doesn't finish. Without this, one failed
+  // delivery poisoned the payment permanently: the row was already
+  // there, so every Razorpay retry took the "already processed" branch
+  // and returned 200 without granting anything. A purchase could sit
+  // paid-for and locked forever, and the logs showed only a cheerful
+  // "skipping" line.
+  let response: Response;
+  try {
+    response = await processEvent(supabase, eventType, payment);
+  } catch (e) {
+    // A thrown error must not read as a handled outcome — 500 both tells
+    // Razorpay to retry and triggers the release below.
+    console.error("[razorpay-webhook] unhandled error:", e);
+    response = jsonResponse(
+      { error: e instanceof Error ? e.message : "Unhandled error" },
+      500,
+    );
+  }
+
+  if (!response.ok) {
+    console.error(
+      `[razorpay-webhook] handling failed (${response.status}) - releasing ` +
+        `${eventKey} so Razorpay's retry can try again`,
+    );
+    await supabase
+      .from("webhook_events")
+      .delete()
+      .eq("provider", "razorpay")
+      .eq("event_key", eventKey);
+  }
+  return response;
+});
+
+/// Everything after the idempotency claim. Split out so a single caller
+/// owns whether that claim survives — the release above depends on there
+/// being exactly one exit point, which an inline body full of early
+/// returns could not offer.
+async function processEvent(
+  // deno-lint-ignore no-explicit-any
+  supabase: any,
+  eventType: string,
+  // deno-lint-ignore no-explicit-any
+  payment: any,
+): Promise<Response> {
+
   // The order's notes (set at creation time by admin/src/lib/razorpay.ts)
   // are the authoritative source - Checkout.js never re-passes notes when
   // opening the payment modal, so payment.notes below is only a fallback
@@ -344,7 +390,7 @@ Deno.serve(async (req) => {
   }
 
   return jsonResponse({ ok: true });
-});
+}
 
 
 // ── Course purchases ─────────────────────────────────────────────────
@@ -411,7 +457,80 @@ async function handleCoursePurchase(
     status,
     razorpay_order_id: payment.order_id,
     razorpay_payment_id: payment.id,
+    // The only reliable capture of the buyer's real name: most sign up
+    // without setting a profile display name, and the completion
+    // certificate has to be made out to someone. create-order writes it
+    // to the pending row too; repeating it here covers a payment whose
+    // pending row is missing.
+    billing_name: billing.name,
   };
+
+  // One paid row per (user, course) is enforced by uq_course_purchases_paid,
+  // so a buyer who already owns this course cannot have a second one
+  // written — the write fails, the handler 500s, and Razorpay retries a
+  // payment that can never be recorded. Checkout refuses a course the
+  // buyer already owns, but it cannot close the race: a second tab, a
+  // redelivered older payment, or an access grant applied between order
+  // creation and capture all land here.
+  //
+  // Handle it rather than colliding with it. Which of the two cases this
+  // is depends on whether the existing row still grants access.
+  if (status === "paid") {
+    const { data: incumbent } = await supabase
+      .from("course_purchases")
+      .select("id, razorpay_order_id, expires_at")
+      .eq("user_id", userId)
+      .eq("course_id", courseId)
+      .eq("status", "paid")
+      .maybeSingle();
+
+    if (incumbent && incumbent.razorpay_order_id !== payment.order_id) {
+      const stillGrantsAccess = incumbent.expires_at === null ||
+        new Date(incumbent.expires_at) > new Date();
+
+      if (stillGrantsAccess) {
+        // They already have what they just paid for again. Record the
+        // payment as a duplicate so a refund is owed visibly rather than
+        // the money vanishing, and acknowledge so Razorpay stops
+        // retrying something that will never succeed.
+        console.error(
+          `[razorpay-webhook] DUPLICATE PURCHASE - refund owed: user ` +
+            `${userId} already owns course ${courseId} via order ` +
+            `${incumbent.razorpay_order_id}; recording ${payment.id} ` +
+            `(order ${payment.order_id}) as duplicate`,
+        );
+
+        const duplicatePatch = { ...purchasePatch, status: "duplicate" };
+        const { data: dupUpdated } = await supabase
+          .from("course_purchases")
+          .update(duplicatePatch)
+          .eq("razorpay_order_id", payment.order_id)
+          .select("id");
+
+        if (!dupUpdated || dupUpdated.length === 0) {
+          await supabase.from("course_purchases").insert(duplicatePatch);
+        }
+
+        // No n8n notification: "you're enrolled" is wrong for a payment
+        // that enrolled nobody, and they already got that message the
+        // first time.
+        return jsonResponse({ ok: true, duplicate: true });
+      }
+
+      // The incumbent has lapsed, so this purchase is the buyer getting
+      // their access back and must win. Move the old row aside — it no
+      // longer grants anything, which is exactly what the admin roster
+      // already renders a past expiry as.
+      console.log(
+        `[razorpay-webhook] superseding lapsed enrolment ${incumbent.id} ` +
+          `for user ${userId} on course ${courseId}`,
+      );
+      await supabase
+        .from("course_purchases")
+        .update({ status: "revoked", updated_at: new Date().toISOString() })
+        .eq("id", incumbent.id);
+    }
+  }
 
   const { data: updated, error: updateError } = await supabase
     .from("course_purchases")
@@ -469,6 +588,25 @@ async function handleCoursePurchase(
       email = authUser.user?.email ?? null;
     } catch {
       // non-fatal
+    }
+  }
+
+  // Give the account a display name if it has none. The buyer typed one
+  // at checkout, and an app that greets them by email while holding
+  // their name is just discarding what they told us. Never overwrites a
+  // name they set themselves.
+  if (status === "paid" && billing.name && billing.name.trim() !== "") {
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("display_name")
+      .eq("id", userId)
+      .maybeSingle<{ display_name: string | null }>();
+
+    if (!profile?.display_name || profile.display_name.trim() === "") {
+      await supabase
+        .from("profiles")
+        .update({ display_name: billing.name.trim() })
+        .eq("id", userId);
     }
   }
 

@@ -120,6 +120,15 @@ export interface Course {
   seat_limit: number | null;
   short_description: string | null;
   sort_order: number;
+  /** Admin-uploaded certificate artwork. Null = the app draws its own. */
+  certificate_template_url: string | null;
+  /** Where the recipient's name is printed, as percentages of the image,
+   *  so one template lands correctly at any resolution. */
+  certificate_name_top: number;
+  certificate_name_left: number;
+  /** Font size as a percentage of image width. */
+  certificate_name_size: number;
+  certificate_name_color: string;
   created_by: string | null;
   created_at: string;
   updated_at: string;
@@ -205,4 +214,43 @@ export interface YoutubeVideo {
   sort_order: number;
   created_at: string;
   updated_at: string;
+}
+
+// ── Live sessions ────────────────────────────────────────────────────────
+
+export interface LiveSession {
+  id: string;
+  title: string;
+  description: string | null;
+  join_url: string;
+  thumbnail_url: string | null;
+  starts_at: string;
+  duration_minutes: number;
+  status: "scheduled" | "cancelled";
+  created_at: string;
+  updated_at: string;
+}
+
+export interface SessionReminder {
+  id: string;
+  session_id: string;
+  /** 60, 30 or 5. */
+  minutes_before: number;
+  sent_at: string;
+  recipient_count: number;
+}
+
+// ── Certificates ─────────────────────────────────────────────────────────
+
+export interface Certificate {
+  id: string;
+  user_id: string;
+  course_id: string;
+  certificate_number: string;
+  /** Snapshotted at issue time — renaming the course must not rewrite
+   *  certificates already awarded. */
+  course_title: string;
+  recipient_name: string | null;
+  issued_at: string;
+  revoked_at: string | null;
 }

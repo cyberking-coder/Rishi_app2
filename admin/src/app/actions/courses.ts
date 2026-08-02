@@ -507,3 +507,157 @@ export async function moveLesson(args: {
   revalidatePath(`/courses/${args.courseId}`);
   return { ok: true };
 }
+
+// ── Enrolment access ─────────────────────────────────────────────────────
+
+/**
+ * Revokes or restores one student's access to one course.
+ *
+ * Moves the row between 'paid' and 'revoked' rather than dating
+ * `expires_at`, because uq_course_purchases_paid allows only one paid
+ * row per (user, course). Leaving a withdrawn enrolment as 'paid' meant
+ * the student could never buy the course again — checkout refused them
+ * as already owning it, and had it not, the webhook's update to 'paid'
+ * would have hit the unique index after their card was charged.
+ *
+ * The revoked row keeps its amount and payment id, so the sale stays on
+ * the books; has_course_access() requires 'paid', so access ends at
+ * once. Ending a user's SUBSCRIPTION access does none of this — courses
+ * are sold outright, so a lapsed subscription leaves a bought course
+ * open on purpose, and this is the control for taking one back.
+ */
+export async function setCourseEnrolmentAccess(
+  userId: string,
+  courseId: string,
+  revoked: boolean,
+): Promise<ActionResult> {
+  await requireAdmin();
+  const db = createAdminClient();
+
+  if (!revoked) {
+    // Restoring can collide: if the student rebought the course after
+    // being removed, they already hold an active row and promoting the
+    // old one would violate the unique index. Say so rather than
+    // surfacing a constraint error.
+    const { data: active } = await db
+      .from("course_purchases")
+      .select("id")
+      .eq("user_id", userId)
+      .eq("course_id", courseId)
+      .eq("status", "paid")
+      .maybeSingle();
+
+    if (active) {
+      return {
+        ok: false,
+        error: "This student already has an active enrolment — they " +
+          "bought the course again after being removed.",
+      };
+    }
+  }
+
+  const { error } = await db
+    .from("course_purchases")
+    .update({
+      status: revoked ? "revoked" : "paid",
+      updated_at: new Date().toISOString(),
+    })
+    .eq("user_id", userId)
+    .eq("course_id", courseId)
+    .eq("status", revoked ? "paid" : "revoked");
+
+  if (error) return { ok: false, error: error.message };
+
+  revalidatePath(`/courses/${courseId}`);
+  revalidatePath("/courses");
+  revalidatePath("/users");
+  return { ok: true };
+}
+
+// ── Certificate template ─────────────────────────────────────────────────
+
+/** Uploads the admin's own certificate artwork for this course. */
+export async function uploadCertificateTemplate(args: {
+  courseId: string;
+  fileName: string;
+  contentType: string;
+  base64: string;
+}): Promise<ActionResult> {
+  await requireAdmin();
+  const db = createAdminClient();
+
+  const ext = args.fileName.includes(".")
+    ? args.fileName.split(".").pop()
+    : "png";
+  // Same bucket as covers — it's public artwork either way, and reusing
+  // it avoids a second bucket to provision and keep permissions on.
+  const path = `course/${args.courseId}/certificate.${ext}`;
+  const bytes = Buffer.from(args.base64, "base64");
+
+  const { error: uploadError } = await db.storage
+    .from("covers")
+    .upload(path, bytes, { contentType: args.contentType, upsert: true });
+  if (uploadError) return { ok: false, error: uploadError.message };
+
+  const { data } = db.storage.from("covers").getPublicUrl(path);
+  // Cache-busted: upsert reuses the path, so a re-upload would otherwise
+  // keep showing the old artwork until the CDN expired it.
+  const url = `${data.publicUrl}?v=${Date.now()}`;
+
+  const { error: updateError } = await db
+    .from("courses")
+    .update({ certificate_template_url: url })
+    .eq("id", args.courseId);
+  if (updateError) return { ok: false, error: updateError.message };
+
+  revalidatePath(`/courses/${args.courseId}`);
+  return { ok: true };
+}
+
+/** Where the recipient's name is printed, as percentages of the image. */
+export async function updateCertificateLayout(args: {
+  courseId: string;
+  top: number;
+  left: number;
+  size: number;
+  color: string;
+}): Promise<ActionResult> {
+  await requireAdmin();
+  const db = createAdminClient();
+
+  const { error } = await db
+    .from("courses")
+    .update({
+      certificate_name_top: args.top,
+      certificate_name_left: args.left,
+      certificate_name_size: args.size,
+      certificate_name_color: args.color,
+    })
+    .eq("id", args.courseId);
+
+  if (error) return { ok: false, error: error.message };
+
+  revalidatePath(`/courses/${args.courseId}`);
+  return { ok: true };
+}
+
+export async function removeCertificateTemplate(
+  courseId: string,
+): Promise<ActionResult> {
+  await requireAdmin();
+  const db = createAdminClient();
+
+  // Only the reference is cleared; the file stays in the bucket. The
+  // course falls back to the app's own drawn certificate, and any
+  // certificate already issued keeps rendering from whatever the app
+  // does now — the artwork was never baked into the record.
+  const { error } = await db
+    .from("courses")
+    .update({ certificate_template_url: null })
+    .eq("id", courseId);
+
+  if (error) return { ok: false, error: error.message };
+
+  revalidatePath(`/courses/${courseId}`);
+  return { ok: true };
+}

@@ -13,6 +13,7 @@ import '../../../audio/application/audio_providers.dart';
 import '../../../audio/domain/entities/audio_track.dart';
 import '../../application/lms_providers.dart';
 import '../../domain/entities/lesson.dart';
+import '../../domain/entities/certificate.dart';
 import '../widgets/course_purchase_sheet.dart';
 
 class CourseDetailScreen extends ConsumerStatefulWidget {
@@ -195,7 +196,7 @@ class _CourseDetailScreenState extends ConsumerState<CourseDetailScreen>
               SliverToBoxAdapter(
                 child: _Hero(
                   coverUrl: detail.course.coverImageUrl,
-                  onBack: () => Navigator.of(context).pop(),
+                  onBack: () => _leaveCourse(context),
                 ),
               ),
 
@@ -292,6 +293,11 @@ class _CourseDetailScreenState extends ConsumerState<CourseDetailScreen>
                 ),
                 const SliverToBoxAdapter(child: SizedBox(height: 10)),
               ],
+
+              if (!locked)
+                SliverToBoxAdapter(
+                  child: _CertificateSection(courseId: widget.courseId),
+                ),
 
               const SliverToBoxAdapter(child: SizedBox(height: 28)),
             ],
@@ -413,7 +419,7 @@ class _MetaCard extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
-        color: AppTheme.surface,
+        gradient: AppTheme.clayFill(),
         borderRadius: BorderRadius.circular(AppTheme.radiusCard),
         boxShadow: AppTheme.cardShadow,
       ),
@@ -421,10 +427,11 @@ class _MetaCard extends StatelessWidget {
         Text(
           title,
           style: const TextStyle(
-            fontSize: 19,
-            fontWeight: FontWeight.w800,
+            fontFamily: AppTheme.display,
+            fontSize: 22,
+            height: 26 / 22,
+            fontWeight: FontWeight.w500,
             color: AppTheme.textPrimary,
-            height: 1.3,
           ),
         ),
         if (description != null && description!.trim().isNotEmpty) ...[
@@ -568,8 +575,9 @@ class _LessonTile extends StatelessWidget {
 
     return Container(
       decoration: BoxDecoration(
-        color: AppTheme.surfaceCream,
+        gradient: AppTheme.clayFill(AppTheme.surfaceCream),
         borderRadius: BorderRadius.circular(AppTheme.radiusRow),
+        boxShadow: AppTheme.cardShadow,
       ),
       clipBehavior: Clip.antiAlias,
       child: Column(children: [
@@ -590,7 +598,7 @@ class _LessonTile extends StatelessWidget {
                     : done
                         ? AppTheme.sage
                         : AppTheme.surface,
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: BorderRadius.circular(16),
               ),
               child: Icon(
                 locked
@@ -814,6 +822,22 @@ class _ResourceRowState extends State<_ResourceRow> {
 
 // ── Shared ───────────────────────────────────────────────────────────
 
+/// Back out of the course, whatever route brought us here.
+///
+/// A plain pop() blanked the screen when there was nothing beneath: the
+/// payment deep link lands with go(), which replaces the stack rather
+/// than pushing onto it, so the course was the only route and popping it
+/// left the navigator empty. Fall back to the course list, which is
+/// where "back" means to go anyway.
+void _leaveCourse(BuildContext context) {
+  final navigator = Navigator.of(context);
+  if (navigator.canPop()) {
+    navigator.pop();
+  } else {
+    context.go('/courses');
+  }
+}
+
 class _BackBar extends StatelessWidget {
   final String title;
   const _BackBar({required this.title});
@@ -825,7 +849,7 @@ class _BackBar extends StatelessWidget {
       child: Row(children: [
         IconButton(
           icon: const Icon(Icons.arrow_back_rounded, size: 20),
-          onPressed: () => Navigator.of(context).pop(),
+          onPressed: () => _leaveCourse(context),
         ),
         Expanded(
           child: Text(
@@ -840,6 +864,205 @@ class _BackBar extends StatelessWidget {
           ),
         ),
       ]),
+    );
+  }
+}
+
+/// Certificate progress, shown once the course is unlocked.
+///
+/// Rendered as its own consumer rather than folded into the course
+/// screen's main provider, so a failure here can't take the curriculum
+/// down with it — the lesson list is the thing people came for.
+class _CertificateSection extends ConsumerWidget {
+  const _CertificateSection({required this.courseId});
+
+  final String courseId;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final completion =
+        ref.watch(courseCompletionProvider(courseId)).valueOrNull;
+    final certificate =
+        ref.watch(courseCertificateProvider(courseId)).valueOrNull;
+
+    if (completion == null) return const SizedBox.shrink();
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 18, 20, 0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _CertificateBanner(
+            courseId: courseId,
+            completion: completion,
+            certificate: certificate,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Either progress toward the certificate, or the certificate itself.
+class _CertificateBanner extends ConsumerStatefulWidget {
+  const _CertificateBanner({
+    required this.courseId,
+    required this.completion,
+    this.certificate,
+  });
+
+  final String courseId;
+  final CourseCompletion completion;
+  final Certificate? certificate;
+
+  @override
+  ConsumerState<_CertificateBanner> createState() => _CertificateBannerState();
+}
+
+class _CertificateBannerState extends ConsumerState<_CertificateBanner> {
+  bool _claiming = false;
+
+  Future<void> _claim() async {
+    setState(() => _claiming = true);
+    try {
+      final certificate = await ref
+          .read(certificateDataSourceProvider)
+          .issueCertificate(widget.courseId);
+
+      if (!mounted) return;
+      ref.invalidate(courseCertificateProvider(widget.courseId));
+      ref.invalidate(myCertificatesProvider);
+      context.push('/certificate/${certificate.id}', extra: certificate);
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text('$e')));
+    } finally {
+      if (mounted) setState(() => _claiming = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final certificate = widget.certificate;
+    final completion = widget.completion;
+
+    if (certificate != null) {
+      return _Banner(
+        icon: Icons.workspace_premium_rounded,
+        title: 'Certificate earned',
+        subtitle: certificate.certificateNumber,
+        actionLabel: 'View',
+        onAction: () => context.push(
+          '/certificate/${certificate.id}',
+          extra: certificate,
+        ),
+      );
+    }
+
+    if (completion.complete) {
+      return _Banner(
+        icon: Icons.workspace_premium_rounded,
+        title: 'Course complete',
+        subtitle: 'Claim your certificate of completion.',
+        actionLabel: _claiming ? 'Claiming…' : 'Claim',
+        onAction: _claiming ? null : _claim,
+      );
+    }
+
+    // Nothing to say until they've actually started — an untouched course
+    // showing "0 of 12" is just noise on top of the lesson list.
+    if (completion.completedSteps == 0) return const SizedBox.shrink();
+
+    return _Banner(
+      icon: Icons.timeline_rounded,
+      title: 'Certificate progress',
+      subtitle: '${completion.completedSteps} of ${completion.totalSteps} '
+          'lessons complete',
+      progress: completion.fraction,
+    );
+  }
+}
+
+class _Banner extends StatelessWidget {
+  const _Banner({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    this.actionLabel,
+    this.onAction,
+    this.progress,
+  });
+
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final String? actionLabel;
+  final VoidCallback? onAction;
+  final double? progress;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppTheme.sageSoft,
+        borderRadius: BorderRadius.circular(22),
+      ),
+      child: Column(
+        children: [
+          Row(
+            children: [
+              Icon(icon, size: 24, color: AppTheme.sage),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      style: const TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w700,
+                        color: AppTheme.textPrimary,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      subtitle,
+                      style: const TextStyle(
+                        fontSize: 12,
+                        color: AppTheme.textSecondary,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              if (actionLabel != null)
+                FilledButton(
+                  onPressed: onAction,
+                  style: FilledButton.styleFrom(
+                    backgroundColor: AppTheme.sage,
+                    padding: const EdgeInsets.symmetric(horizontal: 18),
+                  ),
+                  child: Text(actionLabel!),
+                ),
+            ],
+          ),
+          if (progress != null) ...[
+            const SizedBox(height: 12),
+            ClipRRect(
+              borderRadius: BorderRadius.circular(3),
+              child: LinearProgressIndicator(
+                value: progress,
+                minHeight: 6,
+                backgroundColor: Colors.white,
+                valueColor: const AlwaysStoppedAnimation<Color>(AppTheme.sage),
+              ),
+            ),
+          ],
+        ],
+      ),
     );
   }
 }

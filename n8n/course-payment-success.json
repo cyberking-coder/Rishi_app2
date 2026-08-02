@@ -1,0 +1,518 @@
+{
+  "name": "Rishi App — Course payments (success + failed)",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "6872d5b6-912a-411b-b40e-ad393e4454f7",
+        "responseMode": "onReceived",
+        "options": {}
+      },
+      "id": "a1000000-0000-4000-8000-000000000001",
+      "name": "Payment webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        -220,
+        0
+      ],
+      "webhookId": "6872d5b6-912a-411b-b40e-ad393e4454f7"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose"
+          },
+          "conditions": [
+            {
+              "id": "c1000000-0000-4000-8000-000000000001",
+              "leftValue": "={{ $json.body.event }}",
+              "rightValue": "payment_success",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "a1000000-0000-4000-8000-000000000002",
+      "name": "Is success?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        0,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "f1000000-0000-4000-8000-000000000001",
+              "name": "waNumber",
+              "value": "={{ ($json.body.phone || '').replace(/\\D/g, '').replace(/^(?!91)(\\d{10})$/, '91$1') }}",
+              "type": "string"
+            },
+            {
+              "id": "f1000000-0000-4000-8000-000000000002",
+              "name": "firstName",
+              "value": "={{ ($json.body.name || 'there').split(' ')[0] }}",
+              "type": "string"
+            },
+            {
+              "id": "f1000000-0000-4000-8000-000000000003",
+              "name": "amountLabel",
+              "value": "={{ $json.body.currency === 'INR' ? '₹' + $json.body.amount : $json.body.currency + ' ' + $json.body.amount }}",
+              "type": "string"
+            },
+            {
+              "id": "f1000000-0000-4000-8000-000000000004",
+              "name": "courseTitle",
+              "value": "={{ $json.body.plan_name }}",
+              "type": "string"
+            },
+            {
+              "id": "f1000000-0000-4000-8000-000000000005",
+              "name": "buyerName",
+              "value": "={{ $json.body.name || '' }}",
+              "type": "string"
+            },
+            {
+              "id": "f1000000-0000-4000-8000-000000000006",
+              "name": "buyerEmail",
+              "value": "={{ $json.body.email || '' }}",
+              "type": "string"
+            },
+            {
+              "id": "f1000000-0000-4000-8000-000000000007",
+              "name": "buyerState",
+              "value": "={{ $json.body.state || '' }}",
+              "type": "string"
+            },
+            {
+              "id": "f1000000-0000-4000-8000-000000000008",
+              "name": "amount",
+              "value": "={{ $json.body.amount }}",
+              "type": "number"
+            },
+            {
+              "id": "f1000000-0000-4000-8000-000000000009",
+              "name": "currency",
+              "value": "={{ $json.body.currency }}",
+              "type": "string"
+            },
+            {
+              "id": "f1000000-0000-4000-8000-00000000000a",
+              "name": "couponCode",
+              "value": "={{ $json.body.coupon_code || '' }}",
+              "type": "string"
+            },
+            {
+              "id": "f1000000-0000-4000-8000-00000000000b",
+              "name": "discountAmount",
+              "value": "={{ $json.body.discount_amount || 0 }}",
+              "type": "number"
+            },
+            {
+              "id": "f1000000-0000-4000-8000-00000000000c",
+              "name": "userId",
+              "value": "={{ $json.body.user_id }}",
+              "type": "string"
+            },
+            {
+              "id": "f1000000-0000-4000-8000-00000000000d",
+              "name": "courseId",
+              "value": "={{ $json.body.course_id }}",
+              "type": "string"
+            },
+            {
+              "id": "f1000000-0000-4000-8000-00000000000e",
+              "name": "purchasedAt",
+              "value": "={{ $now.setZone('Asia/Kolkata').format('yyyy-LL-dd HH:mm') }}",
+              "type": "string"
+            },
+            {
+              "id": "f3000000-0000-4000-8000-000000000001",
+              "name": "eventType",
+              "type": "string",
+              "value": "={{ $json.body.event === 'payment_success' ? 'Success' : 'Failed' }}"
+            }
+          ]
+        },
+        "includeOtherFields": false,
+        "options": {}
+      },
+      "id": "a1000000-0000-4000-8000-000000000003",
+      "name": "Normalise",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        220,
+        -100
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://live-mt-server.wati.io/REPLACE_TENANT_ID/api/v1/sendTemplateMessage?whatsappNumber={{ $json.waNumber }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "Bearer REPLACE_WITH_WATI_TOKEN"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ template_name: 'course_purchase_success', broadcast_name: 'course_purchase_success', parameters: [ { name: '1', value: $json.firstName }, { name: '2', value: $json.amountLabel }, { name: '3', value: $json.courseTitle } ] }) }}",
+        "options": {}
+      },
+      "id": "a1000000-0000-4000-8000-000000000004",
+      "name": "Wati: send confirmation",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        440,
+        -100
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "REPLACE_WITH_SPREADSHEET_ID",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "Sheet1",
+          "mode": "name"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Date": "={{ $('Normalise').item.json.purchasedAt }}",
+            "Event": "={{ $('Normalise').item.json.eventType }}",
+            "Name": "={{ $('Normalise').item.json.buyerName }}",
+            "Email": "={{ $('Normalise').item.json.buyerEmail }}",
+            "Phone": "={{ $('Normalise').item.json.waNumber }}",
+            "State": "={{ $('Normalise').item.json.buyerState }}",
+            "Course": "={{ $('Normalise').item.json.courseTitle }}",
+            "Amount": "={{ $('Normalise').item.json.amount }}",
+            "Currency": "={{ $('Normalise').item.json.currency }}",
+            "Coupon": "={{ $('Normalise').item.json.couponCode }}",
+            "Discount": "={{ $('Normalise').item.json.discountAmount }}",
+            "User ID": "={{ $('Normalise').item.json.userId }}",
+            "Course ID": "={{ $('Normalise').item.json.courseId }}"
+          },
+          "matchingColumns": [],
+          "schema": []
+        },
+        "options": {}
+      },
+      "id": "a1000000-0000-4000-8000-000000000005",
+      "name": "Log sale to Sheets",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        660,
+        -100
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "f2000000-0000-4000-8000-000000000001",
+              "name": "waNumber",
+              "type": "string",
+              "value": "={{ ($json.body.phone || '').replace(/\\D/g, '').replace(/^(?!91)(\\d{10})$/, '91$1') }}"
+            },
+            {
+              "id": "f2000000-0000-4000-8000-000000000002",
+              "name": "firstName",
+              "type": "string",
+              "value": "={{ ($json.body.name || 'there').split(' ')[0] }}"
+            },
+            {
+              "id": "f2000000-0000-4000-8000-000000000003",
+              "name": "courseTitle",
+              "type": "string",
+              "value": "={{ $json.body.plan_name }}"
+            },
+            {
+              "id": "f2000000-0000-4000-8000-000000000004",
+              "name": "amountLabel",
+              "type": "string",
+              "value": "={{ $json.body.currency === 'INR' ? '₹' + $json.body.amount : $json.body.currency + ' ' + $json.body.amount }}"
+            },
+            {
+              "id": "f2000000-0000-4000-8000-000000000005",
+              "name": "reason",
+              "type": "string",
+              "value": "={{ ($json.body.reason || 'The payment could not be completed.').slice(0, 200) }}"
+            },
+            {
+              "id": "f2000000-0000-4000-8000-000000000006",
+              "name": "buyerName",
+              "type": "string",
+              "value": "={{ $json.body.name || '' }}"
+            },
+            {
+              "id": "f2000000-0000-4000-8000-000000000007",
+              "name": "buyerEmail",
+              "type": "string",
+              "value": "={{ $json.body.email || '' }}"
+            },
+            {
+              "id": "f2000000-0000-4000-8000-000000000008",
+              "name": "buyerState",
+              "type": "string",
+              "value": "={{ $json.body.state || '' }}"
+            },
+            {
+              "id": "f2000000-0000-4000-8000-000000000009",
+              "name": "amount",
+              "type": "number",
+              "value": "={{ $json.body.amount }}"
+            },
+            {
+              "id": "f2000000-0000-4000-8000-000000000010",
+              "name": "currency",
+              "type": "string",
+              "value": "={{ $json.body.currency }}"
+            },
+            {
+              "id": "f2000000-0000-4000-8000-000000000011",
+              "name": "couponCode",
+              "type": "string",
+              "value": "={{ $json.body.coupon_code || '' }}"
+            },
+            {
+              "id": "f2000000-0000-4000-8000-000000000012",
+              "name": "userId",
+              "type": "string",
+              "value": "={{ $json.body.user_id }}"
+            },
+            {
+              "id": "f2000000-0000-4000-8000-000000000013",
+              "name": "courseId",
+              "type": "string",
+              "value": "={{ $json.body.course_id }}"
+            },
+            {
+              "id": "f2000000-0000-4000-8000-000000000014",
+              "name": "failedAt",
+              "type": "string",
+              "value": "={{ $now.setZone('Asia/Kolkata').format('yyyy-LL-dd HH:mm') }}"
+            },
+            {
+              "id": "f3000000-0000-4000-8000-000000000002",
+              "name": "eventType",
+              "type": "string",
+              "value": "={{ $json.body.event === 'payment_success' ? 'Success' : 'Failed' }}"
+            }
+          ]
+        },
+        "includeOtherFields": false,
+        "options": {}
+      },
+      "id": "a1000000-0000-4000-8000-000000000007",
+      "name": "Normalise (failed)",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        220,
+        160
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://live-mt-server.wati.io/REPLACE_TENANT_ID/api/v1/sendTemplateMessage?whatsappNumber={{ $json.waNumber }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "Bearer REPLACE_WITH_WATI_TOKEN"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ template_name: 'course_payment_failed', broadcast_name: 'course_payment_failed', parameters: [ { name: '1', value: $json.firstName }, { name: '2', value: $json.courseTitle }, { name: '3', value: $json.reason } ] }) }}",
+        "options": {}
+      },
+      "id": "a1000000-0000-4000-8000-000000000008",
+      "name": "Wati: send failure notice",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        440,
+        160
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "REPLACE_WITH_SPREADSHEET_ID",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "Failures",
+          "mode": "name"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Date": "={{ $('Normalise (failed)').item.json.failedAt }}",
+            "Event": "={{ $('Normalise (failed)').item.json.eventType }}",
+            "Name": "={{ $('Normalise (failed)').item.json.buyerName }}",
+            "Email": "={{ $('Normalise (failed)').item.json.buyerEmail }}",
+            "Phone": "={{ $('Normalise (failed)').item.json.waNumber }}",
+            "State": "={{ $('Normalise (failed)').item.json.buyerState }}",
+            "Course": "={{ $('Normalise (failed)').item.json.courseTitle }}",
+            "Amount": "={{ $('Normalise (failed)').item.json.amount }}",
+            "Currency": "={{ $('Normalise (failed)').item.json.currency }}",
+            "Coupon": "={{ $('Normalise (failed)').item.json.couponCode }}",
+            "Reason": "={{ $('Normalise (failed)').item.json.reason }}",
+            "User ID": "={{ $('Normalise (failed)').item.json.userId }}",
+            "Course ID": "={{ $('Normalise (failed)').item.json.courseId }}"
+          },
+          "matchingColumns": [],
+          "schema": []
+        },
+        "options": {}
+      },
+      "id": "a1000000-0000-4000-8000-000000000009",
+      "name": "Log failure to Sheets",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        660,
+        160
+      ]
+    }
+  ],
+  "connections": {
+    "Payment webhook": {
+      "main": [
+        [
+          {
+            "node": "Is success?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Is success?": {
+      "main": [
+        [
+          {
+            "node": "Normalise",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Normalise (failed)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalise": {
+      "main": [
+        [
+          {
+            "node": "Wati: send confirmation",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wati: send confirmation": {
+      "main": [
+        [
+          {
+            "node": "Log sale to Sheets",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalise (failed)": {
+      "main": [
+        [
+          {
+            "node": "Wati: send failure notice",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wati: send failure notice": {
+      "main": [
+        [
+          {
+            "node": "Log failure to Sheets",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "pinData": {
+    "Payment webhook": [
+      {
+        "json": {
+          "headers": {
+            "content-type": "application/json"
+          },
+          "params": {},
+          "query": {},
+          "body": {
+            "event": "payment_success",
+            "content_type": "course",
+            "user_id": "3a56bb6b-979d-4690-8666-612393d93dbf",
+            "course_id": "8f4b87c8-ef1d-4873-97d1-022558a69968",
+            "plan_name": "Mental Detox",
+            "name": "Ritesh Kelkar",
+            "email": "riteshkelkar45@gmail.com",
+            "phone": "8180804366",
+            "state": "Maharashtra",
+            "amount": 499,
+            "currency": "INR",
+            "coupon_code": "LAUNCH50",
+            "discount_amount": 50
+          }
+        }
+      }
+    ]
+  }
+}

@@ -1,8 +1,10 @@
 # Know Thyself — LMS Integration & Scale-Up Plan
 
-**Status: Phases 0-3a are built and under test (branch `claude/repo-structure-overview-vt36iu`,
-not yet merged to `main`). See `PROJECT_LOG.md` Section 7 for exactly what shipped, what
-bugs were found and fixed, and Section 10 for what's still unresolved/unstarted.** This
+**Status: Phases 0-5 are built (branch `claude/repo-structure-overview-vt36iu`, still not
+merged to `main`). Phases 0-4 are tested end-to-end on a real device; Phase 5 is written
+and building but not yet exercised, and its migration is not yet applied. See
+`PROJECT_LOG.md` Section 7 for exactly what shipped and what broke along the way, and
+Section 10 for what's still unresolved/unstarted.** This
 file remains the single source of truth for the *plan* — how we take the existing
 meditation/audio app and turn it into a full Learning Management System (LMS) with free
 and premium tiers, self-service signup, Razorpay + Stripe payments, and infrastructure
@@ -332,13 +334,20 @@ file-by-file plans are written and approved before coding starts on each one.
 | **0** | Land the Free/Retreat(Premium)/Admin role-resolution work already planned in the prior task (no DB change, pure derivation layer) | — | ✅ Done |
 | **1** | Self-service signup (mobile signup screen, `handle_new_user` default tweak, email verification flow) | Phase 0 | ✅ Done (email/password + Google Sign-In) |
 | **2** | Content gating pass — confirm `is_premium` is consistently enforced across audio/video for the new free-signup population (it already is via `has_active_access`, this phase is verification + admin UI to mark content free/premium per item if not already exposed) | Phase 1 | ✅ Done |
-| **3** | Payments: external web checkout portal, `payments`/`subscriptions`/`entitlements` wiring, Razorpay + Stripe, webhooks, background job queue, email + WhatsApp confirmation, admin Billing page, account-deletion flow | Phase 1 | 🟡 Partial (3a done: Razorpay blanket-subscription checkout + webhook. 3b/3c not started: Stripe, per-item purchases, admin Billing page, notifications, account deletion. **One known bug**: content isn't unlocking after a successful payment — see `PROJECT_LOG.md` §10.) |
-| **4** | LMS core: courses/modules/lessons schema, admin course builder, mobile course catalog + lesson player (including finally building video playback UI), lesson progress | Phase 2 | Not started |
-| **5** | Quizzes + certificates | Phase 4 | Not started |
+| **3** | Payments: external web checkout portal, `payments`/`subscriptions`/`entitlements` wiring, Razorpay + Stripe, webhooks, background job queue, email + WhatsApp confirmation, admin Billing page, account-deletion flow | Phase 1 | 🟡 Mostly done. 3a: Razorpay checkout + webhook. 3b: **per-course** purchases, coupons, seat limits, enrolment roster, access revocation, and WhatsApp + Sheets confirmation via n8n/Wati. Still open: Stripe, admin Billing page with refunds, account deletion. |
+| **4** | LMS core: courses/modules/lessons schema, admin course builder, mobile course catalog + lesson player (including finally building video playback UI), lesson progress | Phase 2 | ✅ Done — incl. Bunny Stream video hosting and a quality selector |
+| **5** | Quizzes + certificates | Phase 4 | 🟡 Built, not yet tested on a device. Quizzes were built and then deliberately removed — completion is finishing every lesson. Migrations `20260801000003`/`4` applied; `5`, `6`, `7` still pending. |
+| **—** | Live Zoom sessions in the Watch tab, with push reminders at 60/30/5 minutes | Phase 1 | 🟡 Built, untested. Outside the numbered rollout — asked for directly. Needs `google-services.json`, `FCM_SERVICE_ACCOUNT`, and the n8n cron workflow imported. See `PROJECT_LOG.md` §7. |
 | **6** | Scaling hardening: connection pooling, read replicas, Redis caching, CDN tuning, monitoring/error tracking wired up | Can start in parallel with Phase 3 onward, tuned continuously | Not started |
 | **7** | Load testing at simulated 10-lakh-user scale, fix bottlenecks found, go-live checklist | After Phase 5 and 6 | Not started |
 
 **Also unresolved**: this work lives on git branch `claude/repo-structure-overview-vt36iu`, not yet merged to `main` — see `PROJECT_LOG.md` §7 and §10 for the full detail on everything above.
+
+**Two design decisions departed from this roadmap deliberately**, both recorded in `PROJECT_LOG.md` §7:
+per-course purchases use a dedicated `course_purchases` table rather than the `entitlements` table §3
+proposed (entitlements remains unused and ready for per-*item* audio/video purchases), and certificates
+are verifiable records rather than PDFs in a bucket (§5.2) — a number that resolves against
+`verify_certificate()` can be checked by whoever is shown it, which a PDF cannot.
 
 ---
 
@@ -347,33 +356,27 @@ file-by-file plans are written and approved before coding starts on each one.
 These don't block writing this roadmap, but need an answer before the
 relevant phase's file-level plan is written:
 
-1. **Pricing**: one-time premium purchase, or recurring subscription
-   (monthly/yearly)? `subscription_plans` schema already supports recurring —
-   confirming this avoids rework in Phase 3.
-2. **Course content authoring**: will lesson video/audio be freshly produced,
-   or do existing `audios`/`videos` rows get "promoted" into course lessons?
-   Affects whether `lessons` references existing content rows or always gets
-   its own upload.
-3. **Certificate design**: any branding/template requirements, or is a simple
-   auto-generated PDF (name, course, date) sufficient for Phase 5?
+1. ~~**Pricing**~~ — **Answered: per-course, one-time.** The blanket subscription
+   still exists in schema but nothing sells it; `has_course_access` is the gate.
+2. ~~**Course content authoring**~~ — **Answered: both.** A lesson references an
+   existing `audios`/`videos` row, and the builder's "upload new" path creates
+   that row first via the normal content pipeline. A lesson never owns media.
+3. ~~**Certificate design**~~ — **Answered: rendered natively + publicly
+   verifiable by number**, not a PDF. See `PROJECT_LOG.md` §7, Phase 5.
 4. **Video transcoding vendor** (Cloudflare Stream vs Mux) — deferred to
    Phase 4 per §7, but worth flagging now so it's not a last-minute decision.
-5. **WhatsApp Business Platform provider** (Twilio vs Gupshup vs MSG91) —
-   deferred to Phase 3; likely comes down to existing account/pricing
-   preference rather than a technical difference, since all three support
-   the same webhook-driven send pattern.
-6. **Blanket subscription vs per-course-only pricing**: §3/§6 now support
-   both a course-by-course purchase (via `entitlements`) and a blanket
-   premium window (via `access_expires_at`) since the schema already allows
-   either. Confirming whether we actually sell blanket subscriptions, or
-   keep pricing strictly per-course, changes what the web checkout page in
-   §6.1 needs to present at Phase 3.
-7. **Web checkout portal hosting**: new route on the existing admin Next.js
-   app, or a separate minimal Next.js deployment? Affects whether Phase 3
-   touches `admin/` at all or stands up a new project.
+5. ~~**WhatsApp Business Platform provider**~~ — **Answered: Wati**, driven from
+   n8n rather than from our own code, so message copy and routing change
+   without a deploy.
+6. ~~**Blanket subscription vs per-course-only pricing**~~ — **Answered:
+   per-course only** for now.
+7. ~~**Web checkout portal hosting**~~ — **Answered: a public route on the existing
+   admin app** (`/checkout`), exempted from its login middleware. `/verify` now
+   sits alongside it on the same basis.
 
 ---
 
-*This is a living planning document. As of Phase 3a, this no longer describes
-purely future work — see `PROJECT_LOG.md` for the record of what's actually been
-built, tested, and what bugs were found along the way.*
+*This is a living planning document. As of Phase 5 it describes mostly-completed
+work — see `PROJECT_LOG.md` for the record of what was actually built, what was
+tested, and the bug-fix chronology, which is where the non-obvious traps in this
+codebase are written down.*

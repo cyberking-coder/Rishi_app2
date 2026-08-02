@@ -46,7 +46,7 @@ class _PopupCard extends StatelessWidget {
           end: Alignment.bottomRight,
           colors: [Color(0xFFFFFFFF), AppTheme.sageSoft],
         ),
-        borderRadius: BorderRadius.circular(24),
+        borderRadius: BorderRadius.circular(30),
         boxShadow: [
           BoxShadow(
             color: AppTheme.sage.withValues(alpha: 0.18),
@@ -68,7 +68,7 @@ class _PopupCard extends StatelessWidget {
               children: [
                 if (hasImage)
                   ClipRRect(
-                    borderRadius: BorderRadius.circular(16),
+                    borderRadius: BorderRadius.circular(22),
                     child: ConstrainedBox(
                       constraints: const BoxConstraints(maxHeight: 320),
                       child: Image.network(

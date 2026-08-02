@@ -240,7 +240,7 @@ class CourseCard extends StatelessWidget {
       },
       child: Container(
         decoration: BoxDecoration(
-          color: AppTheme.surface,
+          gradient: AppTheme.clayFill(),
           borderRadius: BorderRadius.circular(AppTheme.radiusCard),
           boxShadow: AppTheme.cardShadow,
         ),

@@ -218,23 +218,20 @@ class _Header extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  // Eyebrow above, display line below — the design puts
+                  // the time of day in small caps and the person's name
+                  // in the serif, rather than the other way round: the
+                  // greeting is context, the name is the moment.
                   Text(
-                    'Hi, $username 👋',
+                    greeting.toUpperCase(),
+                    style: AppTheme.label,
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'Hi, $username',
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      fontSize: 23,
-                      fontWeight: FontWeight.w800,
-                      color: AppTheme.textPrimary,
-                    ),
-                  ),
-                  const SizedBox(height: 3),
-                  Text(
-                    greeting,
-                    style: const TextStyle(
-                      fontSize: 13,
-                      color: AppTheme.textSecondary,
-                    ),
+                    style: AppTheme.displayLarge,
                   ),
                 ],
               ),
@@ -309,7 +306,7 @@ class _SearchBar extends StatelessWidget {
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
           decoration: BoxDecoration(
-            color: AppTheme.surface,
+            gradient: AppTheme.clayFill(),
             borderRadius: BorderRadius.circular(AppTheme.radiusPill),
             boxShadow: AppTheme.cardShadow,
           ),
@@ -396,7 +393,7 @@ class _ContinueCard extends ConsumerWidget {
               ),
               child: Row(children: [
                 ClipRRect(
-                  borderRadius: BorderRadius.circular(12),
+                  borderRadius: BorderRadius.circular(16),
                   child: SizedBox(
                     width: 54,
                     height: 54,
@@ -527,7 +524,7 @@ class _CategoriesRow extends ConsumerWidget {
                   alignment: Alignment.center,
                   padding: const EdgeInsets.symmetric(horizontal: 16),
                   decoration: BoxDecoration(
-                    color: AppTheme.surface,
+                    gradient: AppTheme.clayFill(),
                     borderRadius: BorderRadius.circular(AppTheme.radiusPill),
                     boxShadow: AppTheme.cardShadow,
                   ),
@@ -600,7 +597,7 @@ class _CourseMiniCard extends StatelessWidget {
       child: Container(
         width: 214,
         decoration: BoxDecoration(
-          color: AppTheme.surface,
+          gradient: AppTheme.clayFill(),
           borderRadius: BorderRadius.circular(AppTheme.radiusCard),
           boxShadow: AppTheme.cardShadow,
         ),
@@ -812,8 +809,9 @@ class _EmptyHint extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 18),
       decoration: BoxDecoration(
-        color: AppTheme.surface,
+        gradient: AppTheme.clayFill(),
         borderRadius: BorderRadius.circular(AppTheme.radiusCard),
+        boxShadow: AppTheme.cardShadow,
       ),
       child: Row(children: [
         Icon(icon, size: 19, color: AppTheme.textSecondary),

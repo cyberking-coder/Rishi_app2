@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {
+  Award,
   LayoutDashboard,
   Users,
   Smartphone,
@@ -10,6 +11,7 @@ import {
   Music,
   GraduationCap,
   Youtube,
+  Video,
   TicketPercent,
   Tags,
   BarChart3,
@@ -28,7 +30,9 @@ const NAV = [
   { href: "/videos", label: "Videos", icon: Film },
   { href: "/audios", label: "Audios", icon: Music },
   { href: "/courses", label: "Courses", icon: GraduationCap },
+  { href: "/certificates", label: "Certificates", icon: Award },
   { href: "/youtube", label: "YouTube", icon: Youtube },
+  { href: "/sessions", label: "Live sessions", icon: Video },
   { href: "/coupons", label: "Coupons", icon: TicketPercent },
   { href: "/categories", label: "Categories", icon: Tags },
   { href: "/analytics", label: "Analytics", icon: BarChart3 },
