@@ -80,7 +80,7 @@
     {
       "parameters": {
         "method": "POST",
-        "url": "https://YOUR-PROJECT-REF.supabase.co/functions/v1/send-content-notifications",
+        "url": "https://gzcanqovqirarnculqjq.supabase.co/functions/v1/send-content-notifications",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
