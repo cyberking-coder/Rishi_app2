@@ -209,7 +209,7 @@
             "Currency": "={{ $('Normalise').item.json.currency }}",
             "Coupon": "={{ $('Normalise').item.json.couponCode }}",
             "Discount": "={{ $('Normalise').item.json.discountAmount }}",
-            "Reason": "=",
+            "Reason": "={{ '' }}",
             "User ID": "={{ $('Normalise').item.json.userId }}"
           },
           "matchingColumns": [],
@@ -382,7 +382,7 @@
             "Amount": "={{ $('Normalise (failed)').item.json.amount }}",
             "Currency": "={{ $('Normalise (failed)').item.json.currency }}",
             "Coupon": "={{ $('Normalise (failed)').item.json.couponCode }}",
-            "Discount": "=",
+            "Discount": "={{ '' }}",
             "Reason": "={{ $('Normalise (failed)').item.json.reason }}",
             "User ID": "={{ $('Normalise (failed)').item.json.userId }}"
           },

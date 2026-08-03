@@ -167,6 +167,8 @@
             "Name": "={{ $('Normalise (lapsed)').item.json.fullName }}",
             "Email": "={{ $('Normalise (lapsed)').item.json.email }}",
             "Phone": "={{ $('Normalise (lapsed)').item.json.waNumber }}",
+            "Days left": "={{ '' }}",
+            "Access ends": "={{ '' }}",
             "Access ended": "={{ $('Normalise (lapsed)').item.json.endedOn }}",
             "User ID": "={{ $('Normalise (lapsed)').item.json.userId }}"
           },
@@ -183,7 +185,7 @@
         680,
         -140
       ],
-      "notes": "One row per reminder sent, so renewal rate per mark can actually be measured rather than guessed."
+      "notes": "Both branches write every column in the Renewals tab; the ones this branch has no value for are mapped to an empty string rather than left out. An unmapped column leaves its cell unwritten, and a later append can then land its values one column across — corrupting the sheet quietly instead of failing."
     },
     {
       "parameters": {
@@ -308,6 +310,7 @@
             "Phone": "={{ $('Normalise (expiring)').item.json.waNumber }}",
             "Days left": "={{ $('Normalise (expiring)').item.json.daysLeft }}",
             "Access ends": "={{ $('Normalise (expiring)').item.json.endsOn }}",
+            "Access ended": "={{ '' }}",
             "User ID": "={{ $('Normalise (expiring)').item.json.userId }}"
           },
           "matchingColumns": [],
@@ -323,7 +326,7 @@
         680,
         140
       ],
-      "notes": "Same sheet as the lapsed branch, so one tab shows the whole renewal funnel in order."
+      "notes": "Both branches write every column in the Renewals tab; the ones this branch has no value for are mapped to an empty string rather than left out. An unmapped column leaves its cell unwritten, and a later append can then land its values one column across — corrupting the sheet quietly instead of failing."
     }
   ],
   "connections": {
