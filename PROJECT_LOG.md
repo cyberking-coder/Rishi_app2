@@ -406,7 +406,9 @@ Failure handling distinguishes the two cases: a claim that has never delivered a
 
 Lifecycle events go to their own n8n webhook (`N8N_LIFECYCLE_WEBHOOK_URL`, falling back to `N8N_PAYMENT_WEBHOOK_URL`). A payment message congratulates somebody and an expiry message asks them to come back; sharing a workflow would mean branching on event type forever, with a change to renewal copy risking the receipt copy.
 
-**Still missing on the subscription side**: the n8n workflow for subscription *payments*. The webhook already sends the payload with `content_type: "subscription"`, but it reads `N8N_PAYMENT_WEBHOOK_URL`, which has never been set — so a course buyer gets WhatsApp and a Sheets row while a subscription buyer gets nothing. `notifyN8n` logs exactly that when it happens. The fix is a workflow, not code.
+**Two importable workflows ship with this**: `n8n/subscription-payments.json` (the confirmation a subscription buyer never used to get — the webhook has always sent the payload with `content_type: "subscription"`, but `N8N_PAYMENT_WEBHOOK_URL` was never set, so nobody was listening) and `n8n/access-expiry-reminders.json` (the WhatsApp half of the reminders, split into separate "ending soon" and "already ended" branches because those ask for different things and read wrong forced into one template).
+
+Both need the same three placeholders filled that the course workflow needed — `REPLACE_TENANT_ID`, `REPLACE_WITH_WATI_TOKEN`, `REPLACE_WITH_SPREADSHEET_ID` — plus the Google Sheets credential re-selected on import, and four Wati templates approved: `subscription_purchase_success`, `subscription_payment_failed`, `access_expiring`, `access_lapsed`.
 
 ### Bug-fix chronology — Phases 3b through 5
 
