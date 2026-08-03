@@ -38,6 +38,15 @@
         tools:node="remove" />
     <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE"
         tools:node="remove" />
+    <!-- Android 14's partial photo access. The build tools add this on
+         their own wherever READ_MEDIA_IMAGES appears, so removing that
+         one alone leaves this behind — and Play's photo and video policy
+         counts it, which is why the declaration was still demanded after
+         the first pass. -->
+    <uses-permission android:name="android.permission.READ_MEDIA_VISUAL_USER_SELECTED"
+        tools:node="remove" />
+    <uses-permission android:name="android.permission.ACCESS_MEDIA_LOCATION"
+        tools:node="remove" />
 
     <application
         android:label="Know Thyself"
