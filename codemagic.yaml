@@ -73,8 +73,12 @@ workflows:
       - name: Flutter build ipa
         script: |
           cd mobile_app
+          # No --build-name: it was pinned to 1.0.0, which would have
+          # shipped the 2.0.0 code labelled as 1.0.0 and quietly gone on
+          # doing that for every release after. Omitted, Flutter takes the
+          # version from pubspec.yaml, which is the one place it is
+          # written down.
           flutter build ipa --release \
-            --build-name=1.0.0 \
             --build-number=$BUILD_NUMBER \
             --export-options-plist=$HOME/export_options.plist
 
@@ -87,3 +91,139 @@ workflows:
         auth: integration
         submit_to_testflight: true
         submit_to_app_store: false        # set true when ready for full public release
+
+  # ───────────────────────────────────────────────────────────────────────
+  # Android
+  # ───────────────────────────────────────────────────────────────────────
+  # Note every script enters mobile_app/ first. This repo also holds the
+  # Next.js admin, the Supabase functions and the n8n workflows, so the
+  # Flutter project is not at the root and auto-detection must not be
+  # relied on to find it.
+
+  android-release:
+    name: Know Thyself — Android Release
+    max_build_duration: 45
+    instance_type: linux_x2
+
+    environment:
+      flutter: stable
+      java: 17
+      android_signing:
+        # Upload rishi-release.jks under Codemagic → Teams → Code signing
+        # identities → Android keystores, using exactly this reference.
+        #
+        # Without it the build still SUCCEEDS: android/app/build.gradle
+        # falls back to debug signing when key.properties is missing, so
+        # Codemagic goes green and Play rejects the upload with an error
+        # that says nothing about the build. That silent success is the
+        # trap this workflow is most likely to hit.
+        - rishi_release_keystore
+
+    triggering:
+      events:
+        - tag
+      tag_patterns:
+        - pattern: 'v*'
+          include: true
+
+    scripts:
+      - name: Write key.properties from the signing identity
+        script: |
+          set -e
+          cat > "$CM_BUILD_DIR/mobile_app/android/key.properties" <<EOF
+          storeFile=$CM_KEYSTORE_PATH
+          storePassword=$CM_KEYSTORE_PASSWORD
+          keyAlias=$CM_KEY_ALIAS
+          keyPassword=$CM_KEY_PASSWORD
+          EOF
+
+      - name: Get Flutter packages
+        script: |
+          cd mobile_app
+          flutter pub get
+
+      - name: Flutter build appbundle
+        # Obfuscated, with the symbol files kept as an artifact below.
+        # Without them a crash report from Play is unreadable, and they
+        # cannot be regenerated afterwards — so every build archives its
+        # own set.
+        script: |
+          cd mobile_app
+          flutter build appbundle --release \
+            --build-number=$BUILD_NUMBER \
+            --obfuscate \
+            --split-debug-info=build/symbols
+
+      - name: Confirm the release key was used
+        # Catches the debug-signing fallback described above at build
+        # time, rather than at upload time via a Play error.
+        script: |
+          cd mobile_app/android
+          ./gradlew signingReport | sed -n '/Variant: release/,/^----/p'
+
+    artifacts:
+      - mobile_app/build/**/outputs/bundle/**/*.aab
+      - mobile_app/build/symbols/**
+      - mobile_app/build/**/mapping.txt
+
+    publishing:
+      email:
+        recipients:
+          - rohankelkar0555@gmail.com
+        notify:
+          success: true
+          failure: true
+
+      # Turn on once a Google Play service-account JSON is added in
+      # Codemagic. Left off deliberately: automatic publishing should not
+      # be switched on before a manual upload has been checked by eye.
+      #
+      # google_play:
+      #   credentials: $GCLOUD_SERVICE_ACCOUNT_CREDENTIALS
+      #   track: internal
+      #   submit_as_draft: true
+
+  android-apk:
+    name: Know Thyself — Android APK (manual)
+    max_build_duration: 45
+    instance_type: linux_x2
+
+    # No triggering block: this one is started by hand. An APK is for
+    # getting a build onto a handset quickly, not for releases.
+    environment:
+      flutter: stable
+      java: 17
+      android_signing:
+        - rishi_release_keystore
+
+    scripts:
+      - name: Write key.properties from the signing identity
+        script: |
+          set -e
+          cat > "$CM_BUILD_DIR/mobile_app/android/key.properties" <<EOF
+          storeFile=$CM_KEYSTORE_PATH
+          storePassword=$CM_KEYSTORE_PASSWORD
+          keyAlias=$CM_KEY_ALIAS
+          keyPassword=$CM_KEY_PASSWORD
+          EOF
+
+      - name: Get Flutter packages
+        script: |
+          cd mobile_app
+          flutter pub get
+
+      - name: Flutter build apk
+        script: |
+          cd mobile_app
+          flutter build apk --release
+
+    artifacts:
+      - mobile_app/build/**/outputs/**/*.apk
+
+    publishing:
+      email:
+        recipients:
+          - rohankelkar0555@gmail.com
+        notify:
+          success: true
+          failure: true
