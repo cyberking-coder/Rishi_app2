@@ -388,6 +388,26 @@ The rendered notification is stored on the claim as `payload`. A resume must not
 
 Failure handling distinguishes the two cases: a claim that has never delivered anything is released so the next run retries from scratch (a failure there is the token read or the FCM credentials, both of which fail before the first send), while a claim that already has a cursor keeps it and resumes.
 
+### Subscription lifecycle — expiry reminders
+
+**Migration**: `20260801000010_subscription_lifecycle.sql`.
+
+**There is no auto-renewal in this system, and that is the fact everything here follows from.** A subscription payment is a one-off that extends `profiles.access_expires_at` by the plan's interval; no Razorpay Subscriptions API, no mandate, no card on file. Every renewal is a customer deciding to buy again — so the message telling them access is about to end *is* the renewal mechanism, not a courtesy on top of one. Until this, the only warning was an in-app banner at seven days, which reaches exactly the people who were already opening the app.
+
+**Four marks**: seven days, three days and one day before, then once after it lapses. The last one matters most and is the easiest to leave out — somebody whose access ended yesterday is the likeliest renewal there is, and nothing was telling them it had happened.
+
+**The reminder key includes the expiry timestamp**, so renewing starts a fresh cycle automatically. The same user gets warned again before their *next* expiry with no separate reset step that could be forgotten or run twice.
+
+**Checkout was collecting a phone number and throwing it away** — passed to Razorpay and to n8n, never stored. Exactly the omission `billing_name` had, found the same way: something needed to contact a user and had nothing to contact them with. `profiles.phone` now holds it, filled by the webhook on any successful payment and only ever into a blank, so a number the user set themselves is never overwritten.
+
+**Push and WhatsApp are sent independently and neither blocks the other.** Somebody who never installed the app still has a phone number; somebody who never bought through checkout has devices but no number. Requiring both would have silently dropped whichever group was missing a channel. A reminder that reached one channel and not the other is still marked complete — re-sending it in full an hour later would give the people it *did* reach a duplicate, which reads worse than the people it missed getting it once.
+
+**`sendToUser` is deliberately separate from `fanOut`.** A broadcast is unbounded and has to be resumable; one user has a handful of devices and always finishes in a single pass. Folding them together would carry cursor machinery through the case that provably never needs it.
+
+Lifecycle events go to their own n8n webhook (`N8N_LIFECYCLE_WEBHOOK_URL`, falling back to `N8N_PAYMENT_WEBHOOK_URL`). A payment message congratulates somebody and an expiry message asks them to come back; sharing a workflow would mean branching on event type forever, with a change to renewal copy risking the receipt copy.
+
+**Still missing on the subscription side**: the n8n workflow for subscription *payments*. The webhook already sends the payload with `content_type: "subscription"`, but it reads `N8N_PAYMENT_WEBHOOK_URL`, which has never been set — so a course buyer gets WhatsApp and a Sheets row while a subscription buyer gets nothing. `notifyN8n` logs exactly that when it happens. The fix is a workflow, not code.
+
 ### Bug-fix chronology — Phases 3b through 5
 
 Every one of these was found by testing on a real device, not by review.
@@ -427,7 +447,8 @@ None of these are committed to the repo (correctly). Listed here so a fresh setu
 | `BUNNY_STREAM_TOKEN_KEY` | `issue-playback-license` | The pull zone's **Token Authentication key** (Pull Zone → Security), NOT the Stream API key. Leave UNSET unless token auth is on — see the note below |
 | `BUNNY_STREAM_API_KEY`, `BUNNY_STREAM_LIBRARY_ID` | `issue-playback-license` | Reads live encode status, since Bunny sends no webhook. Optional: absent, the status check returns "unknown" and fails open |
 | `N8N_COURSE_PAYMENT_WEBHOOK_URL` | `razorpay-webhook` | Course-payment automation. Falls back to `N8N_PAYMENT_WEBHOOK_URL` |
-| `N8N_PAYMENT_WEBHOOK_URL` | `razorpay-webhook` | Subscription-payment automation (not in active use) |
+| `N8N_PAYMENT_WEBHOOK_URL` | `razorpay-webhook` | Subscription-payment automation. **Not set** — so subscription buyers currently get no WhatsApp confirmation and no Sheets row, while course buyers do. Duplicate the course workflow in n8n and point this at it |
+| `N8N_LIFECYCLE_WEBHOOK_URL` | `send-content-notifications` | Access-expiry reminders (7/3/1 days before, once after). Falls back to `N8N_PAYMENT_WEBHOOK_URL`. Absent, push still goes out and only the WhatsApp side is missing — logged, not silent |
 | `FCM_SERVICE_ACCOUNT` | `send-session-reminders`, `send-content-notifications` | The **entire** service-account JSON from Firebase console → Project settings → Service accounts → Generate new private key. Not a path, not a key id. Absent, the function returns a config error naming it and releases its reminder claim so nothing is silently marked sent |
 
 > **Bunny token authentication is deliberately OFF.** A directory token cannot survive the jump from an HLS master playlist to its renditions on a native player — ExoPlayer and AVPlayer cannot re-attach a token to segment requests at runtime, and Bunny's own workaround is a JavaScript hook that only exists in web players. Setting `BUNNY_STREAM_TOKEN_KEY` again will break playback. Access is gated by `issue-playback-license` (purchase, device lock, access window), not by the CDN.

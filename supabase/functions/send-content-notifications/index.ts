@@ -8,6 +8,12 @@
 //   {"job": "daily_audio"}  — the "start your day" nudge. Run once a
 //                             morning; a second run the same day is a
 //                             no-op, which is what makes a retry safe.
+//   {"job": "expiry_reminders"} — tells people their access ends in 7, 3
+//                             or 1 days, and once more after it has.
+//                             There is no auto-renewal in this system, so
+//                             this IS the renewal mechanism, not a
+//                             courtesy on top of one. Run a few times a
+//                             day; the marks are day-grained.
 //
 // One function rather than two because they share the whole shape —
 // claim, fan out, resume, release on failure — and the only thing that
@@ -20,7 +26,12 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { handlePreflight, jsonResponse } from "../_shared/cors.ts";
 import { FcmConfigError, type PushMessage } from "../_shared/fcm.ts";
-import { fanOut, roleFromAuthHeader } from "../_shared/push_audience.ts";
+import {
+  fanOut,
+  roleFromAuthHeader,
+  sendToUser,
+} from "../_shared/push_audience.ts";
+import { notifyN8nLifecycle } from "../_shared/n8n.ts";
 
 interface DueAnnouncement {
   kind: string;
@@ -35,6 +46,17 @@ interface AudioPick {
   title: string;
   description: string | null;
   cover_art_url: string | null;
+}
+
+interface DueExpiry {
+  user_id: string;
+  email: string | null;
+  display_name: string | null;
+  phone: string | null;
+  expires_at: string;
+  days_before: number;
+  kind: string;
+  reminder_key: string;
 }
 
 interface OpenClaim {
@@ -76,9 +98,10 @@ Deno.serve(async (req) => {
   }
 
   const job = body.job ?? "new_content";
-  if (job !== "new_content" && job !== "daily_audio") {
+  const jobs = ["new_content", "daily_audio", "expiry_reminders"];
+  if (!jobs.includes(job)) {
     return jsonResponse(
-      { error: `Unknown job "${job}". Use "new_content" or "daily_audio".` },
+      { error: `Unknown job "${job}". Use one of ${jobs.join(", ")}.` },
       400,
     );
   }
@@ -94,9 +117,10 @@ Deno.serve(async (req) => {
   // would sit half-delivered forever.
   const resumed = await resumeOpenClaims(supabase);
 
-  const result = job === "daily_audio"
-    ? await runDailyAudio(supabase)
-    : await runNewContent(supabase);
+  let result;
+  if (job === "daily_audio") result = await runDailyAudio(supabase);
+  else if (job === "expiry_reminders") result = await runExpiryReminders(supabase);
+  else result = await runNewContent(supabase);
 
   return jsonResponse({ ...result, resumed });
 });
@@ -258,6 +282,112 @@ async function runDailyAudio(supabase: any) {
 }
 
 // ---------------------------------------------------------------------------
+// expiry_reminders
+// ---------------------------------------------------------------------------
+/// Addressed to one person at a time, unlike everything else here.
+///
+/// Push and WhatsApp are sent independently and neither can block the
+/// other: somebody who never installed the app still has a phone number,
+/// and somebody who never bought through checkout has devices but no
+/// number. Requiring both would silently drop whichever group was
+/// missing its channel.
+// deno-lint-ignore no-explicit-any
+async function runExpiryReminders(supabase: any) {
+  const { data: due, error } = await supabase
+    .rpc("due_expiry_reminders", { p_window_hours: 26 })
+    .returns<DueExpiry[]>();
+
+  if (error) {
+    console.error(`due_expiry_reminders failed: ${error.message}`);
+    return { ok: false, job: "expiry_reminders", error: error.message };
+  }
+
+  const outcomes: unknown[] = [];
+
+  for (const item of (due ?? []) as DueExpiry[]) {
+    const lapsed = item.kind === "access_lapsed";
+    const payload: PushMessage = {
+      title: lapsed ? "Your access has ended" : "Your access is ending soon",
+      body: lapsed
+        ? "Renew to pick up where you left off."
+        : `${daysPhrase(item.days_before)} left. Renew to keep your ` +
+          `meditations and courses.`,
+      data: {
+        type: item.kind,
+        deep_link: "/profile",
+      },
+      channelId: "content_updates",
+    };
+
+    const claimed = await claim(
+      supabase,
+      item.kind,
+      item.reminder_key,
+      payload,
+      item.user_id,
+    );
+    if (claimed !== "claimed") {
+      outcomes.push({ user: item.user_id, skipped: claimed });
+      continue;
+    }
+
+    let push = { sent: 0, failed: 0, pruned: 0 };
+    let pushError: string | null = null;
+    try {
+      push = await sendToUser(supabase, item.user_id, payload);
+    } catch (e) {
+      pushError = describe(e);
+      console.error(`Expiry push to ${item.user_id} failed: ${pushError}`);
+    }
+
+    let whatsapp: string = "sent";
+    try {
+      await notifyN8nLifecycle({
+        event: lapsed ? "access_lapsed" : "access_expiring",
+        user_id: item.user_id,
+        email: item.email,
+        name: item.display_name,
+        phone: item.phone,
+        days_before: item.days_before,
+        expires_at: item.expires_at,
+      });
+    } catch (e) {
+      whatsapp = describe(e);
+      console.error(`Expiry n8n notify for ${item.user_id} failed: ${whatsapp}`);
+    }
+
+    // Marked complete either way. A reminder that reached one channel and
+    // not the other should not be re-sent in full an hour later — the
+    // people it did reach would get it twice, which reads worse than the
+    // people it missed getting it once.
+    await supabase
+      .from("notification_log")
+      .update({
+        recipient_count: push.sent,
+        completed_at: new Date().toISOString(),
+      })
+      .eq("kind", item.kind)
+      .eq("key", item.reminder_key);
+
+    outcomes.push({
+      user: item.user_id,
+      kind: item.kind,
+      days_before: item.days_before,
+      push: pushError ?? `${push.sent} delivered`,
+      whatsapp,
+    });
+  }
+
+  return { ok: true, job: "expiry_reminders", due: (due ?? []).length, outcomes };
+}
+
+/// "7 days" / "3 days" / "1 day" — the singular matters because the
+/// one-day notice is the one people actually act on.
+function daysPhrase(days: number): string {
+  return days === 1 ? "1 day" : `${days} days`;
+}
+
+// ---------------------------------------------------------------------------
 // Shared claim / deliver
 // ---------------------------------------------------------------------------
 /// Claims BEFORE sending, so two overlapping runs produce one
@@ -352,10 +482,16 @@ async function deliver(
         .eq("key", args.key);
     }
 
-    const message = e instanceof FcmConfigError
-      ? `Push is not configured: ${e.message}`
-      : String(e);
+    const message = describe(e);
     console.error(`Announcing "${args.label}" failed: ${message}`);
     return { title: args.label, error: message };
   }
+}
+
+/// A missing FCM service account is a configuration problem with a fix,
+/// and says so; anything else is reported as it arrived.
+function describe(e: unknown): string {
+  return e instanceof FcmConfigError
+    ? `Push is not configured: ${e.message}`
+    : String(e);
 }

@@ -16,7 +16,10 @@
       "name": "Every 15 minutes",
       "type": "n8n-nodes-base.scheduleTrigger",
       "typeVersion": 1.2,
-      "position": [0, -140]
+      "position": [
+        0,
+        -140
+      ]
     },
     {
       "parameters": {
@@ -40,7 +43,10 @@
       "name": "Announce new content",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [260, -140],
+      "position": [
+        260,
+        -140
+      ],
       "notes": "New courses and meditations. Most runs report due: 0 — that is the expected state, not a misconfiguration. Idempotent through notification_log, so an overlapping run or a retry announces nothing twice."
     },
     {
@@ -58,7 +64,10 @@
       "name": "Daily at 7am IST",
       "type": "n8n-nodes-base.scheduleTrigger",
       "typeVersion": 1.2,
-      "position": [0, 140],
+      "position": [
+        0,
+        140
+      ],
       "notes": "07:00 in the workflow's own timezone, which settings.timezone pins to Asia/Kolkata. Pinned rather than inherited: n8n falls back to the instance timezone, so an unpinned schedule silently means a different hour on a differently-configured host. Change the hour here to move the morning nudge — the app and the function have no opinion about the time."
     },
     {
@@ -83,16 +92,95 @@
       "name": "Daily audio nudge",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [260, 140],
+      "position": [
+        260,
+        140
+      ],
       "notes": "Keyed on the date inside the function, so a second run the same day is a no-op and a retry is free."
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 10,18 * * *"
+            }
+          ]
+        }
+      },
+      "id": "c1000000-0000-4000-8000-000000000005",
+      "name": "Expiry reminders, twice daily",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        420
+      ],
+      "notes": "10am and 6pm IST. Twice rather than once so a reminder is not lost to a single failed run, and at civil hours because this one asks somebody to spend money. The marks are day-grained and each is claimed once in notification_log, so the second run of the day sends nothing new."
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://gzcanqovqirarnculqjq.supabase.co/functions/v1/send-content-notifications",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "Bearer YOUR_SUPABASE_SERVICE_ROLE_KEY"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "{ \"job\": \"expiry_reminders\" }",
+        "options": {}
+      },
+      "id": "c1000000-0000-4000-8000-000000000006",
+      "name": "Access expiry reminders",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        260,
+        420
+      ],
+      "notes": "Sends push directly and posts each user to N8N_LIFECYCLE_WEBHOOK_URL for the WhatsApp side. There is no auto-renewal in this system, so this is the renewal mechanism rather than a courtesy on top of one."
     }
   ],
   "connections": {
     "Every 15 minutes": {
-      "main": [[{ "node": "Announce new content", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Announce new content",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Daily at 7am IST": {
-      "main": [[{ "node": "Daily audio nudge", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Daily audio nudge",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Expiry reminders, twice daily": {
+      "main": [
+        [
+          {
+            "node": "Access expiry reminders",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     }
   },
   "settings": {

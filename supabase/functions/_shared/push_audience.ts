@@ -119,6 +119,47 @@ export async function fanOut(
   }
 }
 
+/// Sends to one person's devices.
+///
+/// Separate from fanOut rather than a filter on it, because the two have
+/// genuinely different shapes: a broadcast is unbounded and has to be
+/// resumable, while one user has a handful of devices and always finishes
+/// in a single pass. Folding them together would mean carrying cursor
+/// machinery through the case that provably never needs it.
+export async function sendToUser(
+  supabase: SupabaseClient,
+  userId: string,
+  message: PushMessage,
+): Promise<{ sent: number; failed: number; pruned: number }> {
+  const { data, error } = await supabase
+    .from("push_tokens")
+    .select("token")
+    .eq("user_id", userId)
+    .returns<{ token: string }[]>();
+
+  if (error) {
+    throw new Error(`Could not read tokens for ${userId}: ${error.message}`);
+  }
+
+  const tokens = (data ?? []).map((r) => r.token);
+  if (tokens.length === 0) return { sent: 0, failed: 0, pruned: 0 };
+
+  const batch = await sendToTokens(tokens, message);
+
+  if (batch.invalidTokens.length > 0) {
+    await supabase.from("push_tokens").delete().in(
+      "token",
+      batch.invalidTokens,
+    );
+  }
+
+  return {
+    sent: batch.sent,
+    failed: batch.failed,
+    pruned: batch.invalidTokens.length,
+  };
+}
+
 /** Reads the caller's role claim. Signature verification already happened
  *  at the gateway — verify_jwt accepts any valid project JWT, including a
  *  signed-in user's, so this is what actually keeps a fan-out from being

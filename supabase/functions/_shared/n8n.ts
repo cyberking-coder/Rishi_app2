@@ -88,3 +88,60 @@ function redact(url: string): string {
     return "an unparseable URL";
   }
 }
+
+
+// ---------------------------------------------------------------------------
+// Lifecycle events — not a payment, but still something to say
+// ---------------------------------------------------------------------------
+
+export interface LifecycleNotification {
+  event: "access_expiring" | "access_lapsed";
+  user_id: string;
+  email: string | null;
+  name: string | null;
+  phone: string | null;
+  /** 7, 3 or 1 for a warning; 0 once access has actually ended. */
+  days_before: number;
+  /** ISO timestamp the access window ends (or ended). */
+  expires_at: string;
+}
+
+/** Sent to its own workflow rather than the payment one. A payment
+ *  message congratulates somebody; an expiry message asks them to come
+ *  back. Sharing a webhook would mean one workflow branching on event
+ *  type forever, and a change to renewal copy risking the receipt copy.
+ *
+ *  Falls back to the shared payment webhook so this degrades to
+ *  "delivered to the wrong workflow" rather than "silently dropped" if
+ *  only one URL is ever configured. */
+export async function notifyN8nLifecycle(
+  notification: LifecycleNotification,
+): Promise<void> {
+  const webhookUrl = Deno.env.get("N8N_LIFECYCLE_WEBHOOK_URL") ??
+    Deno.env.get("N8N_PAYMENT_WEBHOOK_URL");
+
+  if (!webhookUrl) {
+    console.warn(
+      `n8n lifecycle notification skipped: neither ` +
+        `N8N_LIFECYCLE_WEBHOOK_URL nor N8N_PAYMENT_WEBHOOK_URL is set. ` +
+        `Push still went out; only the WhatsApp/email side is missing.`,
+    );
+    return;
+  }
+
+  const res = await fetch(webhookUrl, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(notification),
+  });
+
+  if (!res.ok) {
+    const detail = await res.text().catch(() => "");
+    throw new Error(
+      `n8n lifecycle webhook returned ${res.status} for ${redact(webhookUrl)}` +
+        (detail ? `: ${detail.slice(0, 300)}` : ""),
+    );
+  }
+
+  console.log(`n8n lifecycle notified (${res.status}) at ${redact(webhookUrl)}`);
+}
