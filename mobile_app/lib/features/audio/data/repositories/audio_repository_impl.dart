@@ -29,6 +29,12 @@ class AudioRepositoryImpl implements AudioRepository {
   }
 
   @override
+  Future<AudioTrack?> getTrack(String audioId) async {
+    final row = await _remote.getAudio(audioId);
+    return row == null ? null : AudioTrack.fromMap(row);
+  }
+
+  @override
   Future<List<AudioTrack>> getPlaylistTracks(String playlistId) async {
     final rows = await _remote.getPlaylistTracks(playlistId);
     return rows

@@ -2,7 +2,7 @@
 
 Complete record of everything built, fixed, and configured across the mobile app, admin dashboard, and Supabase backend.
 
-**If you are an AI picking up this project**: read this whole file before touching code. Section 7 explains the LMS/payments work added on top of the original app (also described in `README.md`, which is the forward-looking roadmap this log tracks progress against) — and ends with a bug-fix chronology that is the most useful part of this document, because almost every entry in it is a trap the code alone does not reveal. Section 9 explains the folder structure in plain language. Section 10 lists exactly what's unfinished right now, including operational landmines that have each cost a full round of testing.
+**If you are an AI picking up this project**: read this whole file before touching code. Section 7 explains the LMS/payments work added on top of the original app (also described in `README.md`, which is the forward-looking roadmap this log tracks progress against) — and ends with a bug-fix chronology that is the most useful part of this document, because almost every entry in it is a trap the code alone does not reveal. Section 9 explains the folder structure in plain language. Section 10 lists exactly what's unfinished right now, including operational landmines that have each cost a full round of testing. Section 11 says how many users this can carry as it stands, and which limit gives way first.
 
 ---
 
@@ -352,6 +352,64 @@ Not a roadmap phase — the roadmap's Phase 6 is scaling hardening. This was ask
 
 **Also fixed here**: the mini-player's progress bar never moved. It read `PlaybackState.position`, which only emits on play/pause/seek — the bar was drawn correctly and simply sat frozen in between. It now reads the player's continuous `positionStream`, the same fix the Now Playing screen had already needed, and shows elapsed/total in tabular figures so the text doesn't jiggle every second.
 
+### Content notifications — new content, and a daily audio
+
+**Migration**: `20260801000008_content_notifications.sql`.
+
+Three reasons to open the app, three notifications: something is starting soon (live sessions, above), something new arrived, and it's morning.
+
+**"New" means newly published, not newly created.** Courses and audios are drafted and published later, sometimes weeks later, so `created_at` was the wrong signal in both directions — a course drafted in June and published today would never be announced, and one created and published in the same minute would be announced by accident. Both tables gained `published_at`, stamped by a trigger on the transition into `published`. The trigger uses `is distinct from` rather than `<>`, because `OLD.status` is null on insert and `null <> 'published'` is null, not true — the straight-to-published insert would silently never stamp.
+
+**The back catalogue is pre-marked as announced.** The migration seeds `notification_log` with every already-published course and audio. Without that, the first cron run after deploy would push a notification for every piece of content ever published — the single worst thing this feature could do, and irreversible. A 48-hour lookback window sits behind that as a second net: something published a month ago but somehow missing from the log is not news, and announcing it would be worse than staying quiet.
+
+**`notification_log` is the general form of `session_reminders`** — unique on `(kind, key)`, claimed before the send, released if the send fails. Deliberately a second table rather than a merge: the two carry different keys (a session plus a minute mark, versus a content id or a date), and rewriting an applied migration to unify them would trade a small duplication for a real risk of a broken chain.
+
+**The daily nudge is keyed on the date**, which is what makes "once a day" hold however often the cron fires, and makes a retry free. UTC deliberately — the job runs at one moment for everybody, and a local date would make "today" ambiguous at exactly the point the guard needs to be unambiguous. The track is picked least-recently-featured first, never-featured before that, ties broken at random, so the library rotates on its own: no curation list to maintain, no "featured" flag for someone to forget to move, and a newly added track surfaces within a day. An empty library does **not** claim the day — if audio is published later, that evening's run still sends.
+
+**Two Android channels, not one**: `session_reminders` (high importance) and `content_updates` (default). Someone who wants the morning nudge muted should not lose the reminder that a session they signed up for is starting. Each id is written in three places — the manifest, `PushService`, and the sending function's payload — and if any two disagree Android quietly files the notification under a default channel and the importance is lost.
+
+**Tapping a notification goes somewhere.** Every payload carries a `deep_link` go_router path, and `PushService` funnels all three tap sources into one stream: FCM's `onMessageOpenedApp` (backgrounded), `getInitialMessage` (cold start, parked in `pendingDeepLink` because nothing is listening that early), and the local plugin's own response callback (foreground, where FCM posts nothing itself). A new audio needed a destination that didn't exist, so `/audio/:id` was added — it resolves the id, starts playback, and replaces itself with Now Playing, so back goes where the user was rather than to a loading screen they'd have to escape twice.
+
+### Push fan-out at scale
+
+**Migration**: `20260801000009_push_fanout_progress.sql`.
+
+The first version of the fan-out read the whole token list in one query and sent it in one invocation. Both halves had a ceiling, and both failed silently — the worst property a limit can have.
+
+**The unbounded read.** PostgREST enforces a server-side row cap, so past it the token list came back truncated with no error. The function would report `sent: 1000, failed: 0`, look completely healthy, and most of the audience would hear nothing. Replaced with a **keyset walk**: tokens are read in sorted chunks and the cursor is the last token, not a row offset. That matters because dead tokens are deleted mid-walk, and an offset would skip a device every time a pruned row ahead of it shifted the rest backwards. A key cannot be invalidated by a deletion elsewhere in the list.
+
+A short page is deliberately **not** treated as the end of the table. If the server's cap is lower than the requested chunk size, every page comes back short — which would read as "finished" after the first one and reintroduce exactly the truncation this replaced. Only an empty page ends the walk. Verified by simulation against caps of 1000, 500, 100 and 25 with heavy concurrent pruning: every surviving token receives exactly one send, and no token outside the original set is ever contacted.
+
+**The wall clock.** A send is claimed *before* it goes out, so an invocation that timed out mid-fan-out left the notification marked sent with only part of the audience reached, and nothing would retry it. Deliveries are now resumable: the claim row carries `delivery_cursor`, `recipient_count` and `completed_at`, progress is written after every chunk, and both functions finish any open claim before looking for new work. `due_session_reminders()` and `due_content_announcements()` both exclude claimed rows, so without that resume pass an interrupted delivery would sit half-sent forever.
+
+The rendered notification is stored on the claim as `payload`. A resume must not reconstruct the message from a session or course that may have been edited in between — the second half of an audience has to receive the same text as the first half.
+
+**Concurrency raised from 20 to 100.** All the requests go to one host over HTTP/2, so they share connections rather than opening a socket each, and the round trip dominates. At 20, a large audience made the wall clock the binding constraint rather than a theoretical one.
+
+Failure handling distinguishes the two cases: a claim that has never delivered anything is released so the next run retries from scratch (a failure there is the token read or the FCM credentials, both of which fail before the first send), while a claim that already has a cursor keeps it and resumes.
+
+### Subscription lifecycle — expiry reminders
+
+**Migration**: `20260801000010_subscription_lifecycle.sql`.
+
+**There is no auto-renewal in this system, and that is the fact everything here follows from.** A subscription payment is a one-off that extends `profiles.access_expires_at` by the plan's interval; no Razorpay Subscriptions API, no mandate, no card on file. Every renewal is a customer deciding to buy again — so the message telling them access is about to end *is* the renewal mechanism, not a courtesy on top of one. Until this, the only warning was an in-app banner at seven days, which reaches exactly the people who were already opening the app.
+
+**Four marks**: seven days, three days and one day before, then once after it lapses. The last one matters most and is the easiest to leave out — somebody whose access ended yesterday is the likeliest renewal there is, and nothing was telling them it had happened.
+
+**The reminder key includes the expiry timestamp**, so renewing starts a fresh cycle automatically. The same user gets warned again before their *next* expiry with no separate reset step that could be forgotten or run twice.
+
+**Checkout was collecting a phone number and throwing it away** — passed to Razorpay and to n8n, never stored. Exactly the omission `billing_name` had, found the same way: something needed to contact a user and had nothing to contact them with. `profiles.phone` now holds it, filled by the webhook on any successful payment and only ever into a blank, so a number the user set themselves is never overwritten.
+
+**Push and WhatsApp are sent independently and neither blocks the other.** Somebody who never installed the app still has a phone number; somebody who never bought through checkout has devices but no number. Requiring both would have silently dropped whichever group was missing a channel. A reminder that reached one channel and not the other is still marked complete — re-sending it in full an hour later would give the people it *did* reach a duplicate, which reads worse than the people it missed getting it once.
+
+**`sendToUser` is deliberately separate from `fanOut`.** A broadcast is unbounded and has to be resumable; one user has a handful of devices and always finishes in a single pass. Folding them together would carry cursor machinery through the case that provably never needs it.
+
+Lifecycle events go to their own n8n webhook (`N8N_LIFECYCLE_WEBHOOK_URL`, falling back to `N8N_PAYMENT_WEBHOOK_URL`). A payment message congratulates somebody and an expiry message asks them to come back; sharing a workflow would mean branching on event type forever, with a change to renewal copy risking the receipt copy.
+
+**Two importable workflows ship with this**: `n8n/subscription-payments.json` (the confirmation a subscription buyer never used to get — the webhook has always sent the payload with `content_type: "subscription"`, but `N8N_PAYMENT_WEBHOOK_URL` was never set, so nobody was listening) and `n8n/access-expiry-reminders.json` (the WhatsApp half of the reminders, split into separate "ending soon" and "already ended" branches because those ask for different things and read wrong forced into one template).
+
+Both need the same three placeholders filled that the course workflow needed — `REPLACE_TENANT_ID`, `REPLACE_WITH_WATI_TOKEN`, `REPLACE_WITH_SPREADSHEET_ID` — plus the Google Sheets credential re-selected on import, and four Wati templates approved: `subscription_purchase_success`, `subscription_payment_failed`, `access_expiring`, `access_lapsed`.
+
 ### Bug-fix chronology — Phases 3b through 5
 
 Every one of these was found by testing on a real device, not by review.
@@ -391,8 +449,9 @@ None of these are committed to the repo (correctly). Listed here so a fresh setu
 | `BUNNY_STREAM_TOKEN_KEY` | `issue-playback-license` | The pull zone's **Token Authentication key** (Pull Zone → Security), NOT the Stream API key. Leave UNSET unless token auth is on — see the note below |
 | `BUNNY_STREAM_API_KEY`, `BUNNY_STREAM_LIBRARY_ID` | `issue-playback-license` | Reads live encode status, since Bunny sends no webhook. Optional: absent, the status check returns "unknown" and fails open |
 | `N8N_COURSE_PAYMENT_WEBHOOK_URL` | `razorpay-webhook` | Course-payment automation. Falls back to `N8N_PAYMENT_WEBHOOK_URL` |
-| `N8N_PAYMENT_WEBHOOK_URL` | `razorpay-webhook` | Subscription-payment automation (not in active use) |
-| `FCM_SERVICE_ACCOUNT` | `send-session-reminders` | The **entire** service-account JSON from Firebase console → Project settings → Service accounts → Generate new private key. Not a path, not a key id. Absent, the function returns a config error naming it and releases its reminder claim so nothing is silently marked sent |
+| `N8N_PAYMENT_WEBHOOK_URL` | `razorpay-webhook` | Subscription-payment automation. **Not set** — so subscription buyers currently get no WhatsApp confirmation and no Sheets row, while course buyers do. Duplicate the course workflow in n8n and point this at it |
+| `N8N_LIFECYCLE_WEBHOOK_URL` | `send-content-notifications` | Access-expiry reminders (7/3/1 days before, once after). Falls back to `N8N_PAYMENT_WEBHOOK_URL`. Absent, push still goes out and only the WhatsApp side is missing — logged, not silent |
+| `FCM_SERVICE_ACCOUNT` | `send-session-reminders`, `send-content-notifications` | The **entire** service-account JSON from Firebase console → Project settings → Service accounts → Generate new private key. Not a path, not a key id. Absent, the function returns a config error naming it and releases its reminder claim so nothing is silently marked sent |
 
 > **Bunny token authentication is deliberately OFF.** A directory token cannot survive the jump from an HLS master playlist to its renditions on a native player — ExoPlayer and AVPlayer cannot re-attach a token to segment requests at runtime, and Bunny's own workaround is a JavaScript hook that only exists in web players. Setting `BUNNY_STREAM_TOKEN_KEY` again will break playback. Access is gated by `issue-playback-license` (purchase, device lock, access window), not by the CDN.
 
@@ -413,7 +472,7 @@ None of these are committed to the repo (correctly). Listed here so a fresh setu
 | `lib/core/config/google_auth_config.dart` | Google OAuth Web Client ID |
 | `lib/core/config/checkout_config.dart` | The admin app's public URL |
 | `ios/Runner/Info.plist` | `GIDClientID` + `CFBundleURLSchemes` (Google OAuth iOS client) |
-| `android/app/google-services.json` | Downloaded from the Firebase console. Gitignored-by-absence — not in the repo, and the Gradle plugin is applied only when it exists, so a checkout without it still builds (with push inert). **Register a second Android app for `com.knowthyself.app.debug`** in the same Firebase project, or push won't work in debug builds — the same suffix trap that broke Google Sign-In earlier |
+| `android/app/google-services.json` | Firebase project `anurag-rishi-1c479`. **In the repo** — it is client config, restricted by package name and shipped inside every APK anyway, so keeping it out would only mean a build that silently has no push. The Gradle plugin is still applied conditionally, so a checkout without the file builds fine. **Only `com.knowthyself.app` is registered so far — add a second Android app for `com.knowthyself.app.debug`** or push won't work in debug builds, the same suffix trap that broke Google Sign-In earlier |
 
 ---
 
@@ -539,31 +598,76 @@ The admin app doesn't use this layering — it's a much thinner app, and Next.js
 
 ## 10. Known Issues / Next Steps
 
-As of the end of the Phase 5 session, in priority order:
+As of the end of the push-notification session, in priority order:
 
 1. **This branch (`claude/repo-structure-overview-vt36iu`) still has not been merged to `main`.** Nothing in Section 7 is live for real users until that happens. `checkout_config.dart` now points at the stable production alias (`https://rishi-app2.vercel.app`) rather than a per-deployment preview URL, so that particular breakage is resolved either way.
 
-2. **Phase 5 has not been tested end-to-end on a device.** Both apps build clean. Migrations `20260801000003` and `20260801000004` are applied; **`20260801000005` is not**. Before anything else next session: apply it, upload certificate artwork on a course, position the name, complete every lesson on a phone, and claim the certificate.
+2. **Phase 5 (certificates) has still not been tested end-to-end on a device.** Both apps build clean and migrations `20260801000003` through `20260801000006` are applied. Upload certificate artwork on a course, position the name, complete every lesson on a phone, and claim the certificate. This is the largest untested surface left.
 
-3. **Operational landmines that have each cost a testing round.** Written down because they are not discoverable from the code:
+   **Push, live sessions and the WhatsApp flows ARE tested** — token registration, the daily audio nudge, notification tap-through, a 60-minute session reminder, and both new n8n webhook workflows (subscription payments and access expiry) have each been confirmed end to end.
+
+   Still untested: the 30- and 5-minute session marks, new-course and new-audio announcements, expiry reminders driven by the real cron rather than a direct webhook POST, and any resumed (`complete: false`) delivery — that last one needs an audience larger than a single invocation, so it cannot be exercised at current scale. **A real live-mode Razorpay payment end to end is the largest remaining gap**: the n8n side is proven by direct POST, but nothing has yet confirmed that Razorpay actually reaches the webhook with live keys.
+
+3. **Firebase and Google Sign-In share one project — keep it that way.** The app briefly carried a `google-services.json` for a *different* Google Cloud project than the one `googleWebClientId` points at, and Google Sign-In failed with `DEVELOPER_ERROR` until they were consolidated onto `rishi-503917` / project number `395908400723`. Anything that touches either — a new SHA-1, a new OAuth client, a rotated service-account key — must be done in that project and nowhere else.
+
+   Two SHA-1s are registered: release `E7:D2:10:CC:FC:8C:18:B4:D3:80:CA:0C:69:E9:D6:92:92:41:DF:FC` and debug `79:C4:CB:7E:09:2E:5D:33:11:FF:AD:F2:D7:AD:63:D0:C6:82:D5:CC`. **`com.knowthyself.app.debug` is not yet registered as a Firebase app**, so debug builds get no push and no Google Sign-In. And if the app is ever distributed through Play with App Signing, Play re-signs it with a third key whose SHA-1 must also be registered — otherwise sign-in works in local release builds and fails for everyone who installs from the store.
+
+4. **Operational landmines that have each cost a testing round.** Written down because they are not discoverable from the code:
    - **"Verify JWT" resets to ON after every `supabase functions deploy`**, and must be OFF for `razorpay-webhook`. Razorpay's POST is rejected with 401 before any code runs. The durable fix is a `[functions.razorpay-webhook] verify_jwt = false` block in the local `supabase/config.toml` (untracked — it holds the project ref).
    - **The Supabase CLI's migration history is empty** because migrations were applied by hand in the SQL editor. `supabase db push` therefore offers to replay all of them, which would fail partway. Either run `supabase migration repair --status applied <version>` for each existing migration once, or keep applying by hand.
    - **Deploy after pulling.** Several rounds were lost to a deployed function predating the fix being tested.
+   - **An n8n workflow that is saved, correct and tested still does nothing until it is activated**, and gives no indication it isn't running. This has now cost rounds on both the payments workflow and the reminders workflow. The check is n8n's Executions list: regular runs returning `due: 0` are the proof it is alive.
+   - **Verify JWT must stay ON for `send-session-reminders` and `send-content-notifications`** — the opposite of `razorpay-webhook`, and easy to get backwards out of habit. Both check the `service_role` claim themselves.
+   - **Times are pinned to IST in two places that must agree**: `formatDateTime` in the admin, and the session form's `istInputToIso`/`isoToIstInput`. The admin pages are server components and the server runs in UTC, so an unpinned format renders five and a half hours off what the client-side form accepted. The n8n daily schedule pins the same zone in `settings.timezone`.
 
-4. **Refunds owed.** At least one duplicate payment (`pay_TKA6LFBfAzXBiu`) bought nothing and needs refunding in Razorpay. The course page shows a "duplicates to refund" badge once `20260801000002` is applied.
+5. **Refunds owed.** At least one duplicate payment (`pay_TKA6LFBfAzXBiu`) bought nothing and needs refunding in Razorpay. The course page shows a "duplicates to refund" badge once `20260801000002` is applied.
 
-5. **Legacy revoked enrolments block repurchase.** Anyone revoked before the `status = 'revoked'` mechanism landed still has a lapsed-but-`paid` row occupying the unique index. One-time cleanup:
+6. **Legacy revoked enrolments block repurchase.** Anyone revoked before the `status = 'revoked'` mechanism landed still has a lapsed-but-`paid` row occupying the unique index. One-time cleanup:
    ```sql
    update public.course_purchases set status = 'revoked', updated_at = now()
    where status = 'paid' and expires_at is not null and expires_at <= now();
    ```
 
-6. **Not started, from the original roadmap**: Stripe (non-India), the admin Billing page (payment history + refund button), the account-deletion flow, and per-item purchases of individual audios/videos (`entitlements` remains ready and unused — courses use `course_purchases` instead).
+7. **Not started, from the original roadmap**: Stripe (non-India), the admin Billing page (payment history + refund button), the account-deletion flow, and per-item purchases of individual audios/videos (`entitlements` remains ready and unused — courses use `course_purchases` instead).
 
-7. **Phases 6 and 7 (scaling, load testing) have not been started** — see `README.md`.
+8. **Phases 6 and 7 (scaling, load testing) have not been started** — see `README.md` and Section 11 below, which sets out what actually binds first.
 
-8. **Certificates download as a PNG, not a PDF.** The app renders the on-screen certificate to a ~2000px image via RepaintBoundary and hands it to the system share sheet, which is how it gets saved as well as shared. A PDF would need a layout engine and a font pipeline to reproduce what is already being drawn correctly; if one is ever wanted, the record and its number already exist, so it is a rendering job rather than a data-model change.
+9. **Certificates download as a PNG, not a PDF.** The app renders the on-screen certificate to a ~2000px image via RepaintBoundary and hands it to the system share sheet, which is how it gets saved as well as shared. A PDF would need a layout engine and a font pipeline to reproduce what is already being drawn correctly; if one is ever wanted, the record and its number already exist, so it is a rendering job rather than a data-model change.
 
 ---
 
-*Last updated: 1 August 2026, after Phase 5 (quizzes and certificates). Phases 3b, 4 and 5 all landed in one extended session; see the bug-fix chronology at the end of Section 7 for what broke along the way and why.*
+## 11. Capacity — what this can carry today
+
+Assumes Supabase **Pro**, Cloudflare R2, and Bunny Stream, with the usage shape of a meditation app: people open it once or twice a day for ten to twenty minutes. Verify the Supabase quotas against their current pricing page before betting on them — plan limits change.
+
+**Headline: roughly 50,000 registered users / 10,000 daily actives before anything has to be touched.**
+
+### What breaks, in order
+
+| # | Limit | Breaks at | How you'd find out |
+|---|---|---|---|
+| 1 | Postgres compute (Pro defaults to a Micro instance) | ~10,000 daily actives | Slow queries, then timeouts |
+| 2 | Edge function invocations (2M/month included) | ~35,000–65,000 users | A billed overage, ~$2 per extra million |
+| 3 | Auth MAU (100,000 included) | 100,000 monthly actives | Billed per MAU |
+| 4 | Push fan-out | ~500,000 devices per invocation, and past that it simply takes more cron runs | Nothing breaks; deliveries report `complete: false` and resume |
+| 5 | Bunny video egress | No ceiling — cost only | Your invoice |
+
+**Compute is the one you will actually feel**, and it is a slider in the Supabase dashboard, not an architecture change: Micro → Small → Medium, minutes of downtime, $15–60/month. Opening the app fires roughly eight queries (home, categories, courses, continue-listening, live sessions, access, profile), all indexed.
+
+**Edge functions are the metered resource.** Every audio play calls `issue-audio-license`, every video calls `issue-playback-license`. At 30 plays per user per month, 2M invocations covers about 65,000 users; at 60 plays, about 33,000. The notification crons contribute roughly 11,500 invocations a month combined — negligible.
+
+**Audio costs nothing to serve.** R2 has no egress fees, which is the single best property of this stack.
+
+**Video is where the money goes.** A thousand people watching a 30-minute HD lesson is on the order of 1–2 TB through Bunny. That is a pricing question to model before a launch push, and it is unrelated to how much load the system can carry.
+
+**Paid vs free makes no meaningful difference to load.** A paid user hits `has_course_access` and the license functions slightly more often; that is one indexed lookup. Razorpay absorbs payment volume, and the webhook is a single write per purchase. The device lock (one account, one device) caps concurrent streams per account at one, which helps.
+
+**Storage will not bind.** 100,000 users with full progress history sits well under the 8 GB included.
+
+### What was already fixed to get here
+
+The push fan-out originally broke at about **1,000 devices, silently** — an unbounded token read that PostgREST truncated with no error, so the function reported success while most of the audience heard nothing. See "Push fan-out at scale" in Section 7. That was the only limit standing between this app and every other number on this page.
+
+---
+
+*Last updated: 2 August 2026, after live sessions, push notifications, and the fan-out scaling work. Phases 3b, 4 and 5 landed in one extended session before that; see the bug-fix chronology at the end of Section 7 for what broke along the way and why.*

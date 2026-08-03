@@ -24,16 +24,27 @@ import {
 } from "@/app/actions/sessions";
 import type { LiveSession } from "@/lib/types";
 
-/// `datetime-local` wants "YYYY-MM-DDTHH:mm" in the browser's own zone,
-/// while the database stores UTC. Converting through the Date object is
-/// what makes "7pm" mean 7pm to the admin typing it, wherever they are.
-function toLocalInputValue(iso: string): string {
-  const d = new Date(iso);
-  const pad = (n: number) => n.toString().padStart(2, "0");
-  return (
-    `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}` +
-    `T${pad(d.getHours())}:${pad(d.getMinutes())}`
-  );
+/// Both directions between the `datetime-local` input and the UTC the
+/// database stores, fixed to IST.
+///
+/// Pinned rather than using the browser's own zone, because the table
+/// that lists these renders on the server (which is UTC) — so a
+/// browser-local form and a server-rendered list disagreed by five and a
+/// half hours, and neither told you which one to believe. One stated
+/// zone on both sides is the only version of this that can't drift.
+///
+/// A fixed +05:30 offset is exact: India has no daylight saving, so
+/// there is no date on which this is wrong, and no zone library needed.
+const IST_OFFSET_MS = 5.5 * 60 * 60 * 1000;
+
+function istInputToIso(local: string): string {
+  return new Date(`${local}:00+05:30`).toISOString();
+}
+
+function isoToIstInput(iso: string): string {
+  return new Date(new Date(iso).getTime() + IST_OFFSET_MS)
+    .toISOString()
+    .slice(0, 16);
 }
 
 /// One dialog for both add and edit — the fields are identical, and two
@@ -55,7 +66,7 @@ export function SessionFormDialog({
   const [description, setDescription] = useState(session?.description ?? "");
   const [joinUrl, setJoinUrl] = useState(session?.join_url ?? "");
   const [startsAt, setStartsAt] = useState(
-    session ? toLocalInputValue(session.starts_at) : "",
+    session ? isoToIstInput(session.starts_at) : "",
   );
   const [duration, setDuration] = useState(
     String(session?.duration_minutes ?? 60),
@@ -101,9 +112,9 @@ export function SessionFormDialog({
         title,
         description: description || undefined,
         joinUrl,
-        // The input is local-time; toISOString converts it once, here,
-        // so nothing downstream has to guess a zone.
-        startsAt: new Date(startsAt).toISOString(),
+        // Read as IST and converted once, here, so nothing downstream
+        // has to guess a zone.
+        startsAt: istInputToIso(startsAt),
         durationMinutes: Number(duration),
         thumbnailUrl: thumbnailUrl || undefined,
       };
@@ -175,7 +186,7 @@ export function SessionFormDialog({
 
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <Label htmlFor="ls-start">Starts</Label>
+              <Label htmlFor="ls-start">Starts (IST)</Label>
               <Input
                 id="ls-start"
                 type="datetime-local"
@@ -210,14 +221,6 @@ export function SessionFormDialog({
 
           <div>
             <Label htmlFor="ls-thumb">Thumbnail</Label>
-            {thumbnailUrl && (
-              /* eslint-disable-next-line @next/next/no-img-element */
-              <img
-                src={thumbnailUrl}
-                alt=""
-                className="mb-2 aspect-video w-full rounded-lg object-cover"
-              />
-            )}
             <Input
               id="ls-thumb"
               type="file"
@@ -231,7 +234,9 @@ export function SessionFormDialog({
             <p className="mt-1 text-xs text-muted-foreground">
               {uploading
                 ? "Uploading…"
-                : "Optional. Without one the app draws a plain card."}
+                : thumbnailUrl
+                  ? "Thumbnail set. Choose a file to replace it."
+                  : "Optional. Without one the app draws a plain card."}
             </p>
           </div>
 

@@ -19,6 +19,19 @@ class AudioRemoteDataSource {
     return (url != null && url.isNotEmpty) ? url : null;
   }
 
+  /// One track by id. Used by the /audio/:id destination a "start your
+  /// day" notification opens — the only place the app arrives holding an
+  /// audio id and nothing else. RLS limits this to published rows, so an
+  /// archived track resolves to null rather than to something the app
+  /// would then fail to play.
+  Future<Map<String, dynamic>?> getAudio(String audioId) async {
+    return await _client
+        .from('audios')
+        .select('id, title, artist, cover_art_url, duration_seconds')
+        .eq('id', audioId)
+        .maybeSingle();
+  }
+
   Future<Map<String, dynamic>> issueAudioLicense(String audioId) async {
     final deviceId = await _getActiveDeviceId();
 

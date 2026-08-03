@@ -591,22 +591,40 @@ async function handleCoursePurchase(
     }
   }
 
-  // Give the account a display name if it has none. The buyer typed one
-  // at checkout, and an app that greets them by email while holding
-  // their name is just discarding what they told us. Never overwrites a
-  // name they set themselves.
-  if (status === "paid" && billing.name && billing.name.trim() !== "") {
+  // Fill in what the account is missing from what the buyer just typed at
+  // checkout. Only ever fills a blank — a name or number they set
+  // themselves is theirs, and this must not overwrite it.
+  //
+  // The name stops the app greeting people by email address. The phone is
+  // what expiry reminders reach them on: checkout has always collected
+  // one, handed it to Razorpay and n8n, and then discarded it, so the one
+  // message that decides whether a subscription renews had no way to
+  // arrive. Same omission the name had, found the same way.
+  if (status === "paid") {
     const { data: profile } = await supabase
       .from("profiles")
-      .select("display_name")
+      .select("display_name, phone")
       .eq("id", userId)
-      .maybeSingle<{ display_name: string | null }>();
+      .maybeSingle<{ display_name: string | null; phone: string | null }>();
 
-    if (!profile?.display_name || profile.display_name.trim() === "") {
-      await supabase
-        .from("profiles")
-        .update({ display_name: billing.name.trim() })
-        .eq("id", userId);
+    const patch: Record<string, string> = {};
+
+    if (
+      billing.name?.trim() &&
+      (!profile?.display_name || profile.display_name.trim() === "")
+    ) {
+      patch.display_name = billing.name.trim();
+    }
+
+    if (
+      billing.phone?.trim() &&
+      (!profile?.phone || profile.phone.trim() === "")
+    ) {
+      patch.phone = billing.phone.trim();
+    }
+
+    if (Object.keys(patch).length > 0) {
+      await supabase.from("profiles").update(patch).eq("id", userId);
     }
   }
 

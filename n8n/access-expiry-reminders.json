@@ -1,0 +1,412 @@
+{
+  "name": "Rishi App — Access expiry reminders",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "3f7b0c19-2a64-4e83-8d51-c6b9e047af12",
+        "responseMode": "onReceived",
+        "options": {}
+      },
+      "id": "e1000000-0000-4000-8000-000000000001",
+      "name": "Expiry webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        -280,
+        0
+      ],
+      "webhookId": "3f7b0c19-2a64-4e83-8d51-c6b9e047af12",
+      "notes": "Set the PRODUCTION url of this node as N8N_LIFECYCLE_WEBHOOK_URL in the Supabase edge function secrets. One POST per user per mark, from send-content-notifications. Push has already gone out by the time this fires; this is only the WhatsApp half, so a failure here costs the message, not the reminder."
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose"
+          },
+          "conditions": [
+            {
+              "id": "e1000000-c1",
+              "leftValue": "={{ $json.body.event }}",
+              "rightValue": "access_lapsed",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "e1000000-0000-4000-8000-000000000002",
+      "name": "Already lapsed?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        -40,
+        0
+      ],
+      "notes": "Two different messages, not one with a variable. 'Your access ends in 3 days' and 'your access has ended' ask for different things and read wrong if forced into one template."
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "e2000000-0000-4000-8000-000000000001",
+              "name": "waNumber",
+              "value": "={{ ($json.body.phone || '').replace(/\\D/g, '').replace(/^(?!91)(\\d{10})$/, '91$1') }}",
+              "type": "string"
+            },
+            {
+              "id": "e2000000-0000-4000-8000-000000000002",
+              "name": "firstName",
+              "value": "={{ ($json.body.name || 'there').split(' ')[0] }}",
+              "type": "string"
+            },
+            {
+              "id": "e2000000-0000-4000-8000-000000000003",
+              "name": "fullName",
+              "value": "={{ $json.body.name || '' }}",
+              "type": "string"
+            },
+            {
+              "id": "e2000000-0000-4000-8000-000000000004",
+              "name": "email",
+              "value": "={{ $json.body.email || '' }}",
+              "type": "string"
+            },
+            {
+              "id": "e2000000-0000-4000-8000-000000000005",
+              "name": "userId",
+              "value": "={{ $json.body.user_id }}",
+              "type": "string"
+            },
+            {
+              "id": "e2000000-0000-4000-8000-000000000006",
+              "name": "endedOn",
+              "value": "={{ DateTime.fromISO($json.body.expires_at).setZone('Asia/Kolkata').toFormat('dd LLL yyyy') }}",
+              "type": "string"
+            },
+            {
+              "id": "e2000000-0000-4000-8000-000000000007",
+              "name": "eventType",
+              "value": "={{ $json.body.event }}",
+              "type": "string"
+            },
+            {
+              "id": "e2000000-0000-4000-8000-000000000008",
+              "name": "sentAt",
+              "value": "={{ $now.setZone('Asia/Kolkata').toFormat('yyyy-LL-dd HH:mm') }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "e1000000-0000-4000-8000-000000000003",
+      "name": "Normalise (lapsed)",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        200,
+        -140
+      ],
+      "notes": "Dates are formatted in IST here rather than left as the raw UTC ISO string — a renewal message quoting a timestamp five and a half hours off is worse than one with no date at all."
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://live-mt-server.wati.io/REPLACE_TENANT_ID/api/v1/sendTemplateMessage?whatsappNumber={{ $json.waNumber }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "Bearer REPLACE_WITH_WATI_TOKEN"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ template_name: 'access_lapsed', broadcast_name: 'access_lapsed', parameters: [ { name: '1', value: $json.firstName }, { name: '2', value: $json.endedOn } ] }) }}",
+        "options": {}
+      },
+      "id": "e1000000-0000-4000-8000-000000000004",
+      "name": "Wati: access ended",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        440,
+        -140
+      ],
+      "notes": "Create in Wati with two variables: name, date. This is the highest-value message in the whole system — someone whose access ended yesterday is the likeliest renewal there is."
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "REPLACE_WITH_SPREADSHEET_ID",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "Renewals",
+          "mode": "name"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Date": "={{ $('Normalise (lapsed)').item.json.sentAt }}",
+            "Event": "={{ $('Normalise (lapsed)').item.json.eventType }}",
+            "Name": "={{ $('Normalise (lapsed)').item.json.fullName }}",
+            "Email": "={{ $('Normalise (lapsed)').item.json.email }}",
+            "Phone": "={{ $('Normalise (lapsed)').item.json.waNumber }}",
+            "Days left": "={{ '' }}",
+            "Access ends": "={{ '' }}",
+            "Access ended": "={{ $('Normalise (lapsed)').item.json.endedOn }}",
+            "User ID": "={{ $('Normalise (lapsed)').item.json.userId }}"
+          },
+          "matchingColumns": [],
+          "schema": []
+        },
+        "options": {}
+      },
+      "id": "e1000000-0000-4000-8000-000000000005",
+      "name": "Log reminder (lapsed)",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        680,
+        -140
+      ],
+      "notes": "Both branches write every column in the Renewals tab; the ones this branch has no value for are mapped to an empty string rather than left out. An unmapped column leaves its cell unwritten, and a later append can then land its values one column across — corrupting the sheet quietly instead of failing."
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "e3000000-0000-4000-8000-000000000001",
+              "name": "waNumber",
+              "value": "={{ ($json.body.phone || '').replace(/\\D/g, '').replace(/^(?!91)(\\d{10})$/, '91$1') }}",
+              "type": "string"
+            },
+            {
+              "id": "e3000000-0000-4000-8000-000000000002",
+              "name": "firstName",
+              "value": "={{ ($json.body.name || 'there').split(' ')[0] }}",
+              "type": "string"
+            },
+            {
+              "id": "e3000000-0000-4000-8000-000000000003",
+              "name": "fullName",
+              "value": "={{ $json.body.name || '' }}",
+              "type": "string"
+            },
+            {
+              "id": "e3000000-0000-4000-8000-000000000004",
+              "name": "email",
+              "value": "={{ $json.body.email || '' }}",
+              "type": "string"
+            },
+            {
+              "id": "e3000000-0000-4000-8000-000000000005",
+              "name": "userId",
+              "value": "={{ $json.body.user_id }}",
+              "type": "string"
+            },
+            {
+              "id": "e3000000-0000-4000-8000-000000000006",
+              "name": "daysLeft",
+              "value": "={{ $json.body.days_before === 1 ? '1 day' : $json.body.days_before + ' days' }}",
+              "type": "string"
+            },
+            {
+              "id": "e3000000-0000-4000-8000-000000000007",
+              "name": "endsOn",
+              "value": "={{ DateTime.fromISO($json.body.expires_at).setZone('Asia/Kolkata').toFormat('dd LLL yyyy') }}",
+              "type": "string"
+            },
+            {
+              "id": "e3000000-0000-4000-8000-000000000008",
+              "name": "eventType",
+              "value": "={{ $json.body.event }}",
+              "type": "string"
+            },
+            {
+              "id": "e3000000-0000-4000-8000-000000000009",
+              "name": "sentAt",
+              "value": "={{ $now.setZone('Asia/Kolkata').toFormat('yyyy-LL-dd HH:mm') }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "e1000000-0000-4000-8000-000000000006",
+      "name": "Normalise (expiring)",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        200,
+        140
+      ],
+      "notes": "daysLeft is written out singular/plural here rather than in the template, because '1 days' is the kind of detail that makes a renewal message read as automated."
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://live-mt-server.wati.io/REPLACE_TENANT_ID/api/v1/sendTemplateMessage?whatsappNumber={{ $json.waNumber }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "Bearer REPLACE_WITH_WATI_TOKEN"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ template_name: 'access_expiring', broadcast_name: 'access_expiring', parameters: [ { name: '1', value: $json.firstName }, { name: '2', value: $json.daysLeft }, { name: '3', value: $json.endsOn } ] }) }}",
+        "options": {}
+      },
+      "id": "e1000000-0000-4000-8000-000000000007",
+      "name": "Wati: access ending",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        440,
+        140
+      ],
+      "notes": "Create in Wati with three variables: name, time left, end date. Fires at the 7, 3 and 1 day marks — the same template each time, with the interval as a variable."
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "REPLACE_WITH_SPREADSHEET_ID",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "Renewals",
+          "mode": "name"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Date": "={{ $('Normalise (expiring)').item.json.sentAt }}",
+            "Event": "={{ $('Normalise (expiring)').item.json.eventType }}",
+            "Name": "={{ $('Normalise (expiring)').item.json.fullName }}",
+            "Email": "={{ $('Normalise (expiring)').item.json.email }}",
+            "Phone": "={{ $('Normalise (expiring)').item.json.waNumber }}",
+            "Days left": "={{ $('Normalise (expiring)').item.json.daysLeft }}",
+            "Access ends": "={{ $('Normalise (expiring)').item.json.endsOn }}",
+            "Access ended": "={{ '' }}",
+            "User ID": "={{ $('Normalise (expiring)').item.json.userId }}"
+          },
+          "matchingColumns": [],
+          "schema": []
+        },
+        "options": {}
+      },
+      "id": "e1000000-0000-4000-8000-000000000008",
+      "name": "Log reminder (expiring)",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        680,
+        140
+      ],
+      "notes": "Both branches write every column in the Renewals tab; the ones this branch has no value for are mapped to an empty string rather than left out. An unmapped column leaves its cell unwritten, and a later append can then land its values one column across — corrupting the sheet quietly instead of failing."
+    }
+  ],
+  "connections": {
+    "Expiry webhook": {
+      "main": [
+        [
+          {
+            "node": "Already lapsed?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Already lapsed?": {
+      "main": [
+        [
+          {
+            "node": "Normalise (lapsed)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Normalise (expiring)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalise (lapsed)": {
+      "main": [
+        [
+          {
+            "node": "Wati: access ended",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wati: access ended": {
+      "main": [
+        [
+          {
+            "node": "Log reminder (lapsed)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalise (expiring)": {
+      "main": [
+        [
+          {
+            "node": "Wati: access ending",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wati: access ending": {
+      "main": [
+        [
+          {
+            "node": "Log reminder (expiring)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "Asia/Kolkata"
+  },
+  "pinData": {}
+}

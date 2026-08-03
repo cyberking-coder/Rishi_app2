@@ -1,0 +1,46 @@
+{
+  "project_info": {
+    "project_number": "395908400723",
+    "project_id": "rishi-503917",
+    "storage_bucket": "rishi-503917.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:395908400723:android:ee2f8d9bf10a54d0ca68a6",
+        "android_client_info": {
+          "package_name": "com.knowthyself.app"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "395908400723-a03gbndf3bcecahi97s3rg80p911poas.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDhx8veuWDJp6TZmiUWjW22_eA1T1o-N28"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "395908400723-a03gbndf3bcecahi97s3rg80p911poas.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "395908400723-qlv7qnkm0p6ml5c28opm7p1l0iksiul9.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.anuragrishi.knowthyself"
+              }
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

@@ -131,6 +131,12 @@ export interface PushMessage {
   /** Delivered to the app as message.data — strings only, FCM rejects
    *  anything else. */
   data?: Record<string, string>;
+  /** Android channel. Must match a channel PushService creates in the
+   *  app, or Android files the notification under a default one and the
+   *  importance settings are silently lost. Reminders about something
+   *  starting and announcements about something new are separate
+   *  channels so a user can mute one without losing the other. */
+  channelId?: "session_reminders" | "content_updates";
 }
 
 /// Sends one message to many tokens.
@@ -153,8 +159,14 @@ export async function sendToTokens(
 
   // Bounded concurrency. Unbounded would open a socket per device and
   // trip Deno's limits on a large list; serial would time the function
-  // out. 20 is comfortably inside both.
-  const CONCURRENCY = 20;
+  // out.
+  //
+  // 100, not 20: these all go to one host over HTTP/2, so they share
+  // connections rather than opening a socket each, and the round trip
+  // dominates. At 20 a hundred thousand devices took long enough that
+  // the invocation's wall clock became the real limit rather than a
+  // theoretical one.
+  const CONCURRENCY = 100;
   let cursor = 0;
 
   async function worker() {
@@ -175,7 +187,7 @@ export async function sendToTokens(
               android: {
                 priority: "high",
                 notification: {
-                  channel_id: "session_reminders",
+                  channel_id: message.channelId ?? "session_reminders",
                   // Tapping opens the launcher activity; the app then
                   // routes on the data payload.
                   click_action: "FLUTTER_NOTIFICATION_CLICK",
@@ -192,13 +204,19 @@ export async function sendToTokens(
 
         result.failed++;
         const detail = await res.text().catch(() => "");
-        // UNREGISTERED means the app was uninstalled or the token was
-        // reissued; INVALID_ARGUMENT on a token field means it was never
-        // valid. Both are permanent, so the row should go. Anything else
-        // (429, 503) is transient and the token must be kept.
+        // Permanent failures, all of which mean the row is dead:
+        //   404 UNREGISTERED     — app uninstalled, or the token reissued
+        //   400 INVALID_ARGUMENT — the token was never valid
+        //   403 SENDER_ID_MISMATCH — the token belongs to a different
+        //     Firebase project. Happens whenever the app is repointed at
+        //     a new project, and the old rows would otherwise fail on
+        //     every send forever, because nothing else ever removes them.
+        // Anything else (429, 503) is transient and the token must be
+        // kept — pruning on a momentary outage would delete live devices.
         if (
           res.status === 404 ||
-          (res.status === 400 && detail.includes("INVALID_ARGUMENT"))
+          (res.status === 400 && detail.includes("INVALID_ARGUMENT")) ||
+          (res.status === 403 && detail.includes("SENDER_ID_MISMATCH"))
         ) {
           result.invalidTokens.push(deviceToken);
         } else {

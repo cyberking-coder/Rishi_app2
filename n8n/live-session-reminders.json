@@ -16,124 +16,37 @@
       "name": "Every 5 minutes",
       "type": "n8n-nodes-base.scheduleTrigger",
       "typeVersion": 1.2,
-      "position": [-220, 0]
+      "position": [0, 0]
     },
     {
       "parameters": {
         "method": "POST",
-        "url": "https://YOUR-PROJECT-REF.supabase.co/functions/v1/send-session-reminders",
+        "url": "https://gzcanqovqirarnculqjq.supabase.co/functions/v1/send-session-reminders",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
             {
               "name": "Authorization",
               "value": "Bearer YOUR_SUPABASE_SERVICE_ROLE_KEY"
-            },
-            {
-              "name": "Content-Type",
-              "value": "application/json"
             }
           ]
         },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={}",
-        "options": {
-          "response": {
-            "response": {
-              "neverError": true,
-              "fullResponse": true
-            }
-          }
-        }
+        "jsonBody": "{}",
+        "options": {}
       },
       "id": "b1000000-0000-4000-8000-000000000002",
       "name": "Send due reminders",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [0, 0],
-      "notes": "The function decides what is due. This node only has to call it — no scheduling logic here, so 'when does a reminder fire' has one answer in one place (due_session_reminders in the database)."
-    },
-    {
-      "parameters": {
-        "conditions": {
-          "options": {
-            "caseSensitive": true,
-            "typeValidation": "loose"
-          },
-          "conditions": [
-            {
-              "id": "c2000000-0000-4000-8000-000000000001",
-              "leftValue": "={{ $json.statusCode }}",
-              "rightValue": 200,
-              "operator": {
-                "type": "number",
-                "operation": "notEquals"
-              }
-            }
-          ],
-          "combinator": "and"
-        },
-        "options": {}
-      },
-      "id": "b1000000-0000-4000-8000-000000000003",
-      "name": "Did it fail?",
-      "type": "n8n-nodes-base.if",
-      "typeVersion": 2,
-      "position": [220, 0],
-      "notes": "neverError is on above so a bad run reaches this branch as data rather than killing the execution — otherwise a single 500 shows up only as a red execution nobody is watching."
-    },
-    {
-      "parameters": {
-        "message": "=Live session reminders failed: HTTP {{ $json.statusCode }} — {{ JSON.stringify($json.body).slice(0, 400) }}",
-        "options": {}
-      },
-      "id": "b1000000-0000-4000-8000-000000000004",
-      "name": "Raise the failure",
-      "type": "n8n-nodes-base.stopAndError",
-      "typeVersion": 1,
-      "position": [460, -100]
-    },
-    {
-      "parameters": {
-        "assignments": {
-          "assignments": [
-            {
-              "id": "f2000000-0000-4000-8000-000000000001",
-              "name": "due",
-              "value": "={{ $json.body.due }}",
-              "type": "number"
-            },
-            {
-              "id": "f2000000-0000-4000-8000-000000000002",
-              "name": "outcomes",
-              "value": "={{ JSON.stringify($json.body.outcomes || []) }}",
-              "type": "string"
-            }
-          ]
-        },
-        "options": {}
-      },
-      "id": "b1000000-0000-4000-8000-000000000005",
-      "name": "Run summary",
-      "type": "n8n-nodes-base.set",
-      "typeVersion": 3.4,
-      "position": [460, 100],
-      "notes": "Most runs report due: 0. That is the expected state — reminders only exist in the ten minutes around a 60/30/5-minute mark."
+      "position": [240, 0],
+      "notes": "The function decides what is due. This node only has to call it — no scheduling logic here, so 'when does a reminder fire' has one answer in one place (due_session_reminders in the database). A non-200 fails the execution, which is what turns it red in the executions list; there is no error branch because that list is already the alarm."
     }
   ],
   "connections": {
     "Every 5 minutes": {
       "main": [[{ "node": "Send due reminders", "type": "main", "index": 0 }]]
-    },
-    "Send due reminders": {
-      "main": [[{ "node": "Did it fail?", "type": "main", "index": 0 }]]
-    },
-    "Did it fail?": {
-      "main": [
-        [{ "node": "Raise the failure", "type": "main", "index": 0 }],
-        [{ "node": "Run summary", "type": "main", "index": 0 }]
-      ]
     }
   },
   "settings": {

@@ -13,6 +13,15 @@
 -dontwarn com.google.android.exoplayer2.**
 -dontwarn androidx.media3.**
 
+# --- flutter_local_notifications / Firebase Messaging ---------------------
+# The notification plugin serialises its settings through Gson and reads
+# them back by reflection, so R8 renaming those classes turns a working
+# debug build into a release build that drops notifications silently —
+# the worst kind of shrink failure, because nothing throws.
+-keep class com.dexterous.** { *; }
+-keep class com.google.firebase.** { *; }
+-dontwarn com.dexterous.**
+
 # --- Keep annotations & native method signatures --------------------------
 -keepattributes *Annotation*, Signature, InnerClasses, EnclosingMethod
 -keepclasseswithmembernames class * {
