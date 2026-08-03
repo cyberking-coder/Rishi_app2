@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
 
     <!-- Network -->
     <uses-permission android:name="android.permission.INTERNET" />
@@ -14,7 +15,29 @@
     <!-- Android 13+ notification permission -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
-    <!-- Storage (downloads to app-private dir, no media store permission needed) -->
+    <!-- Storage: nothing is read from the user's gallery.
+         Downloads are written to app-private storage, and both open_filex
+         and share_plus hand files to other apps through a FileProvider,
+         which grants access per-URI without any permission at all.
+
+         These removals are load-bearing, not tidying. Plugins in the
+         dependency tree merge the media permissions into the final
+         manifest, and Play then requires a Photo and Video Permissions
+         declaration justifying access the app does not actually use —
+         which blocks the release and cannot be answered honestly,
+         because the honest answer is "we don't need them".
+
+         If a future feature genuinely reads the gallery (a profile
+         picture, say), delete the relevant line here AND complete that
+         declaration in Play Console. Do not do one without the other. -->
+    <uses-permission android:name="android.permission.READ_MEDIA_IMAGES"
+        tools:node="remove" />
+    <uses-permission android:name="android.permission.READ_MEDIA_VIDEO"
+        tools:node="remove" />
+    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE"
+        tools:node="remove" />
+    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE"
+        tools:node="remove" />
 
     <application
         android:label="Know Thyself"

@@ -9,7 +9,7 @@ publish_to: "none"
 # The build number after the + is what Play actually enforces, and it
 # must increase on every upload, including uploads that never leave
 # internal testing.
-version: 2.0.0+9
+version: 2.0.0+10
 
 environment:
   sdk: ">=3.3.0 <4.0.0"
