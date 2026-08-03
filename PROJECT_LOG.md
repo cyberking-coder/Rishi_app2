@@ -604,7 +604,9 @@ As of the end of the push-notification session, in priority order:
 
 2. **Phase 5 (certificates) has still not been tested end-to-end on a device.** Both apps build clean and migrations `20260801000003` through `20260801000006` are applied. Upload certificate artwork on a course, position the name, complete every lesson on a phone, and claim the certificate. This is the largest untested surface left.
 
-   **Push and live sessions ARE tested on a device** — token registration, the daily audio nudge, notification tap-through, and a 60-minute session reminder have all been confirmed working end to end. Untested: the 30- and 5-minute marks, new-course and new-audio announcements, and any resumed (`complete: false`) delivery, which needs an audience larger than one invocation to trigger.
+   **Push, live sessions and the WhatsApp flows ARE tested** — token registration, the daily audio nudge, notification tap-through, a 60-minute session reminder, and both new n8n webhook workflows (subscription payments and access expiry) have each been confirmed end to end.
+
+   Still untested: the 30- and 5-minute session marks, new-course and new-audio announcements, expiry reminders driven by the real cron rather than a direct webhook POST, and any resumed (`complete: false`) delivery — that last one needs an audience larger than a single invocation, so it cannot be exercised at current scale. **A real live-mode Razorpay payment end to end is the largest remaining gap**: the n8n side is proven by direct POST, but nothing has yet confirmed that Razorpay actually reaches the webhook with live keys.
 
 3. **Firebase and Google Sign-In share one project — keep it that way.** The app briefly carried a `google-services.json` for a *different* Google Cloud project than the one `googleWebClientId` points at, and Google Sign-In failed with `DEVELOPER_ERROR` until they were consolidated onto `rishi-503917` / project number `395908400723`. Anything that touches either — a new SHA-1, a new OAuth client, a rotated service-account key — must be done in that project and nowhere else.
 
