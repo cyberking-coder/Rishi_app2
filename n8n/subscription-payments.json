@@ -209,6 +209,7 @@
             "Currency": "={{ $('Normalise').item.json.currency }}",
             "Coupon": "={{ $('Normalise').item.json.couponCode }}",
             "Discount": "={{ $('Normalise').item.json.discountAmount }}",
+            "Reason": "=",
             "User ID": "={{ $('Normalise').item.json.userId }}"
           },
           "matchingColumns": [],
@@ -224,7 +225,7 @@
         700,
         -120
       ],
-      "notes": "Mapping is explicit, NOT 'Map Automatically'. Left automatic, this node logs whatever the Wati node returned instead of the payment — which is exactly what happened on the course workflow."
+      "notes": "Successes and failures share one Subscriptions tab, so the whole story of a subscriber sits in one place in the order it happened. The Event column separates them. Columns that only one branch fills (Discount on a success, Reason on a failure) are still mapped, to an empty string — an unmapped column leaves its cell unwritten, and a later append can then land values one column across. Mapping is explicit, NOT 'Map Automatically': left automatic this logs whatever Wati returned instead of the payment, which is what happened on the course workflow."
     },
     {
       "parameters": {
@@ -365,7 +366,7 @@
         },
         "sheetName": {
           "__rl": true,
-          "value": "Failures",
+          "value": "Subscriptions",
           "mode": "name"
         },
         "columns": {
@@ -381,6 +382,7 @@
             "Amount": "={{ $('Normalise (failed)').item.json.amount }}",
             "Currency": "={{ $('Normalise (failed)').item.json.currency }}",
             "Coupon": "={{ $('Normalise (failed)').item.json.couponCode }}",
+            "Discount": "=",
             "Reason": "={{ $('Normalise (failed)').item.json.reason }}",
             "User ID": "={{ $('Normalise (failed)').item.json.userId }}"
           },
@@ -390,14 +392,14 @@
         "options": {}
       },
       "id": "s1000000-0000-4000-8000-000000000008",
-      "name": "Log failure to Sheets",
+      "name": "Log failed payment to Sheets",
       "type": "n8n-nodes-base.googleSheets",
       "typeVersion": 4.5,
       "position": [
         700,
         140
       ],
-      "notes": "Same sheet the course workflow logs failures to, so both products' declines sit in one place."
+      "notes": "Successes and failures share one Subscriptions tab, so the whole story of a subscriber sits in one place in the order it happened. The Event column separates them. Columns that only one branch fills (Discount on a success, Reason on a failure) are still mapped, to an empty string — an unmapped column leaves its cell unwritten, and a later append can then land values one column across. Mapping is explicit, NOT 'Map Automatically': left automatic this logs whatever Wati returned instead of the payment, which is what happened on the course workflow."
     }
   ],
   "connections": {
@@ -467,7 +469,7 @@
       "main": [
         [
           {
-            "node": "Log failure to Sheets",
+            "node": "Log failed payment to Sheets",
             "type": "main",
             "index": 0
           }
