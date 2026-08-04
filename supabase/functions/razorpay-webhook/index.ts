@@ -183,9 +183,30 @@ async function processEvent(
     console.error("[razorpay-webhook] order fetch failed, falling back to payment.notes:", e);
     notes = payment.notes ?? {};
   }
-  if (!notes.user_id || (!notes.plan_id && !notes.course_id)) {
+  if (
+    !notes.user_id ||
+    (!notes.plan_id && !notes.course_id && !notes.popup_id)
+  ) {
     console.log("[razorpay-webhook] order notes incomplete, trying payment.notes");
     notes = payment.notes ?? {};
+  }
+
+  // A workshop seat carries popup_id. It grants no content access at all
+  // — it books a place at an event — so it branches out before any of
+  // the access-granting paths below.
+  if (notes.popup_id) {
+    return await handleWorkshopRegistration(supabase, {
+      eventType,
+      payment,
+      userId: notes.user_id,
+      popupId: notes.popup_id,
+      billing: {
+        email: notes.billing_email ?? null,
+        name: notes.billing_name ?? null,
+        phone: notes.billing_phone ?? payment.contact ?? null,
+        state: notes.billing_state ?? null,
+      },
+    });
   }
 
   // Courses are sold individually and carry course_id instead of plan_id.
@@ -403,6 +424,205 @@ interface CourseBilling {
   name: string | null;
   phone: string | null;
   state: string | null;
+}
+
+/// Books a workshop seat.
+///
+/// Deliberately simpler than the course handler, and the simplicity is
+/// the point: a registration grants no access to anything. There is no
+/// entitlement to reconcile, no expiry to compare, no lapsed row to
+/// supersede — only "did this person pay for this seat".
+async function handleWorkshopRegistration(
+  // deno-lint-ignore no-explicit-any
+  supabase: any,
+  args: {
+    eventType: string;
+    // deno-lint-ignore no-explicit-any
+    payment: any;
+    userId?: string;
+    popupId: string;
+    billing: CourseBilling;
+  },
+): Promise<Response> {
+  const { eventType, payment, userId, popupId, billing } = args;
+
+  if (!userId) {
+    console.error("[razorpay-webhook] workshop registration missing user_id");
+    return jsonResponse({ error: "Payment missing user_id note" }, 400);
+  }
+
+  const { data: popup } = await supabase
+    .from("app_popups")
+    .select("id, title")
+    .eq("id", popupId)
+    .maybeSingle();
+
+  if (!popup) {
+    console.error("[razorpay-webhook] unknown workshop on notes", { popupId });
+    return jsonResponse({ error: "Unknown workshop on payment notes" }, 404);
+  }
+
+  const title = popup.title ?? "Workshop";
+  const amountRupees = payment.amount / 100;
+  const status = eventType === "payment.failed" ? "failed" : "paid";
+
+  const patch = {
+    user_id: userId,
+    popup_id: popupId,
+    amount: payment.amount,
+    currency: payment.currency ?? "INR",
+    status,
+    razorpay_order_id: payment.order_id,
+    razorpay_payment_id: payment.id,
+    billing_name: billing.name,
+    billing_phone: billing.phone,
+    billing_email: billing.email,
+  };
+
+  // A second payment for a seat they already hold. uq_..._paid would
+  // reject the write, the handler would 500, and Razorpay would retry a
+  // payment that can never be recorded. Checkout refuses a workshop the
+  // person is already registered for, but it cannot close the race —
+  // two tabs, or a redelivered older payment, both land here.
+  //
+  // Recorded as a duplicate so the refund owed is visible rather than
+  // the money simply vanishing.
+  if (status === "paid") {
+    const { data: incumbent } = await supabase
+      .from("workshop_registrations")
+      .select("id, razorpay_order_id")
+      .eq("user_id", userId)
+      .eq("popup_id", popupId)
+      .eq("status", "paid")
+      .maybeSingle();
+
+    if (incumbent && incumbent.razorpay_order_id !== payment.order_id) {
+      console.error(
+        `[razorpay-webhook] DUPLICATE WORKSHOP REGISTRATION - refund owed: ` +
+          `user ${userId} already registered for ${popupId} via order ` +
+          `${incumbent.razorpay_order_id}; recording ${payment.id} ` +
+          `(order ${payment.order_id}) as duplicate`,
+      );
+
+      const duplicatePatch = { ...patch, status: "duplicate" };
+      const { data: dupUpdated } = await supabase
+        .from("workshop_registrations")
+        .update(duplicatePatch)
+        .eq("razorpay_order_id", payment.order_id)
+        .select("id");
+
+      if (!dupUpdated || dupUpdated.length === 0) {
+        await supabase.from("workshop_registrations").insert(duplicatePatch);
+      }
+
+      // No notification: "you're registered" is wrong for a payment that
+      // registered nobody, and they were told the first time.
+      return jsonResponse({ ok: true, duplicate: true });
+    }
+  }
+
+  // Update-then-insert, never an upsert. Both unique indexes on this
+  // table are partial, and Postgres refuses a partial index as an ON
+  // CONFLICT target unless the statement repeats its predicate — which
+  // PostgREST cannot express. Checkout always writes a pending row, so
+  // the UPDATE is the normal path; the INSERT covers a payment whose
+  // pending row is missing, so money is never silently unaccounted for.
+  const { data: updated, error: updateError } = await supabase
+    .from("workshop_registrations")
+    .update(patch)
+    .eq("razorpay_order_id", payment.order_id)
+    .select("id");
+
+  if (updateError) {
+    console.error(
+      "[razorpay-webhook] WORKSHOP REGISTRATION FAILED:",
+      updateError.message,
+    );
+    return jsonResponse({ error: updateError.message }, 500);
+  }
+
+  if (!updated || updated.length === 0) {
+    const { error: insertError } = await supabase
+      .from("workshop_registrations")
+      .insert(patch);
+
+    if (insertError) {
+      console.error(
+        "[razorpay-webhook] WORKSHOP REGISTRATION FAILED (insert):",
+        insertError.message,
+      );
+      return jsonResponse({ error: insertError.message }, 500);
+    }
+  }
+
+  console.log("[razorpay-webhook] workshop registration recorded", {
+    userId,
+    popupId,
+    status,
+  });
+
+  let email = billing.email;
+  if (!email) {
+    try {
+      const { data: authUser } = await supabase.auth.admin.getUserById(userId);
+      email = authUser.user?.email ?? null;
+    } catch {
+      // non-fatal
+    }
+  }
+
+  // Same fill-the-blanks as a course purchase: only ever writes into an
+  // empty field, so a name or number the member set themselves is never
+  // overwritten by what they typed at checkout.
+  if (status === "paid") {
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("display_name, phone")
+      .eq("id", userId)
+      .maybeSingle<{ display_name: string | null; phone: string | null }>();
+
+    const profilePatch: Record<string, string> = {};
+
+    if (
+      billing.name?.trim() &&
+      (!profile?.display_name || profile.display_name.trim() === "")
+    ) {
+      profilePatch.display_name = billing.name.trim();
+    }
+    if (
+      billing.phone?.trim() &&
+      (!profile?.phone || profile.phone.trim() === "")
+    ) {
+      profilePatch.phone = billing.phone.trim();
+    }
+
+    if (Object.keys(profilePatch).length > 0) {
+      await supabase.from("profiles").update(profilePatch).eq("id", userId);
+    }
+  }
+
+  try {
+    await notifyN8n({
+      event: status === "paid" ? "payment_success" : "payment_failed",
+      user_id: userId,
+      email,
+      name: billing.name,
+      phone: billing.phone,
+      state: billing.state,
+      plan_name: title,
+      content_type: "workshop",
+      popup_id: popupId,
+      amount: amountRupees,
+      currency: payment.currency ?? "INR",
+      reason: status === "failed"
+        ? (payment.error_description ?? "Payment failed")
+        : undefined,
+    });
+  } catch (e) {
+    console.error("n8n workshop notification failed:", e);
+  }
+
+  return jsonResponse({ ok: true });
 }
 
 async function handleCoursePurchase(

@@ -17,6 +17,15 @@ class AppPopup {
 
   final int sortOrder;
 
+  /// Registration fee in **paise**, matching courses.price_amount. Null or
+  /// zero means this pop-up is an announcement with no button.
+  final int? priceAmount;
+
+  final String currency;
+
+  /// Wording on the button. Null falls back to "Register Now".
+  final String? ctaLabel;
+
   const AppPopup({
     required this.id,
     this.title,
@@ -25,6 +34,9 @@ class AppPopup {
     this.weekday,
     this.startsAt,
     this.sortOrder = 0,
+    this.priceAmount,
+    this.currency = 'INR',
+    this.ctaLabel,
   });
 
   factory AppPopup.fromMap(Map<String, dynamic> map) => AppPopup(
@@ -37,7 +49,29 @@ class AppPopup {
             ? null
             : DateTime.tryParse(map['starts_at'] as String)?.toLocal(),
         sortOrder: (map['sort_order'] as num?)?.toInt() ?? 0,
+        priceAmount: (map['price_amount'] as num?)?.toInt(),
+        currency: map['currency'] as String? ?? 'INR',
+        ctaLabel: map['cta_label'] as String?,
       );
+
+  /// Whether this pop-up is selling a place at something.
+  bool get isPaidWorkshop => (priceAmount ?? 0) > 0;
+
+  /// The fee as it should read on the button.
+  ///
+  /// Whole rupees drop the decimals — "₹499" rather than "₹499.00", which
+  /// on a price tag reads as an accountant's number rather than a price.
+  String get priceLabel {
+    final rupees = (priceAmount ?? 0) / 100;
+    final symbol = currency == 'INR' ? '₹' : '$currency ';
+    return rupees % 1 == 0
+        ? '$symbol${rupees.toStringAsFixed(0)}'
+        : '$symbol${rupees.toStringAsFixed(2)}';
+  }
+
+  String get ctaText => (ctaLabel?.trim().isNotEmpty ?? false)
+      ? ctaLabel!.trim()
+      : 'Register Now';
 
   /// A pop-up with neither a title nor a body has nothing to say, and
   /// showing an empty card would read as a failed image load.

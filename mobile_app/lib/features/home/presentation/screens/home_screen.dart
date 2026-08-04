@@ -74,11 +74,14 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
       // before the storage read returns, and two builds both passing the
       // check would open the dialog twice.
       _popupShown = true;
-      WidgetsBinding.instance.addPostFrameCallback((_) => _showPopup(popup));
+      final registered = access.registeredPopupIds.contains(popup.id);
+      WidgetsBinding.instance.addPostFrameCallback(
+        (_) => _showPopup(popup, registered: registered),
+      );
     }
   }
 
-  Future<void> _showPopup(AppPopup popup) async {
+  Future<void> _showPopup(AppPopup popup, {required bool registered}) async {
     final today = popup.todayKey;
     if (await PopupSeenStore.wasSeen(popup.id, today)) return;
     if (!mounted) return;
@@ -89,7 +92,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     // it and decided they were done.
     await PopupSeenStore.markSeen(popup.id, today);
     if (!mounted) return;
-    await NextEventPopup.show(context, popup);
+    await NextEventPopup.show(context, popup, alreadyRegistered: registered);
   }
 
   Future<void> _playAudio(AudioSummary audio) async {

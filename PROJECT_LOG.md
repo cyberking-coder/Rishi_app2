@@ -465,6 +465,26 @@ The pop-up used to be three columns on the singleton `app_config` row, which all
 
 The migration copies the existing pop-up across as an every-day one, guarded on `app_popups` being empty so re-running it cannot duplicate the row.
 
+### Paid workshop registration (from a pop-up)
+
+**Migration**: `20260801000013_workshop_registrations.sql`. **Workflow**: `n8n/workshop-registrations.json`. **Secret**: `N8N_WORKSHOP_WEBHOOK_URL`.
+
+Give a pop-up a fee and it grows a **Register Now • ₹499** button. Tapping it opens the same external web checkout the courses and the membership already use, `razorpay-webhook` settles it, and n8n sends the WhatsApp confirmation. Leave the fee blank and the pop-up stays an announcement with a Close button.
+
+**The price lives on the pop-up, not in a `workshops` table.** From the member's side the advert and the thing being sold are one card with one button; a separate table would have needed its own admin screen, its own scheduling and its own way of being shown. What does get its own table is `workshop_registrations` — that is a receipt: it has money on it, it must survive the pop-up being edited, and it is the answer to "who is coming".
+
+**Paise, not rupees** (`price_amount`), matching `courses.price_amount`. Subscriptions store rupees and courses store paise; the newer per-item convention wins so the two things a member buys one at a time agree. The admin form takes rupees and converts.
+
+**Both unique indexes are partial, so nothing may upsert.** `uq_workshop_registrations_paid` is `where status = 'paid'` and the order index is `where razorpay_order_id is not null`. Postgres refuses a partial index as an ON CONFLICT target unless the statement repeats its predicate, which PostgREST cannot express — this exact trap has already cost three separate bugs on `course_purchases`. Both writers update-then-insert.
+
+**A second payment for a held seat is recorded as `duplicate`, not rejected.** Checkout refuses a workshop somebody is already registered for, but it cannot close the race (two tabs, a redelivered payment). Colliding with the index would 500 the handler and make Razorpay retry a payment that can never be recorded, so the refund owed is made visible instead.
+
+**The handler grants nothing.** Unlike a course purchase there is no entitlement to reconcile, no expiry to compare, no lapsed row to supersede — only "did this person pay for this seat". It does still fill blank `display_name`/`phone` on the profile from the checkout form, never overwriting what a member set themselves.
+
+**Seat count comes from `workshop_seats_taken()`**, one function used by the checkout page, the order route and the admin, because three separate counts drift the moment one forgets to filter on status.
+
+The Sheets tab (`Workshops`) is the attendee list — filter `Event = Registered`. Two Wati templates are needed: `workshop_registration_success` (name, workshop, amount) and `workshop_payment_failed` (name, workshop, reason). The failure message has to say plainly that no seat was held, or somebody turns up on the day.
+
 ### Bug-fix chronology — Phases 3b through 5
 
 Every one of these was found by testing on a real device, not by review.
@@ -506,6 +526,7 @@ None of these are committed to the repo (correctly). Listed here so a fresh setu
 | `BUNNY_STREAM_API_KEY`, `BUNNY_STREAM_LIBRARY_ID` | `issue-playback-license` | Reads live encode status, since Bunny sends no webhook. Optional: absent, the status check returns "unknown" and fails open |
 | `N8N_COURSE_PAYMENT_WEBHOOK_URL` | `razorpay-webhook` | Course-payment automation. Falls back to `N8N_PAYMENT_WEBHOOK_URL` |
 | `N8N_PAYMENT_WEBHOOK_URL` | `razorpay-webhook` | Subscription-payment automation. **Not set** — so subscription buyers currently get no WhatsApp confirmation and no Sheets row, while course buyers do. Duplicate the course workflow in n8n and point this at it |
+| `N8N_WORKSHOP_WEBHOOK_URL` | `razorpay-webhook` | Workshop registration confirmations. Falls back to `N8N_COURSE_PAYMENT_WEBHOOK_URL`, then `N8N_PAYMENT_WEBHOOK_URL` — so an unset variable degrades to the wrong-but-present message rather than to silence. Import `n8n/workshop-registrations.json` and use its **production** URL |
 | `N8N_LIFECYCLE_WEBHOOK_URL` | `send-content-notifications` | Access-expiry reminders (7/3/1 days before, once after). Falls back to `N8N_PAYMENT_WEBHOOK_URL`. Absent, push still goes out and only the WhatsApp side is missing — logged, not silent |
 | `ANTHROPIC_API_KEY` | `chat` | The in-app guide. Absent, the function returns 503 with a written apology and logs the variable name — the chat screen is reachable but every question fails, so this is the one to check first if the guide "does nothing" |
 | `CHAT_MODEL` | `chat` | Optional. Defaults to `claude-haiku-4-5-20251001`. Set to a Sonnet id if the answers ever read as thin — the cost difference is roughly 3× |

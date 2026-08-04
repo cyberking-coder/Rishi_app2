@@ -16,6 +16,18 @@ interface CourseRow {
   cover_image_url: string | null;
 }
 
+/** A workshop is described by the pop-up that advertises it. */
+interface PopupRow {
+  id: string;
+  title: string | null;
+  body: string | null;
+  image_url: string | null;
+  price_amount: number | null;
+  currency: string;
+  seat_limit: number | null;
+  enabled: boolean;
+}
+
 interface PlanRow {
   id: string;
   name: string;
@@ -67,9 +79,55 @@ export default async function CheckoutPage({
   const returnUrl =
     payload.kind === "course"
       ? `meditationapp://app/payment-success?course_id=${planId}`
-      : undefined;
+      : payload.kind === "workshop"
+        ? "meditationapp://app/payment-success"
+        : undefined;
 
-  if (payload.kind === "course") {
+  if (payload.kind === "workshop") {
+    const { data: popup } = await db
+      .from("app_popups")
+      .select("id, title, body, image_url, price_amount, currency, seat_limit, enabled")
+      .eq("id", planId)
+      .maybeSingle<PopupRow>();
+
+    if (!popup || !popup.enabled) {
+      return <ErrorCard message="This workshop is no longer open." />;
+    }
+    if (!popup.price_amount || popup.price_amount <= 0) {
+      return <ErrorCard message="This workshop is not open for paid registration." />;
+    }
+
+    // Already registered: taking a second payment for the same seat is
+    // never what the person meant, and the unique index would reject the
+    // second grant anyway — better to say so before charging.
+    const { data: existing } = await db
+      .from("workshop_registrations")
+      .select("id")
+      .eq("user_id", payload.uid)
+      .eq("popup_id", popup.id)
+      .eq("status", "paid")
+      .maybeSingle();
+
+    if (existing) {
+      return <ErrorCard message="You are already registered for this workshop." />;
+    }
+
+    if (popup.seat_limit !== null) {
+      const { data: taken } = await db.rpc("workshop_seats_taken", {
+        p_popup_id: popup.id,
+      });
+      seatsLeft = Math.max(0, popup.seat_limit - (taken ?? 0));
+      if (seatsLeft === 0) {
+        return <ErrorCard message="This workshop is full." />;
+      }
+    }
+
+    title = popup.title ?? "Workshop";
+    description = popup.body;
+    coverUrl = popup.image_url;
+    priceAmount = popup.price_amount;
+    priceLabel = formatPrice(popup.price_amount / 100, popup.currency);
+  } else if (payload.kind === "course") {
     const { data: course } = await db
       .from("courses")
       .select(

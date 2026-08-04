@@ -60,4 +60,26 @@ class CheckoutRemoteDataSource {
     final token = (response.data as Map)['token'] as String;
     return Uri.parse('$checkoutBaseUrl/checkout/$courseId?token=$token');
   }
+
+  /// Mints a checkout link for a paid workshop.
+  ///
+  /// The target is the pop-up that advertises it — a workshop has no
+  /// other record until somebody registers, and giving it one would mean
+  /// a second admin screen for something the pop-up already describes.
+  Future<Uri> getWorkshopCheckoutUrl(String popupId) async {
+    final response = await _client.functions.invoke(
+      'mint-checkout-token',
+      body: {'popup_id': popupId},
+    );
+
+    if (response.status != 200) {
+      final detail = response.data is Map
+          ? (response.data as Map)['error'] ?? response.data
+          : response.data;
+      throw Exception('Registration failed (${response.status}): $detail');
+    }
+
+    final token = (response.data as Map)['token'] as String;
+    return Uri.parse('$checkoutBaseUrl/checkout/$popupId?token=$token');
+  }
 }

@@ -70,6 +70,16 @@ export async function POST(req: NextRequest) {
 
   const db = createAdminClient();
 
+  // A workshop is priced from the pop-up that advertises it.
+  if (payload.kind === "workshop") {
+    return await createWorkshopOrder(db, payload.uid, payload.tid, {
+      name,
+      phone,
+      email,
+      state,
+    });
+  }
+
   // Courses are sold individually, priced from the course row itself.
   if (payload.kind === "course") {
     return await createCourseOrder(
@@ -130,6 +140,134 @@ interface Billing {
   phone: string;
   email: string;
   state: string;
+}
+
+/**
+ * Builds a Razorpay order for a workshop seat.
+ *
+ * No coupon path: workshops are one-off events at a fixed price, and the
+ * coupons table is scoped to a course id, so there is nothing here for a
+ * code to apply to. The checkout page hides the field for the same
+ * reason.
+ */
+async function createWorkshopOrder(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  db: any,
+  userId: string,
+  popupId: string,
+  billing: Billing,
+) {
+  const { data: popup } = await db
+    .from("app_popups")
+    .select("id, title, price_amount, currency, seat_limit, enabled")
+    .eq("id", popupId)
+    .maybeSingle();
+
+  if (!popup || !popup.enabled) {
+    return NextResponse.json(
+      { error: "This workshop is no longer open." },
+      { status: 404 },
+    );
+  }
+  if (!popup.price_amount || popup.price_amount <= 0) {
+    return NextResponse.json(
+      { error: "This workshop is not open for paid registration." },
+      { status: 400 },
+    );
+  }
+
+  // Re-checked here and not only on the page: the checkout page can sit
+  // open for the whole token's fifteen minutes, and both the last seat
+  // and the person's own registration can change underneath it.
+  const { data: existing } = await db
+    .from("workshop_registrations")
+    .select("id")
+    .eq("user_id", userId)
+    .eq("popup_id", popup.id)
+    .eq("status", "paid")
+    .maybeSingle();
+
+  if (existing) {
+    return NextResponse.json(
+      { error: "You are already registered for this workshop." },
+      { status: 409 },
+    );
+  }
+
+  if (popup.seat_limit !== null) {
+    const { data: taken } = await db.rpc("workshop_seats_taken", {
+      p_popup_id: popup.id,
+    });
+    if ((taken ?? 0) >= popup.seat_limit) {
+      return NextResponse.json(
+        { error: "This workshop is full." },
+        { status: 409 },
+      );
+    }
+  }
+
+  const title = popup.title ?? "Workshop";
+
+  try {
+    const order = await createRazorpayOrder({
+      amountRupees: popup.price_amount / 100,
+      currency: popup.currency,
+      // What razorpay-webhook reads back to know who paid, for what, and
+      // how to reach them. popup_id is what makes it a workshop payment
+      // rather than a course or a subscription.
+      notes: {
+        user_id: userId,
+        popup_id: popup.id,
+        billing_name: billing.name,
+        billing_phone: billing.phone,
+        billing_email: billing.email,
+        billing_state: billing.state,
+      },
+    });
+
+    // Recorded as pending so an abandoned checkout is still visible; the
+    // webhook flips it to paid on the same order id.
+    //
+    // A plain insert, not an upsert. Both unique indexes on this table
+    // are PARTIAL, and Postgres refuses a partial index as an ON CONFLICT
+    // target unless the statement repeats its predicate — which
+    // PostgREST cannot express. The order id is freshly minted, so there
+    // is nothing to conflict with anyway.
+    const { error: pendingError } = await db
+      .from("workshop_registrations")
+      .insert({
+        user_id: userId,
+        popup_id: popup.id,
+        amount: popup.price_amount,
+        currency: popup.currency,
+        status: "pending",
+        razorpay_order_id: order.id,
+        billing_name: billing.name,
+        billing_phone: billing.phone,
+        billing_email: billing.email,
+      });
+
+    // Read, not ignored. The identical write on course_purchases had its
+    // error dropped, so the pending row it promised was silently never
+    // written and abandoned checkouts left no trace at all.
+    if (pendingError) {
+      console.error("workshop pending row failed:", pendingError.message);
+    }
+
+    return NextResponse.json({
+      order_id: order.id,
+      amount: order.amount,
+      currency: order.currency,
+      key_id: env.razorpay().keyId,
+      plan_name: title,
+      prefill: { name: billing.name, email: billing.email, contact: billing.phone },
+    });
+  } catch (e) {
+    return NextResponse.json(
+      { error: e instanceof Error ? e.message : "Could not create order" },
+      { status: 502 },
+    );
+  }
 }
 
 /**

@@ -19,10 +19,14 @@ export interface PaymentNotification {
   /** Lets the n8n workflow pick a different WhatsApp/email template for a
    *  course purchase vs the recurring subscription — "you're in Rishi
    *  Mode" reads wrong on a one-off course sale, and vice versa. */
-  content_type?: "subscription" | "course";
+  content_type?: "subscription" | "course" | "workshop";
   /** Only set for content_type: "course" — lets the message deep-link
    *  straight to the course instead of the generic app link. */
   course_id?: string;
+  /** Only set for content_type: "workshop" — the pop-up that describes
+   *  the event, so the message can name it and the admin can join a
+   *  registration back to what was sold. */
+  popup_id?: string;
   /** Set when a coupon was applied, so the message can say what was saved. */
   coupon_code?: string;
   discount_amount?: number; // rupees
@@ -39,6 +43,15 @@ function webhookUrlFor(notification: PaymentNotification): string | undefined {
     return Deno.env.get("N8N_COURSE_PAYMENT_WEBHOOK_URL") ??
       Deno.env.get("N8N_PAYMENT_WEBHOOK_URL");
   }
+  // A workshop confirmation says "you have a place on Saturday", which is
+  // a different message from either a course enrolment or a membership —
+  // hence its own workflow, falling back so it degrades to *some*
+  // confirmation rather than silence if the variable is unset.
+  if (notification.content_type === "workshop") {
+    return Deno.env.get("N8N_WORKSHOP_WEBHOOK_URL") ??
+      Deno.env.get("N8N_COURSE_PAYMENT_WEBHOOK_URL") ??
+      Deno.env.get("N8N_PAYMENT_WEBHOOK_URL");
+  }
   return Deno.env.get("N8N_PAYMENT_WEBHOOK_URL");
 }
 
@@ -52,7 +65,8 @@ export async function notifyN8n(notification: PaymentNotification): Promise<void
     console.warn(
       `n8n notification skipped: no webhook URL configured for ` +
         `content_type=${notification.content_type ?? "subscription"}. ` +
-        `Set N8N_COURSE_PAYMENT_WEBHOOK_URL (or N8N_PAYMENT_WEBHOOK_URL).`,
+        `Set N8N_WORKSHOP_WEBHOOK_URL / N8N_COURSE_PAYMENT_WEBHOOK_URL ` +
+        `(or N8N_PAYMENT_WEBHOOK_URL, which all three fall back to).`,
     );
     return;
   }

@@ -10,12 +10,12 @@
 // CHECKOUT_TOKEN_SECRET lives only in Supabase function secrets and the
 // admin app's environment - never in source.
 
-export type CheckoutKind = "subscription" | "course";
+export type CheckoutKind = "subscription" | "course" | "workshop";
 
 export interface CheckoutTokenPayload {
   uid: string; // purchasing user's id
   kind: CheckoutKind; // what is being bought
-  tid: string; // target id - a subscription_plans.id or a courses.id
+  tid: string; // target id - a subscription_plans.id, courses.id or app_popups.id
   exp: number; // unix seconds
 }
 

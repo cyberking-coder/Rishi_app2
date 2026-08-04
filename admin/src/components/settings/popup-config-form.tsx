@@ -141,6 +141,17 @@ function PopupCard({
   const [imageUrl, setImageUrl] = useState(popup?.image_url ?? "");
   const [imageUploading, setImageUploading] = useState(false);
 
+  // Entered in rupees, stored in paise. Kept as a string while typing so
+  // the field can be cleared — a number state would snap an empty box
+  // back to 0 on every keystroke.
+  const [priceRupees, setPriceRupees] = useState(
+    popup?.price_amount ? String(popup.price_amount / 100) : "",
+  );
+  const [ctaLabel, setCtaLabel] = useState(popup?.cta_label ?? "");
+  const [seatLimit, setSeatLimit] = useState(
+    popup?.seat_limit == null ? "" : String(popup.seat_limit),
+  );
+
   const dateRef = useRef<HTMLInputElement>(null);
   const timeRef = useRef<HTMLInputElement>(null);
   const imageInputRef = useRef<HTMLInputElement>(null);
@@ -188,6 +199,20 @@ function PopupCard({
       return toast.error("Give the pop-up a title or some text to show.");
     }
 
+    const rupees = priceRupees.trim() === "" ? 0 : Number(priceRupees);
+    if (Number.isNaN(rupees) || rupees < 0) {
+      return toast.error("Enter a valid fee, or leave it blank.");
+    }
+    // Rounded rather than truncated, and rounded here rather than left to
+    // the database: 499.995 has to land on a whole paisa before it
+    // becomes the amount somebody is charged.
+    const paise = Math.round(rupees * 100);
+
+    const seats = seatLimit.trim() === "" ? null : Number(seatLimit);
+    if (seats !== null && (!Number.isInteger(seats) || seats < 1)) {
+      return toast.error("Seats must be a whole number, or blank for no limit.");
+    }
+
     setBusy(true);
     const result = await savePopup({
       id: popup?.id,
@@ -198,6 +223,10 @@ function PopupCard({
       starts_at: dateTimeToIso(startDate, startTime),
       enabled,
       sort_order: position - 1,
+      price_amount: paise > 0 ? paise : null,
+      currency: popup?.currency ?? "INR",
+      cta_label: ctaLabel || null,
+      seat_limit: seats,
     });
     setBusy(false);
     if (!result.ok) return toast.error(result.error);
@@ -333,6 +362,63 @@ function PopupCard({
               onChange={(e) => setBody(e.target.value)}
               placeholder="Dates, location, and how to register…"
             />
+          </div>
+
+          <div className="space-y-3 rounded-md border p-4">
+            <div>
+              <Label>Paid registration (optional)</Label>
+              <p className="pt-1 text-xs text-muted-foreground">
+                Set a fee and the pop-up gets a button that takes payment
+                and sends a WhatsApp confirmation. Leave it blank and the
+                pop-up is an announcement with a Close button.
+              </p>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <Label className="text-xs text-muted-foreground">
+                  Fee (₹)
+                </Label>
+                <Input
+                  type="number"
+                  min={0}
+                  step="1"
+                  inputMode="decimal"
+                  value={priceRupees}
+                  onChange={(e) => setPriceRupees(e.target.value)}
+                  placeholder="499"
+                />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs text-muted-foreground">
+                  Seats (blank = no limit)
+                </Label>
+                <Input
+                  type="number"
+                  min={1}
+                  step="1"
+                  value={seatLimit}
+                  onChange={(e) => setSeatLimit(e.target.value)}
+                  placeholder="50"
+                />
+              </div>
+            </div>
+
+            <div className="space-y-1">
+              <Label className="text-xs text-muted-foreground">
+                Button text
+              </Label>
+              <Input
+                value={ctaLabel}
+                onChange={(e) => setCtaLabel(e.target.value)}
+                placeholder="Register Now"
+              />
+              <p className="text-xs text-muted-foreground">
+                The fee is added automatically — the button reads
+                &ldquo;{ctaLabel.trim() || "Register Now"}
+                {priceRupees.trim() ? ` • ₹${priceRupees.trim()}` : ""}&rdquo;.
+              </p>
+            </div>
           </div>
 
           <div className="space-y-2">

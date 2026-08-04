@@ -5,7 +5,7 @@ import { env } from "./env";
 // MUST stay byte-for-byte compatible with that file's format:
 //   base64url(JSON payload) + "." + base64url(HMAC-SHA256 signature)
 
-export type CheckoutKind = "subscription" | "course";
+export type CheckoutKind = "subscription" | "course" | "workshop";
 
 export interface CheckoutTokenPayload {
   uid: string;
@@ -47,7 +47,9 @@ export function verifyCheckoutToken(token: string): CheckoutTokenPayload | null 
   }
 
   if (
-    (payload.kind !== "subscription" && payload.kind !== "course") ||
+    (payload.kind !== "subscription" &&
+      payload.kind !== "course" &&
+      payload.kind !== "workshop") ||
     !payload.uid ||
     !payload.tid
   ) {
