@@ -57,17 +57,24 @@ class _BottomNav extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(
-        gradient: AppTheme.clayFill(),
-        boxShadow: AppTheme.navShadow,
-      ),
-      child: SafeArea(
-        top: false,
-        child: SizedBox(
-          height: 62,
-          child: Row(
-            children: [
+    // A floating bar rather than a full-width edge-to-edge one: it sits
+    // inset from all three sides so the page's background — the misty
+    // hills on Downloads and Profile — carries on running underneath it,
+    // which is what makes those screens read as one continuous scene.
+    return SafeArea(
+      top: false,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(14, 0, 14, 10),
+        child: Container(
+          decoration: BoxDecoration(
+            gradient: AppTheme.clayFill(AppTheme.surface),
+            borderRadius: BorderRadius.circular(AppTheme.radiusCard),
+            boxShadow: AppTheme.cardShadow,
+          ),
+          child: SizedBox(
+            height: 66,
+            child: Row(
+              children: [
               _NavItem(
                 icon: Icons.home_outlined,
                 activeIcon: Icons.home_rounded,
@@ -93,10 +100,11 @@ class _BottomNav extends StatelessWidget {
                 icon: Icons.person_outline_rounded,
                 activeIcon: Icons.person_rounded,
                 label: 'Profile',
-                selected: current == AppTab.profile,
-                onTap: () => _go(context, AppTab.profile),
-              ),
-            ],
+                  selected: current == AppTab.profile,
+                  onTap: () => _go(context, AppTab.profile),
+                ),
+              ],
+            ),
           ),
         ),
       ),
@@ -128,24 +136,61 @@ class _NavItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final color = selected ? AppTheme.sage : AppTheme.textSecondary;
+    final color = selected ? AppTheme.sageDark : AppTheme.textSecondary;
 
     return Expanded(
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(AppTheme.radiusRow),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
+        borderRadius: BorderRadius.circular(AppTheme.radiusCard),
+        child: Stack(
+          alignment: Alignment.center,
           children: [
-            Icon(selected ? activeIcon : icon, size: 23, color: color),
-            const SizedBox(height: 3),
-            Text(
-              label,
-              style: TextStyle(
-                fontSize: 10.5,
-                color: color,
-                fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+            // The short rule above the active tab. Sits on the bar's own
+            // top edge, which is what ties the indicator to the bar
+            // rather than to the icon floating below it.
+            if (selected)
+              Positioned(
+                top: 0,
+                child: Container(
+                  width: 26,
+                  height: 3.5,
+                  decoration: BoxDecoration(
+                    color: AppTheme.sageDark,
+                    borderRadius: BorderRadius.circular(AppTheme.radiusPill),
+                  ),
+                ),
               ),
+            Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                  decoration: BoxDecoration(
+                    // A soft chip behind the active icon only. On the
+                    // inactive ones it would turn the bar into four
+                    // buttons, which is the look the floating bar exists
+                    // to get away from.
+                    color: selected ? AppTheme.sageSoft : Colors.transparent,
+                    borderRadius: BorderRadius.circular(AppTheme.radiusPill),
+                  ),
+                  child: Icon(
+                    selected ? activeIcon : icon,
+                    size: 23,
+                    color: color,
+                  ),
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  label,
+                  style: TextStyle(
+                    fontFamily: AppTheme.text,
+                    fontSize: 11,
+                    color: color,
+                    fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+                  ),
+                ),
+              ],
             ),
           ],
         ),

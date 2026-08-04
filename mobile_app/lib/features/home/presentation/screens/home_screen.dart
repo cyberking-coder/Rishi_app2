@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../../app/theme/app_theme.dart';
+import '../../../../app/widgets/botanical.dart';
 import '../../../access/application/access_providers.dart';
 import '../../../access/domain/access_state.dart';
 import '../../../access/presentation/next_event_popup.dart';
@@ -292,25 +293,55 @@ class _Header extends StatelessWidget {
                 ],
               ),
             ),
-            GestureDetector(
-              onTap: onProfile,
-              child: Container(
-                width: 44,
-                height: 44,
-                decoration: const BoxDecoration(
-                  gradient: AppTheme.sageGradient,
-                  shape: BoxShape.circle,
-                ),
-                child: Center(
-                  child: Text(
-                    username.characters.first.toUpperCase(),
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 17,
-                      fontWeight: FontWeight.w700,
+            // The sprig is painted behind the avatar and allowed to run
+            // off the right edge, which is what makes the leaves read as
+            // part of the page rather than as a badge on the avatar.
+            SizedBox(
+              width: 62,
+              height: 62,
+              child: Stack(
+                clipBehavior: Clip.none,
+                alignment: Alignment.center,
+                children: [
+                  const Positioned(
+                    right: -34,
+                    top: 4,
+                    child: LeafSprig(size: 108, angle: -0.4, opacity: 0.55),
+                  ),
+                  const Positioned(
+                    left: -26,
+                    bottom: -6,
+                    child: LeafSprig(
+                      size: 78,
+                      angle: 2.7,
+                      opacity: 0.45,
+                      flip: true,
                     ),
                   ),
-                ),
+                  GestureDetector(
+                    onTap: onProfile,
+                    child: Container(
+                      width: 52,
+                      height: 52,
+                      decoration: BoxDecoration(
+                        gradient: AppTheme.sageGradient,
+                        shape: BoxShape.circle,
+                        boxShadow: AppTheme.rowShadow,
+                      ),
+                      child: Center(
+                        child: Text(
+                          username.characters.first.toUpperCase(),
+                          style: const TextStyle(
+                            fontFamily: AppTheme.text,
+                            color: Colors.white,
+                            fontSize: 20,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ),
           ]),
@@ -425,18 +456,22 @@ class _SearchBar extends StatelessWidget {
       child: GestureDetector(
         onTap: onTap,
         child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 17),
           decoration: BoxDecoration(
-            gradient: AppTheme.clayFill(),
+            gradient: AppTheme.clayFill(AppTheme.surface),
             borderRadius: BorderRadius.circular(AppTheme.radiusPill),
             boxShadow: AppTheme.cardShadow,
           ),
           child: const Row(children: [
-            Icon(Icons.search_rounded, size: 20, color: AppTheme.textSecondary),
-            SizedBox(width: 10),
+            Icon(Icons.search_rounded, size: 23, color: AppTheme.textSecondary),
+            SizedBox(width: 12),
             Text(
               'Search for anything',
-              style: TextStyle(fontSize: 14, color: AppTheme.textSecondary),
+              style: TextStyle(
+                fontFamily: AppTheme.text,
+                fontSize: 15.5,
+                color: AppTheme.textSecondary,
+              ),
             ),
           ]),
         ),
@@ -463,8 +498,9 @@ class _SectionTitle extends StatelessWidget {
           child: Text(
             title,
             style: const TextStyle(
-              fontSize: 17,
-              fontWeight: FontWeight.w800,
+              fontFamily: AppTheme.display,
+              fontSize: 21,
+              fontWeight: FontWeight.w600,
               color: AppTheme.textPrimary,
             ),
           ),
@@ -472,13 +508,22 @@ class _SectionTitle extends StatelessWidget {
         if (action != null)
           TextButton(
             onPressed: onAction,
-            child: Text(
-              action!,
-              style: const TextStyle(
-                fontSize: 12.5,
-                fontWeight: FontWeight.w700,
-                color: AppTheme.sage,
-              ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  action!,
+                  style: const TextStyle(
+                    fontFamily: AppTheme.text,
+                    fontSize: 13.5,
+                    fontWeight: FontWeight.w600,
+                    color: AppTheme.sageDark,
+                  ),
+                ),
+                const SizedBox(width: 2),
+                const Icon(Icons.chevron_right_rounded,
+                    size: 18, color: AppTheme.sageDark),
+              ],
             ),
           ),
       ]),
@@ -627,35 +672,52 @@ class _CategoriesRow extends ConsumerWidget {
     final async = ref.watch(categoriesProvider);
 
     return async.maybeWhen(
-      orElse: () => const SizedBox(height: 40),
+      orElse: () => const SizedBox(height: 104),
       data: (categories) {
         if (categories.isEmpty) return const SizedBox.shrink();
         return SizedBox(
-          height: 40,
+          height: 104,
           child: ListView.separated(
             scrollDirection: Axis.horizontal,
             padding: const EdgeInsets.symmetric(horizontal: 20),
             itemCount: categories.length,
-            separatorBuilder: (_, __) => const SizedBox(width: 8),
+            separatorBuilder: (_, __) => const SizedBox(width: 12),
             itemBuilder: (_, i) {
               final c = categories[i];
               return GestureDetector(
                 onTap: () => onTap(c),
-                child: Container(
-                  alignment: Alignment.center,
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
-                  decoration: BoxDecoration(
-                    gradient: AppTheme.clayFill(),
-                    borderRadius: BorderRadius.circular(AppTheme.radiusPill),
-                    boxShadow: AppTheme.cardShadow,
-                  ),
-                  child: Text(
-                    c.name,
-                    style: const TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w600,
-                      color: AppTheme.textPrimary,
-                    ),
+                child: SizedBox(
+                  width: 74,
+                  child: Column(
+                    children: [
+                      Container(
+                        width: 68,
+                        height: 68,
+                        decoration: AppTheme.claySurface(
+                          color: AppTheme.surfaceCream,
+                          radius: 22,
+                          small: true,
+                        ),
+                        child: Icon(
+                          _categoryIcon(c.name, c.slug),
+                          size: 30,
+                          color: AppTheme.sageDark,
+                        ),
+                      ),
+                      const SizedBox(height: 7),
+                      Text(
+                        c.name,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(
+                          fontFamily: AppTheme.text,
+                          fontSize: 12.5,
+                          fontWeight: FontWeight.w600,
+                          color: AppTheme.textPrimary,
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               );
@@ -665,6 +727,44 @@ class _CategoriesRow extends ConsumerWidget {
       },
     );
   }
+}
+
+/// Picks a glyph for a category from its name.
+///
+/// A lookup here rather than a column on the table: categories are
+/// created by an admin typing a name, and asking them to also choose a
+/// Material icon id would be a worse job than guessing well and falling
+/// back to the lotus. Matched on substrings so "Guided Meditation" and
+/// "Meditations" both land on the same leaf.
+IconData _categoryIcon(String name, String slug) {
+  final key = '$name $slug'.toLowerCase();
+  if (key.contains('medit')) return Icons.spa_outlined;
+  if (key.contains('spirit') || key.contains('soul')) {
+    return Icons.self_improvement_rounded;
+  }
+  if (key.contains('course') || key.contains('learn')) {
+    return Icons.menu_book_outlined;
+  }
+  if (key.contains('mantra') || key.contains('chant') ||
+      key.contains('music') || key.contains('bhajan')) {
+    return Icons.music_note_outlined;
+  }
+  if (key.contains('well') || key.contains('health') ||
+      key.contains('heal')) {
+    return Icons.favorite_border_rounded;
+  }
+  if (key.contains('sleep') || key.contains('night')) {
+    return Icons.nightlight_outlined;
+  }
+  if (key.contains('breath') || key.contains('pranayam')) {
+    return Icons.air_rounded;
+  }
+  if (key.contains('yoga')) return Icons.accessibility_new_rounded;
+  if (key.contains('talk') || key.contains('podcast') ||
+      key.contains('satsang')) {
+    return Icons.record_voice_over_outlined;
+  }
+  return Icons.filter_vintage_outlined;
 }
 
 // ── Courses ──────────────────────────────────────────────────────────
@@ -689,15 +789,21 @@ class _CoursesRow extends ConsumerWidget {
           );
         }
 
+        // Near-full-width cards, so the first one reads as the hero the
+        // design leads with while the rest stay one swipe away. A single
+        // hero with the others dropped would have made every course
+        // after the first unreachable from Home.
+        final width = MediaQuery.of(context).size.width - 40;
+
         return SizedBox(
-          height: 196,
+          height: 260,
           child: ListView.separated(
             scrollDirection: Axis.horizontal,
             padding: const EdgeInsets.symmetric(horizontal: 20),
             itemCount: courses.length,
             separatorBuilder: (_, __) => const SizedBox(width: 14),
             itemBuilder: (_, i) {
-              return _CourseMiniCard(course: courses[i]);
+              return _CourseMiniCard(course: courses[i], width: width);
             },
           ),
         );
@@ -708,111 +814,158 @@ class _CoursesRow extends ConsumerWidget {
 
 class _CourseMiniCard extends StatelessWidget {
   final CourseSummary course;
+  final double width;
 
-  const _CourseMiniCard({required this.course});
+  const _CourseMiniCard({required this.course, required this.width});
 
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
       onTap: () => context.push('/course/${course.id}', extra: course.title),
       child: Container(
-        width: 214,
+        width: width,
         decoration: BoxDecoration(
-          gradient: AppTheme.clayFill(),
           borderRadius: BorderRadius.circular(AppTheme.radiusCard),
           boxShadow: AppTheme.cardShadow,
         ),
         clipBehavior: Clip.antiAlias,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+        child: Stack(
+          fit: StackFit.expand,
           children: [
-            SizedBox(
-              height: 104,
-              width: double.infinity,
-              child: Stack(fit: StackFit.expand, children: [
-                if (course.coverImageUrl != null &&
-                    course.coverImageUrl!.isNotEmpty)
-                  Image.network(
-                    course.coverImageUrl!,
-                    fit: BoxFit.cover,
-                    errorBuilder: (_, __, ___) => const _MiniCover(),
-                  )
-                else
-                  const _MiniCover(),
-                Positioned(
-                  top: 8,
-                  right: 8,
-                  child: Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: Colors.white.withValues(alpha: 0.92),
-                      borderRadius: BorderRadius.circular(AppTheme.radiusPill),
-                    ),
-                    child: Text(
+            if (course.coverImageUrl != null &&
+                course.coverImageUrl!.isNotEmpty)
+              Image.network(
+                course.coverImageUrl!,
+                fit: BoxFit.cover,
+                errorBuilder: (_, __, ___) => const _MiniCover(),
+              )
+            else
+              const _MiniCover(),
+
+            // A scrim from the left rather than the bottom. Course covers
+            // in this library put the teacher on the right, and a bottom
+            // scrim darkens their face while leaving the title on a busy
+            // background — this does the opposite of both.
+            Container(
+              decoration: const BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.centerLeft,
+                  end: Alignment.centerRight,
+                  colors: [Color(0xE60F2019), Color(0x000F2019)],
+                  stops: [0.05, 0.85],
+                ),
+              ),
+            ),
+
+            Positioned(
+              top: 14,
+              right: 14,
+              child: Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.94),
+                  borderRadius: BorderRadius.circular(AppTheme.radiusPill),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    if (!course.owned && !course.isFree) ...[
+                      const Icon(Icons.lock_rounded,
+                          size: 13, color: AppTheme.clay),
+                      const SizedBox(width: 5),
+                    ],
+                    Text(
                       course.owned ? 'Enrolled' : course.priceLabel,
                       style: TextStyle(
-                        fontSize: 10,
-                        fontWeight: FontWeight.w800,
+                        fontFamily: AppTheme.text,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w700,
                         color: course.owned || course.isFree
-                            ? AppTheme.sage
+                            ? AppTheme.sageDark
                             : AppTheme.clay,
                       ),
                     ),
-                  ),
+                  ],
                 ),
-              ]),
+              ),
             ),
-            Expanded(
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      course.title,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        fontSize: 13.5,
-                        fontWeight: FontWeight.w700,
-                        height: 1.3,
-                        color: AppTheme.textPrimary,
-                      ),
+
+            Padding(
+              padding: const EdgeInsets.fromLTRB(18, 18, 18, 16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    course.title,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      fontFamily: AppTheme.display,
+                      fontSize: 27,
+                      height: 1.15,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.white,
                     ),
-                    const Spacer(),
-                    if (course.isStarted) ...[
-                      ClipRRect(
+                  ),
+                  const Spacer(),
+                  if (course.isStarted) ...[
+                    SizedBox(
+                      width: 170,
+                      child: ClipRRect(
                         borderRadius: BorderRadius.circular(4),
                         child: LinearProgressIndicator(
                           value: course.progressFraction,
-                          backgroundColor: AppTheme.sageSoft,
+                          backgroundColor: Colors.white24,
                           valueColor:
-                              const AlwaysStoppedAnimation(AppTheme.sage),
-                          minHeight: 4,
+                              const AlwaysStoppedAnimation(AppTheme.sandSoft),
+                          minHeight: 5,
                         ),
                       ),
-                      const SizedBox(height: 6),
-                      Text(
-                        '${course.completedLessonCount} of '
-                        '${course.lessonCount} done',
-                        style: const TextStyle(
-                          fontSize: 11,
-                          color: AppTheme.sage,
-                          fontWeight: FontWeight.w700,
-                        ),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      '${course.completedLessonCount} of '
+                      '${course.lessonCount} done',
+                      style: const TextStyle(
+                        fontFamily: AppTheme.text,
+                        fontSize: 12.5,
+                        color: Colors.white,
+                        fontWeight: FontWeight.w600,
                       ),
-                    ] else
-                      Text(
-                        '${course.lessonCount} '
-                        '${course.lessonCount == 1 ? "lesson" : "lessons"}',
-                        style: const TextStyle(
-                          fontSize: 11.5,
-                          color: AppTheme.textSecondary,
-                        ),
-                      ),
+                    ),
+                    const SizedBox(height: 10),
                   ],
-                ),
+                  // Styled as a button, but the whole card is still the
+                  // one tap target — the card was tappable before and
+                  // adding a second gesture here would give the same
+                  // destination two overlapping hit areas.
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 16, vertical: 10),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.94),
+                      borderRadius: BorderRadius.circular(AppTheme.radiusPill),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          course.isStarted ? 'Continue' : 'Start Course',
+                          style: const TextStyle(
+                            fontFamily: AppTheme.text,
+                            fontSize: 14,
+                            fontWeight: FontWeight.w700,
+                            color: AppTheme.textPrimary,
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        const Icon(Icons.arrow_forward_rounded,
+                            size: 16, color: AppTheme.textPrimary),
+                      ],
+                    ),
+                  ),
+                ],
               ),
             ),
           ],
@@ -849,12 +1002,15 @@ class _FeaturedRow extends ConsumerWidget {
     final access = ref.watch(accessStateProvider).valueOrNull;
 
     return async.maybeWhen(
-      orElse: () => const SizedBox(height: 168),
+      orElse: () => const SizedBox(height: 268),
       data: (audios) {
         if (audios.isEmpty) return const SizedBox.shrink();
 
         return SizedBox(
-          height: 168,
+          // Fixed rather than intrinsic: every card is the same height so
+          // the duration pills line up across the row, which is what
+          // stops a two-line title from shunting one card's footer down.
+          height: 268,
           child: ListView.separated(
             scrollDirection: Axis.horizontal,
             padding: const EdgeInsets.symmetric(horizontal: 20),
@@ -866,20 +1022,19 @@ class _FeaturedRow extends ConsumerWidget {
 
               return GestureDetector(
                 onTap: () => onPlay(audio),
-                child: SizedBox(
-                  width: 128,
+                child: Container(
+                  width: 208,
+                  decoration: AppTheme.claySurface(),
+                  clipBehavior: Clip.antiAlias,
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Container(
-                        height: 118,
-                        width: 128,
-                        decoration: BoxDecoration(
-                          borderRadius:
-                              BorderRadius.circular(AppTheme.radiusCard),
-                          boxShadow: AppTheme.cardShadow,
-                        ),
-                        clipBehavior: Clip.antiAlias,
+                      // The cover is edge-to-edge across the card's top,
+                      // with only its own corners rounded — a floated
+                      // thumbnail inside a card reads as two cards.
+                      SizedBox(
+                        height: 148,
+                        width: double.infinity,
                         child: Stack(fit: StackFit.expand, children: [
                           if (audio.coverArtUrl != null &&
                               audio.coverArtUrl!.isNotEmpty)
@@ -891,18 +1046,53 @@ class _FeaturedRow extends ConsumerWidget {
                           else
                             const _MiniCover(),
                           if (locked) const PremiumLockBadge(),
+                          const Positioned(
+                            right: 10,
+                            bottom: 10,
+                            child: _PlayBubble(),
+                          ),
                         ]),
                       ),
-                      const SizedBox(height: 8),
-                      Text(
-                        audio.title,
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          fontSize: 12.5,
-                          fontWeight: FontWeight.w600,
-                          height: 1.3,
-                          color: AppTheme.textPrimary,
+                      Expanded(
+                        child: Padding(
+                          padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                audio.title,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                  fontFamily: AppTheme.text,
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.w700,
+                                  color: AppTheme.textPrimary,
+                                ),
+                              ),
+                              if (audio.artist != null &&
+                                  audio.artist!.trim().isNotEmpty) ...[
+                                const SizedBox(height: 2),
+                                Text(
+                                  'by ${audio.artist!.trim()}',
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(
+                                    fontFamily: AppTheme.text,
+                                    fontSize: 13,
+                                    color: AppTheme.textSecondary,
+                                  ),
+                                ),
+                              ],
+                              const Spacer(),
+                              if (audio.durationSeconds != null)
+                                _MetaPill(
+                                  icon: Icons.schedule_rounded,
+                                  label:
+                                      '${(audio.durationSeconds! / 60).round()} Min',
+                                ),
+                            ],
+                          ),
                         ),
                       ),
                     ],
@@ -913,6 +1103,71 @@ class _FeaturedRow extends ConsumerWidget {
           ),
         );
       },
+    );
+  }
+}
+
+/// The white circle with a sage triangle, sitting over the cover art.
+///
+/// Decoration, not a second button: the whole card is already the tap
+/// target, and a nested GestureDetector here would give the same action
+/// two hit areas with different shapes.
+class _PlayBubble extends StatelessWidget {
+  const _PlayBubble();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 42,
+      height: 42,
+      decoration: BoxDecoration(
+        color: Colors.white,
+        shape: BoxShape.circle,
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.18),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: const Icon(Icons.play_arrow_rounded,
+          size: 26, color: AppTheme.sageDark),
+    );
+  }
+}
+
+/// A small tinted pill for a piece of metadata — duration, lesson count.
+class _MetaPill extends StatelessWidget {
+  final IconData icon;
+  final String label;
+
+  const _MetaPill({required this.icon, required this.label});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+      decoration: BoxDecoration(
+        color: AppTheme.sageSoft,
+        borderRadius: BorderRadius.circular(AppTheme.radiusPill),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 13, color: AppTheme.sageDark),
+          const SizedBox(width: 5),
+          Text(
+            label,
+            style: const TextStyle(
+              fontFamily: AppTheme.text,
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+              color: AppTheme.sageDark,
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

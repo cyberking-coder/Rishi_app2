@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../../app/theme/app_theme.dart';
+import '../../../../app/widgets/botanical.dart';
 import '../../../../app/widgets/lotus_logo.dart';
 import '../../application/auth_providers.dart';
 
@@ -72,70 +73,113 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
             stops: [0.0, 0.55, 1.0],
           ),
         ),
-        child: Center(
-          child: FadeTransition(
-            opacity: _fade,
-            child: ScaleTransition(
-              scale: _scale,
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  // ── Glowing lotus ──
-                  Container(
-                    width: 150,
-                    height: 150,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      boxShadow: [
-                        BoxShadow(
-                          color: AppTheme.sage.withValues(alpha: 0.22),
-                          blurRadius: 60,
-                          spreadRadius: 12,
-                        ),
-                      ],
-                    ),
-                    child: const Center(
-                      child: LotusLogo(size: 96, color: AppTheme.sage),
-                    ),
-                  ),
-                  const SizedBox(height: 36),
-                  // ── Small diamond accent ──
-                  Transform.rotate(
-                    angle: 0.785398,
-                    child: Container(
-                      width: 9,
-                      height: 9,
-                      decoration: BoxDecoration(
-                        color: AppTheme.sand,
-                        borderRadius: BorderRadius.circular(2),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 24),
-                  // ── Wordmark ──
-                  const Text(
-                    'Anurag Rishi',
-                    style: TextStyle(
-                      color: AppTheme.textPrimary,
-                      fontSize: 32,
-                      fontWeight: FontWeight.w800,
-                      letterSpacing: 0.5,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    'Find Peace Within',
-                    style: const TextStyle(
-                      color: AppTheme.textSecondary,
-                      fontSize: 15,
-                      fontWeight: FontWeight.w400,
-                      letterSpacing: 0.3,
-                    ),
-                  ),
-                ],
+        child: Stack(
+          children: [
+            // Landscape first, so the wordmark is never painted over.
+            const Align(
+              alignment: Alignment.bottomCenter,
+              child: MistyHills(height: 300),
+            ),
+
+            // Sprigs at three corners, not four: the fourth makes the
+            // frame read as a border rather than as growth.
+            const Positioned(
+              top: 30,
+              left: -58,
+              child: LeafSprig(size: 200, angle: 0.35, opacity: 0.45),
+            ),
+            const Positioned(
+              top: 60,
+              right: -66,
+              child: LeafSprig(
+                size: 210,
+                angle: -0.30,
+                opacity: 0.45,
+                flip: true,
               ),
             ),
-          ),
+            const Positioned(
+              bottom: 120,
+              left: -70,
+              child: LeafSprig(
+                size: 190,
+                angle: -0.5,
+                opacity: 0.4,
+                flip: true,
+              ),
+            ),
+            const Positioned(
+              bottom: 150,
+              right: -70,
+              child: LeafSprig(size: 185, angle: 0.45, opacity: 0.4),
+            ),
+
+            Center(
+              child: FadeTransition(
+                opacity: _fade,
+                child: ScaleTransition(
+                  scale: _scale,
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      // ── Glowing lotus ──
+                      SizedBox(
+                        width: 260,
+                        height: 260,
+                        child: Stack(
+                          alignment: Alignment.center,
+                          children: const [
+                            SoftHalo(size: 260),
+                            Sparkles(size: 210, color: Colors.white),
+                            LotusLogo(size: 120, color: AppTheme.sage),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 20),
+                      // ── Small diamond accent ──
+                      Transform.rotate(
+                        angle: 0.785398,
+                        child: Container(
+                          width: 10,
+                          height: 10,
+                          decoration: BoxDecoration(
+                            color: AppTheme.sand,
+                            borderRadius: BorderRadius.circular(2),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 22),
+                      // ── Wordmark ──
+                      // Fraunces, not a heavy sans. The serif is the
+                      // brand's voice everywhere else in the app and the
+                      // opening screen is where it should be loudest.
+                      const Text(
+                        'Anurag Rishi',
+                        style: TextStyle(
+                          fontFamily: AppTheme.display,
+                          color: AppTheme.textPrimary,
+                          fontSize: 34,
+                          fontWeight: FontWeight.w600,
+                          letterSpacing: -0.2,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      const Text(
+                        'Find Peace Within',
+                        style: TextStyle(
+                          fontFamily: AppTheme.text,
+                          color: AppTheme.textSecondary,
+                          fontSize: 15.5,
+                          fontWeight: FontWeight.w400,
+                          letterSpacing: 0.3,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ],
         ),
       ),
     );

@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../../app/theme/app_theme.dart';
+import '../../../../app/widgets/botanical.dart';
 import '../../application/auth_providers.dart';
 import '../../application/auth_state.dart';
+import '../widgets/auth_scaffold.dart';
 import '../widgets/auth_text_field.dart';
 import '../widgets/auth_validators.dart';
 
@@ -47,54 +50,94 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
       }
     });
 
-    return Scaffold(
-      appBar: AppBar(title: const Text('Reset password')),
-      body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 24),
-          child: _emailSent
-              ? const Center(
-                  child: Text(
-                    'If an account exists for that email, '
-                    'a password reset link has been sent.',
-                    textAlign: TextAlign.center,
-                  ),
-                )
-              : Form(
-                  key: _formKey,
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    mainAxisSize: MainAxisSize.min,
+    return AuthScaffold(
+      title: 'Reset password',
+      child: _emailSent
+          ? Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const SizedBox(height: 40),
+                SizedBox(
+                  width: 140,
+                  height: 140,
+                  child: Stack(
+                    alignment: Alignment.center,
                     children: [
-                      const SizedBox(height: 24),
-                      const Text(
-                        'Enter your account email and we\'ll send you a '
-                        'link to reset your password.',
-                      ),
-                      const SizedBox(height: 16),
-                      AuthTextField(
-                        controller: _emailController,
-                        label: 'Email',
-                        keyboardType: TextInputType.emailAddress,
-                        validator: validateEmail,
-                      ),
-                      const SizedBox(height: 16),
-                      FilledButton(
-                        onPressed: isLoading ? null : _submit,
-                        child: isLoading
-                            ? const SizedBox(
-                                height: 20,
-                                width: 20,
-                                child:
-                                    CircularProgressIndicator(strokeWidth: 2),
-                              )
-                            : const Text('Send reset link'),
+                      const SoftHalo(size: 140),
+                      Container(
+                        width: 90,
+                        height: 90,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          gradient: AppTheme.clayFill(),
+                          boxShadow: AppTheme.cardShadow,
+                        ),
+                        child: const Icon(
+                          Icons.outgoing_mail,
+                          size: 40,
+                          color: AppTheme.sageDark,
+                        ),
                       ),
                     ],
                   ),
                 ),
-        ),
-      ),
+                const SizedBox(height: 16),
+                const Text(
+                  'Check your inbox',
+                  style: TextStyle(
+                    fontFamily: AppTheme.display,
+                    fontSize: 26,
+                    fontWeight: FontWeight.w600,
+                    color: AppTheme.textPrimary,
+                  ),
+                ),
+                const SizedBox(height: 10),
+                const Text(
+                  'If an account exists for that email, '
+                  'a password reset link has been sent.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontFamily: AppTheme.text,
+                    fontSize: 15,
+                    height: 1.5,
+                    color: AppTheme.textSecondary,
+                  ),
+                ),
+              ],
+            )
+          : Form(
+              key: _formKey,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const SizedBox(height: 20),
+                  const Text(
+                    'Enter your account email and we\'ll send you a '
+                    'link to reset your password.',
+                    style: TextStyle(
+                      fontFamily: AppTheme.text,
+                      fontSize: 15,
+                      height: 1.5,
+                      color: AppTheme.textSecondary,
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+                  AuthTextField(
+                    controller: _emailController,
+                    label: 'Email',
+                    keyboardType: TextInputType.emailAddress,
+                    validator: validateEmail,
+                  ),
+                  const SizedBox(height: 22),
+                  PrimaryGradientButton(
+                    label: 'Send reset link',
+                    loading: isLoading,
+                    onPressed: isLoading ? null : _submit,
+                  ),
+                ],
+              ),
+            ),
     );
   }
 }
