@@ -123,12 +123,12 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       // ── Glowing lotus ──
-                      SizedBox(
+                      const SizedBox(
                         width: 260,
                         height: 260,
                         child: Stack(
                           alignment: Alignment.center,
-                          children: const [
+                          children: [
                             SoftHalo(size: 260),
                             Sparkles(size: 210, color: Colors.white),
                             LotusLogo(size: 120, color: AppTheme.sage),

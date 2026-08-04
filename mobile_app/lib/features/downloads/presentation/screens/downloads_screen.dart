@@ -130,12 +130,12 @@ class _DownloadsHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 14, 20, 18),
+    return const Padding(
+      padding: EdgeInsets.fromLTRB(20, 14, 20, 18),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          const Expanded(
+          Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -166,7 +166,7 @@ class _DownloadsHeader extends StatelessWidget {
             height: 108,
             child: Stack(
               alignment: Alignment.center,
-              children: const [
+              children: [
                 SoftHalo(size: 108),
                 Sparkles(size: 96, color: Colors.white),
                 Icon(Icons.download_rounded,

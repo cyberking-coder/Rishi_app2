@@ -11,7 +11,6 @@ import '../../domain/entities/audio_summary.dart';
 import '../widgets/premium_lock.dart';
 
 const _kBg = AppTheme.background;
-const _kSurface = AppTheme.surface;
 const _kAccent = AppTheme.sage;
 const _kTextSec = AppTheme.textSecondary;
 

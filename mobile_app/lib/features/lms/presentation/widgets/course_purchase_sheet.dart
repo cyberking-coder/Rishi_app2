@@ -91,7 +91,7 @@ class _CoursePurchaseSheetState extends ConsumerState<_CoursePurchaseSheet> {
       ),
       decoration: BoxDecoration(
         gradient: AppTheme.clayFill(),
-        borderRadius: BorderRadius.vertical(top: Radius.circular(26)),
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(26)),
         boxShadow: AppTheme.cardShadow,
       ),
       child: Column(mainAxisSize: MainAxisSize.min, children: [

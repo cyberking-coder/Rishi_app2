@@ -42,11 +42,11 @@ class _CoursesScreenState extends ConsumerState<CoursesScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(20, 14, 20, 16),
+          const Padding(
+            padding: EdgeInsets.fromLTRB(20, 14, 20, 16),
             child: Row(
               children: [
-                const Expanded(
+                Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
@@ -74,7 +74,7 @@ class _CoursesScreenState extends ConsumerState<CoursesScreen> {
                 // Clipped to its own box so the sprig can overhang the
                 // right edge without widening the row and pushing the
                 // title into a wrap.
-                const SizedBox(
+                SizedBox(
                   width: 76,
                   height: 76,
                   child: Stack(

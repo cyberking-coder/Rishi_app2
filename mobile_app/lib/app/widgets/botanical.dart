@@ -227,7 +227,7 @@ class _HillsPainter extends CustomPainter {
     final paint = Paint()..isAntiAlias = true;
 
     // Back to front: each ridge sits lower and reads stronger.
-    final ridges = <_Ridge>[
+    const ridges = <_Ridge>[
       _Ridge(top: 0.30, peak: 0.10, alpha: 0.10, from: 0.10, to: 0.62),
       _Ridge(top: 0.48, peak: 0.26, alpha: 0.14, from: 0.55, to: 1.05),
       _Ridge(top: 0.62, peak: 0.44, alpha: 0.18, from: -0.05, to: 0.45),
