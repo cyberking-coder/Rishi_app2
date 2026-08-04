@@ -187,8 +187,25 @@ async function deliver(
   },
 ): Promise<Record<string, unknown>> {
   try {
+    // Who this is addressed to, decided per reminder rather than carried
+    // on the claim. A free session's reminder IS the invitation and goes
+    // to everybody; a paid one goes to the people holding a seat, since
+    // telling the rest that something starts in an hour is telling them
+    // about a door they cannot open.
+    //
+    // Looked up here rather than passed in, so the resume path — which
+    // reloads a claim, not a due row — narrows exactly the same way.
+    const { data: session } = await supabase
+      .from("live_sessions")
+      .select("price_amount")
+      .eq("id", args.sessionId)
+      .maybeSingle();
+
+    const paid = (session?.price_amount ?? 0) > 0;
+
     const result = await fanOut(supabase, payload, {
       startCursor: args.startCursor,
+      sessionId: paid ? args.sessionId : null,
       onProgress: async (cursor, sentSoFar) => {
         await supabase
           .from("session_reminders")
@@ -213,6 +230,7 @@ async function deliver(
 
     console.log(
       `Reminder "${args.label}" ${args.minutesBefore}m — ` +
+        `${paid ? "registrants only" : "everyone"}, ` +
         `${result.sent} delivered, ${result.failed} failed, ` +
         `${result.pruned} pruned, ` +
         `${result.complete ? "complete" : "paused, will resume"}`,
@@ -221,6 +239,7 @@ async function deliver(
     return {
       session: args.label,
       minutes_before: args.minutesBefore,
+      audience: paid ? "registrants" : "everyone",
       sent: result.sent,
       failed: result.failed,
       pruned: result.pruned,

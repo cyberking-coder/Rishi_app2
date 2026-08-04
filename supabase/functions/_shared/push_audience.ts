@@ -33,17 +33,22 @@ export interface FanOutResult {
 /// Sends `message` to every registered device, resuming after
 /// `startCursor` if one is given.
 ///
-/// There is no per-user targeting: a new course, the morning meditation
-/// and a live session are addressed to everybody by nature. When
-/// something needs a narrower audience, the filter belongs in the query
-/// below rather than at the call site, so it can't be forgotten by one
-/// job and applied by another.
+/// Most sends are addressed to everybody by nature — a new course, the
+/// morning meditation, a free session. `sessionId` narrows the audience
+/// to the people who paid for one particular session, and is the only
+/// narrowing there is: any other filter belongs in the query rather than
+/// at the call site, so it can't be forgotten by one job and applied by
+/// another.
 export async function fanOut(
   supabase: SupabaseClient,
   message: PushMessage,
   opts: {
     startCursor?: string | null;
     budgetMs?: number;
+    /** When set, only devices belonging to somebody with a paid
+     *  registration for this session are addressed. Resolved in the
+     *  database — see session_audience_tokens(). */
+    sessionId?: string | null;
     /** Called after each chunk, before the next one starts. This is what
      *  makes the send resumable: if the invocation dies between chunks,
      *  whatever was last persisted here is where the next run begins. */
@@ -65,19 +70,11 @@ export async function fanOut(
     // Ordered by token and walked with a strict greater-than, so pruning
     // dead rows mid-walk can't shift anything past the cursor out of
     // reach. Keyset pagination, not offset pagination, for exactly that
-    // reason.
-    let query = supabase
-      .from("push_tokens")
-      .select("token")
-      .order("token", { ascending: true })
-      .limit(CHUNK);
-
-    if (cursor !== null) query = query.gt("token", cursor);
-
-    const { data, error } = await query.returns<{ token: string }[]>();
-    if (error) throw new Error(`Could not read push tokens: ${error.message}`);
-
-    const tokens = (data ?? []).map((r) => r.token);
+    // reason. The narrowed audience below paginates on identical terms,
+    // so the resume logic is the same whichever one is in use.
+    const tokens = opts.sessionId
+      ? await readAudienceChunk(supabase, opts.sessionId, cursor)
+      : await readEveryoneChunk(supabase, cursor);
     if (tokens.length === 0) {
       result.complete = true;
       return result;
@@ -117,6 +114,51 @@ export async function fanOut(
       return result;
     }
   }
+}
+
+/// One page of every registered device.
+async function readEveryoneChunk(
+  supabase: SupabaseClient,
+  cursor: string | null,
+): Promise<string[]> {
+  let query = supabase
+    .from("push_tokens")
+    .select("token")
+    .order("token", { ascending: true })
+    .limit(CHUNK);
+
+  if (cursor !== null) query = query.gt("token", cursor);
+
+  const { data, error } = await query.returns<{ token: string }[]>();
+  if (error) throw new Error(`Could not read push tokens: ${error.message}`);
+
+  return (data ?? []).map((r) => r.token);
+}
+
+/// One page of the devices belonging to a paid session's registrants.
+///
+/// The join lives in the database rather than here. Doing it in
+/// PostgREST would mean reading every registrant's id and passing them
+/// back as an `in.(…)` filter — a URL that grows with the guest list and
+/// eventually stops being a valid request.
+async function readAudienceChunk(
+  supabase: SupabaseClient,
+  sessionId: string,
+  cursor: string | null,
+): Promise<string[]> {
+  const { data, error } = await supabase
+    .rpc("session_audience_tokens", {
+      p_session_id: sessionId,
+      p_after: cursor,
+      p_limit: CHUNK,
+    })
+    .returns<{ token: string }[]>();
+
+  if (error) {
+    throw new Error(`Could not read session audience: ${error.message}`);
+  }
+
+  return (data ?? []).map((r) => r.token);
 }
 
 /// Sends to one person's devices.

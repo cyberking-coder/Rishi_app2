@@ -485,6 +485,10 @@ Two consequences worth remembering:
 
 **Checkout refuses a session that has already started**, on the page and again in the order route. Taking money for a meeting somebody cannot now attend is worse than refusing it.
 
+**Reminders for a paid session go only to the people who paid.** The 60/30/5-minute fan-out has always addressed every registered device, which is right for a free session — the reminder *is* the invitation. For a paid one it tells people who cannot attend that something starts in an hour, and tells the ones who paid nothing new. `session_audience_tokens()` does the push_tokens ↔ registrations join in SQL, keyset-paginated on the same terms as the unfiltered walk so the resume logic is identical either way. Doing that filter in PostgREST would have meant passing every registrant id back as an `in.(…)` list — a URL that grows with the guest list until it stops being a valid request.
+
+The sender looks the price up per reminder rather than carrying it on the claim, so the **resume path narrows the same way**: it reloads a claim, not a due row, and would otherwise fall back to broadcasting.
+
 **The pop-up's button is a route, not a URL** — `/watch`, `/courses` or `/home`, enforced by a CHECK constraint and by a fixed list in the admin. An arbitrary link there would turn the pop-up into a way to send members anywhere at all.
 
 The Sheets tab (`Workshops`) is the attendee list — filter `Event = Registered`. Two Wati templates: `workshop_registration_success` (name, session, amount) and `workshop_payment_failed` (name, session, reason). The failure message must say plainly that no seat was held, or somebody turns up on the day.
