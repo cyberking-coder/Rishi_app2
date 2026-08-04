@@ -1,15 +1,20 @@
 name: meditation_app
 description: Meditation and spiritual audio streaming application
 publish_to: "none"
-# 2.0.0 rather than 1.1.0: this is the LMS release. Courses, payments,
-# live sessions, certificates, push notifications and a full redesign —
-# a returning user opens something they will not recognise, and the
-# version should say so.
+# 2.0.0 was the LMS release: courses, payments, live sessions,
+# certificates, push notifications and a full redesign.
+#
+# 2.1.0 is the botanical redesign, the in-app guide with voice input,
+# scheduled pop-ups and paid live sessions. A minor bump rather than
+# 3.0.0 — the app is recognisably the same one, which 2.0.0 could not
+# claim.
 #
 # The build number after the + is what Play actually enforces, and it
 # must increase on every upload, including uploads that never leave
-# internal testing.
-version: 2.0.0+11
+# internal testing. +11 was never successfully built (see the pubspec
+# restore in the bug chronology), so nothing was uploaded under it —
+# but a skipped number costs nothing and a reused one is rejected.
+version: 2.1.0+12
 
 environment:
   sdk: ">=3.3.0 <4.0.0"
