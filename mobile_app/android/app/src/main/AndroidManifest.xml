@@ -15,6 +15,17 @@
     <!-- Android 13+ notification permission -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
+    <!-- Dictation in the guide. Recognition runs through the platform's
+         own service, so this is only needed to capture the audio while
+         the user is holding the mic open. Nothing is recorded to a file
+         and nothing is uploaded by the app.
+
+         Unlike the media permissions below, the microphone needs no
+         extra Play Console declaration — it is a runtime permission
+         asked for at the moment of use, and the prompt only appears the
+         first time somebody taps the mic. -->
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
+
     <!-- Storage: nothing is read from the user's gallery.
          Downloads are written to app-private storage, and both open_filex
          and share_plus hand files to other apps through a FileProvider,
@@ -134,6 +145,13 @@
             <action android:name="android.intent.action.VIEW" />
             <category android:name="android.intent.category.BROWSABLE" />
             <data android:scheme="https" />
+        </intent>
+        <!-- Same restriction, different victim: without this the speech
+             plugin cannot see any recognition service on Android 11+,
+             and initialize() returns false on a handset that is
+             perfectly capable of dictation. -->
+        <intent>
+            <action android:name="android.speech.RecognitionService" />
         </intent>
     </queries>
 </manifest>

@@ -42,6 +42,11 @@ dependencies:
   # the one most worth showing, so foreground messages are re-posted
   # through the local plugin.
   flutter_local_notifications: ^17.2.3
+  # Voice input for the guide. Uses the platform's own recogniser —
+  # Android's SpeechRecognizer, iOS's SFSpeechRecognizer — so dictation
+  # costs nothing per minute, works in the languages the handset already
+  # has, and no audio leaves the device.
+  speech_to_text: ^7.0.0
 
 dev_dependencies:
   flutter_test:

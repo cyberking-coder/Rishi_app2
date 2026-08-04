@@ -1,5 +1,3 @@
-import 'dart:math' as math;
-
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -62,12 +60,18 @@ class GoogleSignInButton extends ConsumerWidget {
   }
 }
 
-/// Google's four-colour G, drawn rather than shipped as an asset.
+/// Google's four-colour G.
 ///
-/// Built the way the mark itself is: one ring split into four coloured
-/// arcs with a gap on the right, plus the blue crossbar. Painted because
-/// a PNG would need three densities and would still be the wrong shade
-/// against a cream card at 1x.
+/// The real mark, drawn from the outline data Google publishes — not an
+/// approximation. A first attempt built it as four coloured arcs plus a
+/// crossbar, which is roughly how the logo is constructed but not
+/// actually its geometry: the arc weights, the angles where the colours
+/// hand over, and the shape of the bar are all specific, and a version
+/// that is nearly right reads as a cheap imitation of a logo everybody
+/// has seen ten thousand times.
+///
+/// Still painted rather than shipped as a PNG, so it stays sharp at any
+/// size and needs no density exports.
 class GoogleGlyph extends StatelessWidget {
   final double size;
 
@@ -84,55 +88,149 @@ class GoogleGlyph extends StatelessWidget {
 }
 
 class _GooglePainter extends CustomPainter {
-  // Google's published brand values.
-  static const _blue = Color(0xFF4285F4);
-  static const _red = Color(0xFFEA4335);
-  static const _yellow = Color(0xFFFBBC05);
-  static const _green = Color(0xFF34A853);
+  /// Google's published brand values, each with the outline it fills.
+  /// Authored against a 48×48 box and scaled to whatever is asked for.
+  static const _viewBox = 48.0;
 
-  static double _rad(double degrees) => degrees * math.pi / 180;
+  static const _segments = <(Color, String)>[
+    (
+      Color(0xFFEA4335),
+      'M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 '
+          '14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z'
+    ),
+    (
+      Color(0xFF4285F4),
+      'M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 '
+          '5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z'
+    ),
+    (
+      Color(0xFFFBBC05),
+      'M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C'
+          '.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.55 10.78l7.98-6.19z'
+    ),
+    (
+      Color(0xFF34A853),
+      'M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 '
+          '2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z'
+    ),
+  ];
+
+  /// Parsed once for the whole app rather than on every paint. The
+  /// outlines never change, and this widget appears on two screens that
+  /// repaint on every keystroke.
+  static final _outlines = [
+    for (final (color, data) in _segments) (color, _parse(data)),
+  ];
 
   @override
   void paint(Canvas canvas, Size size) {
-    final stroke = size.width * 0.27;
-    final rect = Rect.fromLTWH(
-      stroke / 2,
-      stroke / 2,
-      size.width - stroke,
-      size.height - stroke,
-    );
-
-    final arc = Paint()
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = stroke
-      ..isAntiAlias = true;
-
-    // Angles run clockwise from 3 o'clock. The ring is closed except
-    // between 0° and 25°, which is the G's opening beneath the bar.
-    void segment(Color color, double startDeg, double sweepDeg) {
-      arc.color = color;
-      canvas.drawArc(rect, _rad(startDeg), _rad(sweepDeg), false, arc);
+    canvas.save();
+    canvas.scale(size.width / _viewBox, size.height / _viewBox);
+    final paint = Paint()..isAntiAlias = true;
+    for (final (color, outline) in _outlines) {
+      paint.color = color;
+      canvas.drawPath(outline, paint);
     }
-
-    segment(_green, 25, 110); // lower right round to bottom left
-    segment(_yellow, 135, 65); // left
-    segment(_red, 200, 110); // over the top
-    segment(_blue, 310, 50); // upper right, down to the bar
-
-    // The crossbar. Reaches just past the centre, which is what turns a
-    // coloured ring into a G.
-    final cy = size.height / 2;
-    canvas.drawRect(
-      Rect.fromLTRB(
-        size.width * 0.46,
-        cy - stroke / 2,
-        size.width - stroke / 2,
-        cy + stroke / 2,
-      ),
-      Paint()..color = _blue,
-    );
+    canvas.restore();
   }
 
   @override
   bool shouldRepaint(_GooglePainter old) => false;
+
+  /// A path-data reader covering exactly the commands the four outlines
+  /// above use: M, L, H, V, C, S, Z and their relative forms, plus the
+  /// implicit repeat where a command's arguments run on without the
+  /// letter being written again.
+  ///
+  /// Deliberately not a general SVG parser. Arcs, quadratics and
+  /// transforms are absent because nothing here needs them, and an
+  /// unsupported command throws rather than being skipped — silently
+  /// dropping a segment would leave a logo that is subtly wrong, which
+  /// is the exact failure this replaced.
+  static Path _parse(String d) {
+    final tokens = _tokenPattern.allMatches(d).map((m) => m[0]!).toList();
+    final path = Path();
+
+    var i = 0;
+    var command = '';
+    var repeating = false;
+    var cursor = Offset.zero;
+    var subpathStart = Offset.zero;
+    Offset? lastControl;
+
+    double next() => double.parse(tokens[i++]);
+
+    while (i < tokens.length) {
+      final token = tokens[i];
+      if (_letterPattern.hasMatch(token)) {
+        command = token;
+        repeating = false;
+        i++;
+        if (command == 'Z' || command == 'z') {
+          path.close();
+          cursor = subpathStart;
+          lastControl = null;
+          continue;
+        }
+      }
+
+      // A second coordinate pair after M continues as a line, which is
+      // what the spec says and what these outlines rely on.
+      var effective = command;
+      if (repeating && (command == 'M' || command == 'm')) {
+        effective = command == 'M' ? 'L' : 'l';
+      }
+      final relative = effective.toLowerCase() == effective;
+      final base = relative ? cursor : Offset.zero;
+
+      switch (effective.toUpperCase()) {
+        case 'M':
+          cursor = base + Offset(next(), next());
+          path.moveTo(cursor.dx, cursor.dy);
+          subpathStart = cursor;
+          lastControl = null;
+        case 'L':
+          cursor = base + Offset(next(), next());
+          path.lineTo(cursor.dx, cursor.dy);
+          lastControl = null;
+        case 'H':
+          cursor = Offset(base.dx + next(), cursor.dy);
+          path.lineTo(cursor.dx, cursor.dy);
+          lastControl = null;
+        case 'V':
+          cursor = Offset(cursor.dx, base.dy + next());
+          path.lineTo(cursor.dx, cursor.dy);
+          lastControl = null;
+        case 'C':
+          final c1 = base + Offset(next(), next());
+          final c2 = base + Offset(next(), next());
+          final end = base + Offset(next(), next());
+          path.cubicTo(c1.dx, c1.dy, c2.dx, c2.dy, end.dx, end.dy);
+          lastControl = c2;
+          cursor = end;
+        case 'S':
+          // The first control point is the previous one reflected
+          // through the current point — that reflection is the whole
+          // meaning of a smooth curve, and dropping it would flatten
+          // the yellow segment's shoulder.
+          final c2 = base + Offset(next(), next());
+          final end = base + Offset(next(), next());
+          final c1 = lastControl == null ? cursor : cursor * 2 - lastControl;
+          path.cubicTo(c1.dx, c1.dy, c2.dx, c2.dy, end.dx, end.dy);
+          lastControl = c2;
+          cursor = end;
+        default:
+          throw UnsupportedError('Unsupported path command: $effective');
+      }
+
+      repeating = true;
+    }
+
+    return path;
+  }
+
+  static final _tokenPattern = RegExp(
+    r'[MmLlHhVvCcSsZz]|[-+]?(?:\d*\.\d+|\d+)(?:[eE][-+]?\d+)?',
+  );
+  static final _letterPattern = RegExp(r'^[A-Za-z]$');
 }

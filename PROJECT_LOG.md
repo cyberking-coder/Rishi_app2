@@ -434,6 +434,15 @@ Both need the same three placeholders filled that the course workflow needed —
 
 **Verify JWT stays ON** — the function reads the caller's own JWT and every query below it runs under their RLS.
 
+**Voice input** uses `speech_to_text`, which drives the platform's own recogniser — Android's `SpeechRecognizer`, iOS's `SFSpeechRecognizer`. Nothing is uploaded, nothing is billed per minute, and whatever languages the handset already handles come back for free, which matters for a user base that switches between English and Hindi mid-sentence.
+
+**Dictation deliberately does not auto-send.** The transcript lands in the field and the user presses send. Recognisers mishear names and Hindi words often enough that auto-sending would spend one of the day's twenty questions on a garbled sentence nobody got to read.
+
+Three platform requirements, all of which fail quietly or at review time rather than at build time:
+- `RECORD_AUDIO` in the Android manifest. No Play Console declaration needed — unlike the media permissions, this is an ordinary runtime permission.
+- A `<queries>` entry for `android.speech.RecognitionService`. Without it, Android 11+ package-visibility hides every recogniser and `initialize()` returns false on a perfectly capable handset.
+- `NSMicrophoneUsageDescription` **and** `NSSpeechRecognitionUsageDescription` in `Info.plist`. The microphone string already existed for the audio framework and said the app "does not record" — that stopped being true when voice input shipped, and an understated purpose string is what App Review rejects.
+
 ### Bug-fix chronology — Phases 3b through 5
 
 Every one of these was found by testing on a real device, not by review.

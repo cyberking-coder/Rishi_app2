@@ -75,12 +75,22 @@
 	     Connect from requiring export-compliance documentation each release. -->
 	<key>ITSAppUsesNonExemptEncryption</key>
 	<false/>
-	<!-- Required by Apple (validation error 90683): the audio playback
-	     framework (audio_service / just_audio via AVAudioSession) links
-	     against the microphone API, so a purpose string is mandatory even
-	     though this app only plays audio and never records. -->
+	<!-- Two reasons this key is here, and the string has to cover both.
+	     Apple requires it for the audio playback framework alone
+	     (validation error 90683, since audio_service / just_audio link
+	     against the microphone API), and the guide's dictation button now
+	     genuinely opens the microphone.
+
+	     The old string said the app "does not record", which stopped
+	     being true the moment voice input shipped. A purpose string that
+	     understates what the app does is exactly what review rejects. -->
 	<key>NSMicrophoneUsageDescription</key>
-	<string>This app plays guided meditation audio and does not record. Microphone access is only referenced by the audio playback framework.</string>
+	<string>Used only when you tap the microphone to speak a question to the guide. Your voice is not recorded or stored.</string>
+	<!-- Required by SFSpeechRecognizer. Separate from the microphone
+	     permission and asked for separately: one covers capturing the
+	     audio, this one covers turning it into text. -->
+	<key>NSSpeechRecognitionUsageDescription</key>
+	<string>Used to turn your spoken question into text so the guide can answer it.</string>
 	<key>NSAppTransportSecurity</key>
 	<dict>
 		<key>NSAllowsArbitraryLoads</key>
