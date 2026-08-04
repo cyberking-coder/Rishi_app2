@@ -410,6 +410,30 @@ Lifecycle events go to their own n8n webhook (`N8N_LIFECYCLE_WEBHOOK_URL`, falli
 
 Both need the same three placeholders filled that the course workflow needed — `REPLACE_TENANT_ID`, `REPLACE_WITH_WATI_TOKEN`, `REPLACE_WITH_SPREADSHEET_ID` — plus the Google Sheets credential re-selected on import, and four Wati templates approved: `subscription_purchase_success`, `subscription_payment_failed`, `access_expiring`, `access_lapsed`.
 
+### In-app guide (chat assistant)
+
+**Migration**: `20260801000011_chat_assistant.sql`. **Function**: `chat`. **Screen**: `/chat`, entered from a row directly under Home's search bar.
+
+**Available to everyone, free and paid, with a daily allowance** — 20 questions per person per IST day, `CHAT_DAILY_LIMIT` to change it. Putting the guide behind the paywall would have withheld it from exactly the people who most need to be told how to sit for ten minutes; leaving it uncapped would have made an LLM endpoint an open invoice. The allowance is counted from `chat_messages` itself rather than a counter table, so there is nothing to drift and no midnight reset job that can fail quietly — the window moves on its own.
+
+**The day is an IST day.** A UTC boundary rolls over at 05:30 local, which would hand somebody a fresh allowance mid-sitting and cut another off at breakfast.
+
+**Grounded in the real library.** `chat_catalogue()` returns every published audio and course; `chat_user_context()` returns this caller's tier, purchases and last fifteen listens. Without them, "which meditation should I start with?" gets a confident, well-written, entirely invented track name — that is the difference between a guide and a plausible liar.
+
+**The two are separate functions on purpose, and the split is the cost model.** The catalogue is byte-identical for every caller, so it goes into the prompt ahead of the per-user block with a cache breakpoint after it, and the provider serves it from cache at a tenth of the price. Folding the user's progress into the catalogue would make every request a unique prefix and multiply the running cost of the feature by roughly ten. If anyone ever reorders those system blocks, that is what breaks — silently, and only on the invoice.
+
+**Recommendations are tappable.** The model writes links as `[Title](app://audio/<uuid>)`; the app parses them out of the prose into chips under the bubble, matching on a strict uuid shape so a hallucinated slug can't route anywhere. Both destinations already existed — `/audio/:id` is where the daily notification lands.
+
+**The safety boundary is not optional and was not a question.** An app like this gets asked about panic, grief, insomnia and suicide — routinely, not occasionally. The system prompt hands off clinical questions rather than improvising therapy, and carries Indian helplines (Tele-MANAS 14416, AASRA, Vandrevala, iCall) rather than the US numbers a model reaches for by default.
+
+**Conversations are the user's alone.** RLS scopes them to `auth.uid()` with no admin policy — someone asking a meditation app about their insomnia has not agreed to it becoming staff reading material — and there is no update policy at all, so an answered question can't be edited out from under its reply. "Clear conversation" is a real delete.
+
+**Nothing is stored until a reply exists.** Both rows are written together after the completion returns, so a failed turn costs nothing from the allowance and leaves no half-conversation to reload.
+
+**Haiku 4.5 by default**, not Sonnet. The ceiling on answer quality here is the context, which is handed to the model; at a 20-a-day allowance across a free user base the difference between the tiers is the difference between a bill worth paying and one worth cancelling. `CHAT_MODEL` switches it without a redeploy.
+
+**Verify JWT stays ON** — the function reads the caller's own JWT and every query below it runs under their RLS.
+
 ### Bug-fix chronology — Phases 3b through 5
 
 Every one of these was found by testing on a real device, not by review.
@@ -429,6 +453,7 @@ Every one of these was found by testing on a real device, not by review.
 | The webhook silently stopped granting anything, logging only "already processed, skipping" | The idempotency claim was inserted **before** the work it guards and never released on failure. One failed delivery poisoned that payment permanently: every Razorpay retry took the skip branch and returned 200. The claim is now released on any non-2xx. |
 | A student whose access was removed could never buy the course again | Revocation originally dated `expires_at` in the past but left `status = 'paid'`, which still occupies `uq_course_purchases_paid`. Checkout refused them as already owning it, and had it not, the webhook's write would have violated the index **after** the card was charged. Withdrawal now moves the row to `status = 'revoked'`. A `duplicate` status covers the remaining race where someone genuinely pays twice — recorded, not lost, and flagged for refund. |
 | n8n received nothing | Three separate causes over as many attempts, each invisible because the notifier logged nothing: the URL wasn't set on the function; then a `/webhook-test/` URL nobody was listening on; then a production URL whose **workflow was not activated**. `notifyN8n` now logs every outcome — skipped (naming the missing variable), failed (quoting n8n's own response body), and succeeded (host and path, never the query string). |
+| `pubspec.yaml` was zero bytes on the release branch | The commit that bumped the build number to `+11` deleted all 90 lines of the file instead of editing the version line — no dependencies, no fonts, no version. `flutter pub get` fails outright, so the 2.0.0+11 build could never have been produced. Restored from the previous commit with the version line set. A version bump touching a hundred lines is the tell; check the diff stat, not just the diff. |
 | Google Sheets logged Wati's API response instead of the payment | The Sheets node was left on **Map Automatically**, so it wrote whatever the previous node emitted. Manual mapping with `$('Normalise').item.json.*` reaches back past the Wati node to the payment data. |
 
 
@@ -451,6 +476,9 @@ None of these are committed to the repo (correctly). Listed here so a fresh setu
 | `N8N_COURSE_PAYMENT_WEBHOOK_URL` | `razorpay-webhook` | Course-payment automation. Falls back to `N8N_PAYMENT_WEBHOOK_URL` |
 | `N8N_PAYMENT_WEBHOOK_URL` | `razorpay-webhook` | Subscription-payment automation. **Not set** — so subscription buyers currently get no WhatsApp confirmation and no Sheets row, while course buyers do. Duplicate the course workflow in n8n and point this at it |
 | `N8N_LIFECYCLE_WEBHOOK_URL` | `send-content-notifications` | Access-expiry reminders (7/3/1 days before, once after). Falls back to `N8N_PAYMENT_WEBHOOK_URL`. Absent, push still goes out and only the WhatsApp side is missing — logged, not silent |
+| `ANTHROPIC_API_KEY` | `chat` | The in-app guide. Absent, the function returns 503 with a written apology and logs the variable name — the chat screen is reachable but every question fails, so this is the one to check first if the guide "does nothing" |
+| `CHAT_MODEL` | `chat` | Optional. Defaults to `claude-haiku-4-5-20251001`. Set to a Sonnet id if the answers ever read as thin — the cost difference is roughly 3× |
+| `CHAT_DAILY_LIMIT` | `chat` | Optional, defaults to 20 questions per person per IST day. Raising it raises the worst-case bill in direct proportion |
 | `FCM_SERVICE_ACCOUNT` | `send-session-reminders`, `send-content-notifications` | The **entire** service-account JSON from Firebase console → Project settings → Service accounts → Generate new private key. Not a path, not a key id. Absent, the function returns a config error naming it and releases its reminder claim so nothing is silently marked sent |
 
 > **Bunny token authentication is deliberately OFF.** A directory token cannot survive the jump from an HLS master playlist to its renditions on a native player — ExoPlayer and AVPlayer cannot re-attach a token to segment requests at runtime, and Bunny's own workaround is a JavaScript hook that only exists in web players. Setting `BUNNY_STREAM_TOKEN_KEY` again will break playback. Access is gated by `issue-playback-license` (purchase, device lock, access window), not by the CDN.

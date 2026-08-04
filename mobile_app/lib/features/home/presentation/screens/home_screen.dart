@@ -145,6 +145,12 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
             const SizedBox(height: 16),
 
             _SearchBar(onTap: () => context.push('/search')),
+            const SizedBox(height: 12),
+
+            // Directly under search, and worded as a question rather than
+            // labelled "Chat". Nobody opens a meditation app looking for
+            // a chatbot; they open it not knowing how long to sit for.
+            _GuideBar(onTap: () => context.push('/chat')),
             const SizedBox(height: 22),
 
             const _ContinueCard(),
@@ -342,6 +348,71 @@ class _Header extends StatelessWidget {
 }
 
 // ── Search ───────────────────────────────────────────────────────────
+
+class _GuideBar extends StatelessWidget {
+  final VoidCallback onTap;
+  const _GuideBar({required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 20),
+      child: GestureDetector(
+        onTap: onTap,
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+          decoration: AppTheme.claySurface(
+            color: AppTheme.sageSoft,
+            radius: AppTheme.radiusRow,
+            small: true,
+          ),
+          child: Row(children: [
+            Container(
+              width: 34,
+              height: 34,
+              decoration: const BoxDecoration(
+                gradient: AppTheme.sageGradient,
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(Icons.self_improvement_rounded,
+                  size: 19, color: Colors.white),
+            ),
+            const SizedBox(width: 12),
+            const Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Ask the guide',
+                    style: TextStyle(
+                      fontFamily: AppTheme.text,
+                      fontSize: 14.5,
+                      fontWeight: FontWeight.w600,
+                      color: AppTheme.textPrimary,
+                    ),
+                  ),
+                  SizedBox(height: 2),
+                  Text(
+                    'How to meditate, what to play next',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontFamily: AppTheme.text,
+                      fontSize: 12,
+                      color: AppTheme.textSecondary,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const Icon(Icons.chevron_right_rounded,
+                size: 20, color: AppTheme.sageDark),
+          ]),
+        ),
+      ),
+    );
+  }
+}
 
 class _SearchBar extends StatelessWidget {
   final VoidCallback onTap;

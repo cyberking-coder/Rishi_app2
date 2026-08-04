@@ -8,6 +8,7 @@ import '../../features/auth/presentation/screens/login_screen.dart';
 import '../../features/auth/presentation/screens/signup_screen.dart';
 import '../../features/auth/presentation/screens/splash_screen.dart';
 import '../../features/audio/presentation/screens/now_playing_screen.dart';
+import '../../features/chat/presentation/screens/chat_screen.dart';
 import '../../features/downloads/presentation/screens/downloads_screen.dart';
 import '../../features/downloads/presentation/screens/offline_player_screen.dart';
 import '../../features/home/presentation/screens/home_screen.dart';
@@ -121,6 +122,10 @@ final goRouterProvider = Provider<GoRouter>((ref) {
             TextLessonScreen(lesson: state.extra as Lesson),
       ),
       GoRoute(path: '/watch', builder: (_, __) => const WatchScreen()),
+      // Not wrapped in AppShell: the guide is a drill-down from Home,
+      // and a bottom nav under an open keyboard would leave the composer
+      // fighting for the last 60 pixels of the screen.
+      GoRoute(path: '/chat', builder: (_, __) => const ChatScreen()),
       // Where a "start your day" notification lands. Takes only an id,
       // because a notification payload is strings and nothing else — no
       // `extra` object to lean on, unlike every route above.
