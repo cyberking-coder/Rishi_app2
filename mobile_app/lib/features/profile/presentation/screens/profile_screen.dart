@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../../app/theme/app_theme.dart';
+import '../../../../app/widgets/botanical.dart';
 import '../../../../core/device/device_info_service.dart';
 import '../../../access/application/access_providers.dart';
 import '../../../access/domain/access_state.dart';
@@ -54,8 +55,16 @@ class ProfileScreen extends ConsumerWidget {
 
     return Scaffold(
       backgroundColor: _kBg,
-      body: SafeArea(
-        child: profileAsync.when(
+      body: Stack(
+        children: [
+          // Behind the list, so the page closes on the same landscape the
+          // splash screen opened with.
+          const Align(
+            alignment: Alignment.bottomCenter,
+            child: MistyHills(height: 280),
+          ),
+          SafeArea(
+            child: profileAsync.when(
           loading: () =>
               const Center(child: CircularProgressIndicator(color: _kAccent)),
           error: (e, _) => Center(
@@ -90,61 +99,118 @@ class ProfileScreen extends ConsumerWidget {
                 Center(
                   child: Column(
                     children: [
-                      Container(
-                        width: 96,
-                        height: 96,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          gradient: AppTheme.sageGradient,
-                          boxShadow: [
-                            BoxShadow(
-                              color: _kAccent.withValues(alpha: 0.45),
-                              blurRadius: 24,
-                              spreadRadius: 2,
+                      SizedBox(
+                        width: 190,
+                        height: 176,
+                        child: Stack(
+                          alignment: Alignment.center,
+                          children: [
+                            const SoftHalo(size: 176),
+                            const Sparkles(size: 168, color: Colors.white),
+                            const Positioned(
+                              left: -6,
+                              top: 14,
+                              child: LeafSprig(
+                                size: 96,
+                                angle: 2.75,
+                                opacity: 0.75,
+                              ),
+                            ),
+                            const Positioned(
+                              right: -6,
+                              bottom: 30,
+                              child: LeafSprig(
+                                size: 90,
+                                angle: -0.45,
+                                opacity: 0.75,
+                                flip: true,
+                              ),
+                            ),
+                            Container(
+                              width: 112,
+                              height: 112,
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                gradient: AppTheme.sageGradient,
+                                border: Border.all(
+                                  color: Colors.white.withValues(alpha: 0.85),
+                                  width: 5,
+                                ),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: _kAccent.withValues(alpha: 0.32),
+                                    blurRadius: 26,
+                                    offset: const Offset(0, 10),
+                                  ),
+                                ],
+                              ),
+                              child: const Icon(Icons.person,
+                                  size: 56, color: Colors.white),
                             ),
                           ],
                         ),
-                        child: const Icon(Icons.person,
-                            size: 52, color: Colors.white),
                       ),
-                      const SizedBox(height: 14),
+                      const SizedBox(height: 6),
                       Text(
                         profile.displayName ?? profile.email,
+                        textAlign: TextAlign.center,
                         style: const TextStyle(
+                          fontFamily: AppTheme.display,
                           color: _kText,
-                          fontSize: 22,
-                          fontWeight: FontWeight.w700,
+                          fontSize: 24,
+                          fontWeight: FontWeight.w600,
                         ),
                       ),
-                      const SizedBox(height: 4),
-                      Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          if (!isFree)
-                            const Text('👑 ',
-                                style: TextStyle(fontSize: 14)),
-                          Text(
-                            memberLabel,
-                            style: TextStyle(
-                              color: isFree ? _kSub : _kPink,
-                              fontSize: 14,
-                              fontWeight: FontWeight.w600,
+                      const SizedBox(height: 12),
+                      // The plan as a pill rather than a line of text —
+                      // it is a status, and a status reads as one when it
+                      // has an edge around it.
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 16, vertical: 8),
+                        decoration: BoxDecoration(
+                          color: isFree
+                              ? AppTheme.sageSoft
+                              : AppTheme.sandSoft,
+                          borderRadius:
+                              BorderRadius.circular(AppTheme.radiusPill),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              isFree
+                                  ? Icons.eco_outlined
+                                  : Icons.workspace_premium_rounded,
+                              size: 16,
+                              color: isFree ? AppTheme.sageDark : _kPink,
                             ),
-                          ),
-                        ],
+                            const SizedBox(width: 7),
+                            Text(
+                              memberLabel,
+                              style: TextStyle(
+                                fontFamily: AppTheme.text,
+                                color: isFree ? AppTheme.sageDark : _kPink,
+                                fontSize: 14,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
                     ],
                   ),
                 ),
-                const SizedBox(height: 28),
+                const SizedBox(height: 26),
 
                 // ── Achievements ──
                 const Text(
                   'Achievements',
                   style: TextStyle(
+                    fontFamily: AppTheme.display,
                     color: _kText,
-                    fontSize: 18,
-                    fontWeight: FontWeight.w700,
+                    fontSize: 21,
+                    fontWeight: FontWeight.w600,
                   ),
                 ),
                 const SizedBox(height: 14),
@@ -243,12 +309,16 @@ class ProfileScreen extends ConsumerWidget {
                   icon: Icons.settings_outlined,
                   iconColor: _kAccent,
                   title: 'Settings',
+                  subtitle: 'Manage your preferences',
                   onTap: () => _openSettings(context, ref),
                 ),
+                const SizedBox(height: 30),
               ],
             );
           },
-        ),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -504,37 +574,81 @@ class _Badge extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(40),
-      child: Column(
-        children: [
-          Container(
-            width: 60,
-            height: 60,
-            decoration: BoxDecoration(
-              color: earned
-                  ? color.withValues(alpha: 0.18)
-                  : _kSub.withValues(alpha: 0.10),
-              shape: BoxShape.circle,
-              border: Border.all(
-                color: earned
-                    ? color.withValues(alpha: 0.5)
-                    : _kSub.withValues(alpha: 0.25),
-                width: 2,
-              ),
-            ),
-            child: Center(
-              child: Opacity(
-                opacity: earned ? 1 : 0.35,
-                child: Text(emoji, style: const TextStyle(fontSize: 26)),
-              ),
-            ),
+    return Expanded(
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(AppTheme.radiusTile),
+        child: Container(
+          margin: const EdgeInsets.symmetric(horizontal: 4),
+          padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 6),
+          decoration: AppTheme.claySurface(
+            radius: AppTheme.radiusTile,
+            small: true,
           ),
-          const SizedBox(height: 6),
-          Text(label,
-              style: const TextStyle(color: _kSub, fontSize: 11)),
-        ],
+          child: Column(
+            children: [
+              Stack(
+                clipBehavior: Clip.none,
+                children: [
+                  Container(
+                    width: 54,
+                    height: 54,
+                    decoration: BoxDecoration(
+                      color: earned
+                          ? color.withValues(alpha: 0.18)
+                          : _kSub.withValues(alpha: 0.10),
+                      shape: BoxShape.circle,
+                    ),
+                    child: Center(
+                      child: Opacity(
+                        opacity: earned ? 1 : 0.35,
+                        child: Text(emoji, style: const TextStyle(fontSize: 26)),
+                      ),
+                    ),
+                  ),
+                  // A padlock on what hasn't been earned and a spark on
+                  // what has — the row reads at a glance without anyone
+                  // having to compare four shades of grey.
+                  Positioned(
+                    right: -4,
+                    top: -4,
+                    child: Icon(
+                      earned ? Icons.auto_awesome : Icons.lock_rounded,
+                      size: 13,
+                      color: earned ? AppTheme.sand : _kSub,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 9),
+              Text(
+                label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  fontFamily: AppTheme.text,
+                  color: _kText,
+                  fontSize: 12.5,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              const SizedBox(height: 2),
+              // Says only what the app actually knows. The design mocked
+              // up a third "In progress" state, which would need streak
+              // tracking that does not exist — inventing it here would
+              // put a number on screen that nothing is counting.
+              Text(
+                earned ? 'Completed' : 'Locked',
+                style: TextStyle(
+                  fontFamily: AppTheme.text,
+                  fontSize: 11.5,
+                  fontWeight: FontWeight.w600,
+                  color: earned ? AppTheme.sageDark : _kSub,
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -560,22 +674,18 @@ class _ListRow extends StatelessWidget {
       onTap: onTap,
       borderRadius: BorderRadius.circular(20),
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-        decoration: BoxDecoration(
-          gradient: AppTheme.clayFill(),
-          borderRadius: BorderRadius.circular(20),
-        boxShadow: AppTheme.cardShadow,
-      ),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+        decoration: AppTheme.claySurface(radius: 20),
         child: Row(
           children: [
             Container(
-              width: 38,
-              height: 38,
+              width: 48,
+              height: 48,
               decoration: BoxDecoration(
-                color: iconColor.withValues(alpha: 0.18),
+                color: iconColor.withValues(alpha: 0.16),
                 shape: BoxShape.circle,
               ),
-              child: Icon(icon, color: iconColor, size: 20),
+              child: Icon(icon, color: iconColor, size: 23),
             ),
             const SizedBox(width: 14),
             Expanded(
@@ -584,12 +694,19 @@ class _ListRow extends StatelessWidget {
                 children: [
                   Text(title,
                       style: const TextStyle(
+                          fontFamily: AppTheme.display,
                           color: _kText,
-                          fontSize: 15,
+                          fontSize: 18,
                           fontWeight: FontWeight.w600)),
-                  if (subtitle != null)
+                  if (subtitle != null) ...[
+                    const SizedBox(height: 2),
                     Text(subtitle!,
-                        style: const TextStyle(color: _kSub, fontSize: 13)),
+                        style: const TextStyle(
+                          fontFamily: AppTheme.text,
+                          color: _kSub,
+                          fontSize: 13.5,
+                        )),
+                  ],
                 ],
               ),
             ),

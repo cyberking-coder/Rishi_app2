@@ -406,76 +406,8 @@ class _SparklePainter extends CustomPainter {
   bool shouldRepaint(_SparklePainter old) => old.color != color;
 }
 
-// ── Placement helper ─────────────────────────────────────────────────
-
-/// Wraps a screen body with corner sprigs, so every screen places them
-/// the same way instead of each one hand-positioning a Stack.
-///
-/// [Positioned] values are deliberately negative: a sprig that grows out
-/// of the frame edge reads as part of a larger plant, while one tucked
-/// fully inside reads as a sticker.
-class BotanicalFrame extends StatelessWidget {
-  final Widget child;
-  final bool topLeft;
-  final bool topRight;
-  final bool bottomLeft;
-  final bool bottomRight;
-  final double opacity;
-
-  const BotanicalFrame({
-    super.key,
-    required this.child,
-    this.topLeft = false,
-    this.topRight = true,
-    this.bottomLeft = true,
-    this.bottomRight = false,
-    this.opacity = 0.42,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Stack(
-      children: [
-        if (topLeft)
-          Positioned(
-            top: -28,
-            left: -46,
-            child: LeafSprig(size: 170, angle: 0.45, opacity: opacity),
-          ),
-        if (topRight)
-          Positioned(
-            top: -20,
-            right: -50,
-            child: LeafSprig(
-              size: 180,
-              angle: -0.35,
-              opacity: opacity,
-              flip: true,
-            ),
-          ),
-        if (bottomLeft)
-          Positioned(
-            bottom: 40,
-            left: -60,
-            child: LeafSprig(
-              size: 165,
-              angle: -0.55,
-              opacity: opacity * 0.85,
-              flip: true,
-            ),
-          ),
-        if (bottomRight)
-          Positioned(
-            bottom: 24,
-            right: -55,
-            child: LeafSprig(
-              size: 170,
-              angle: 0.5,
-              opacity: opacity * 0.85,
-            ),
-          ),
-        child,
-      ],
-    );
-  }
-}
+// Sprig placement is left to each screen rather than wrapped in a
+// helper. An earlier BotanicalFrame with topLeft/topRight/bottomLeft
+// flags turned out to be the wrong abstraction: every screen wanted a
+// different size, angle and offset, so the flags were never enough and
+// the Positioned values ended up back at the call site anyway.

@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../../app/theme/app_theme.dart';
+import '../../../../app/widgets/botanical.dart';
 import '../../application/lms_providers.dart';
 import '../../domain/entities/course_summary.dart';
 
@@ -41,22 +42,53 @@ class _CoursesScreenState extends ConsumerState<CoursesScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Padding(
-            padding: EdgeInsets.fromLTRB(20, 18, 20, 2),
-            child: Text(
-              'Courses',
-              style: TextStyle(
-                fontSize: 26,
-                fontWeight: FontWeight.w800,
-                color: AppTheme.textPrimary,
-              ),
-            ),
-          ),
-          const Padding(
-            padding: EdgeInsets.fromLTRB(20, 0, 20, 14),
-            child: Text(
-              'Guided programmes, one lesson at a time.',
-              style: TextStyle(fontSize: 13, color: AppTheme.textSecondary),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(20, 14, 20, 16),
+            child: Row(
+              children: [
+                const Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Courses',
+                        style: TextStyle(
+                          fontFamily: AppTheme.display,
+                          fontSize: 30,
+                          fontWeight: FontWeight.w600,
+                          color: AppTheme.textPrimary,
+                        ),
+                      ),
+                      SizedBox(height: 5),
+                      Text(
+                        'Guided programmes, one lesson at a time.',
+                        style: TextStyle(
+                          fontFamily: AppTheme.text,
+                          fontSize: 14.5,
+                          color: AppTheme.textSecondary,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                // Clipped to its own box so the sprig can overhang the
+                // right edge without widening the row and pushing the
+                // title into a wrap.
+                const SizedBox(
+                  width: 76,
+                  height: 76,
+                  child: Stack(
+                    clipBehavior: Clip.none,
+                    children: [
+                      Positioned(
+                        right: -34,
+                        top: 2,
+                        child: LeafSprig(size: 122, angle: -0.42, opacity: 0.6),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
             ),
           ),
 
@@ -129,39 +161,61 @@ class _FilterRow extends StatelessWidget {
     _CourseFilter.notStarted: 'Not started',
   };
 
+  static const _icons = {
+    _CourseFilter.all: Icons.eco_outlined,
+    _CourseFilter.inProgress: Icons.schedule_rounded,
+    _CourseFilter.notStarted: Icons.play_circle_outline_rounded,
+  };
+
   @override
   Widget build(BuildContext context) {
     return SizedBox(
-      height: 36,
+      height: 50,
       child: ListView(
         scrollDirection: Axis.horizontal,
         padding: const EdgeInsets.symmetric(horizontal: 20),
         children: [
           for (final entry in _labels.entries) ...[
-            GestureDetector(
-              onTap: () => onChanged(entry.key),
-              child: Container(
-                margin: const EdgeInsets.only(right: 8),
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                decoration: BoxDecoration(
-                  color: selected == entry.key
-                      ? AppTheme.sage
-                      : AppTheme.surface,
-                  borderRadius: BorderRadius.circular(AppTheme.radiusPill),
-                ),
-                child: Text(
-                  entry.value,
-                  style: TextStyle(
-                    fontSize: 12.5,
-                    fontWeight: FontWeight.w600,
-                    color: selected == entry.key
-                        ? AppTheme.textOnSage
-                        : AppTheme.textSecondary,
+            Builder(builder: (context) {
+              final isSelected = selected == entry.key;
+              return GestureDetector(
+                onTap: () => onChanged(entry.key),
+                child: Container(
+                  margin: const EdgeInsets.only(right: 10),
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 18, vertical: 11),
+                  decoration: BoxDecoration(
+                    color: isSelected ? AppTheme.sage : AppTheme.surface,
+                    borderRadius: BorderRadius.circular(AppTheme.radiusPill),
+                    boxShadow: isSelected ? null : AppTheme.rowShadow,
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        _icons[entry.key],
+                        size: 17,
+                        color: isSelected
+                            ? AppTheme.textOnSage
+                            : AppTheme.textSecondary,
+                      ),
+                      const SizedBox(width: 7),
+                      Text(
+                        entry.value,
+                        style: TextStyle(
+                          fontFamily: AppTheme.text,
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                          color: isSelected
+                              ? AppTheme.textOnSage
+                              : AppTheme.textSecondary,
+                        ),
+                      ),
+                    ],
                   ),
                 ),
-              ),
-            ),
+              );
+            }),
           ],
         ],
       ),
@@ -306,38 +360,60 @@ class CourseCard extends StatelessWidget {
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
                     style: const TextStyle(
-                      fontSize: 15.5,
+                      fontFamily: AppTheme.text,
+                      fontSize: 19,
                       fontWeight: FontWeight.w700,
                       color: AppTheme.textPrimary,
-                      height: 1.3,
+                      height: 1.25,
                     ),
                   ),
                   if (course.description != null &&
                       course.description!.trim().isNotEmpty) ...[
-                    const SizedBox(height: 5),
+                    const SizedBox(height: 8),
                     Text(
                       course.description!,
-                      maxLines: 2,
+                      maxLines: 3,
                       overflow: TextOverflow.ellipsis,
                       style: const TextStyle(
-                        fontSize: 12.5,
+                        fontFamily: AppTheme.text,
+                        fontSize: 14,
                         color: AppTheme.textSecondary,
-                        height: 1.45,
+                        height: 1.5,
                       ),
                     ),
                   ],
-                  const SizedBox(height: 12),
+                  const SizedBox(height: 14),
+                  // A rule above the meta row, as in the design: it
+                  // separates the description from the facts about the
+                  // course without needing a second card.
+                  const Divider(height: 1, color: AppTheme.border),
+                  const SizedBox(height: 14),
                   Row(children: [
-                    const Icon(Icons.play_lesson_outlined,
-                        size: 14, color: AppTheme.textSecondary),
-                    const SizedBox(width: 5),
-                    Text(
-                      '${course.lessonCount} '
-                      '${course.lessonCount == 1 ? "lesson" : "lessons"}',
-                      style: const TextStyle(
-                        fontSize: 11.5,
-                        color: AppTheme.textSecondary,
-                        fontWeight: FontWeight.w500,
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 12, vertical: 8),
+                      decoration: BoxDecoration(
+                        color: AppTheme.sageSoft,
+                        borderRadius:
+                            BorderRadius.circular(AppTheme.radiusPill),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(Icons.play_lesson_outlined,
+                              size: 15, color: AppTheme.sageDark),
+                          const SizedBox(width: 6),
+                          Text(
+                            '${course.lessonCount} '
+                            '${course.lessonCount == 1 ? "lesson" : "lessons"}',
+                            style: const TextStyle(
+                              fontFamily: AppTheme.text,
+                              fontSize: 13,
+                              color: AppTheme.sageDark,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                     const Spacer(),
@@ -345,8 +421,9 @@ class CourseCard extends StatelessWidget {
                       Text(
                         '${(course.progressFraction * 100).round()}% complete',
                         style: const TextStyle(
-                          fontSize: 11.5,
-                          color: AppTheme.sage,
+                          fontFamily: AppTheme.text,
+                          fontSize: 13,
+                          color: AppTheme.sageDark,
                           fontWeight: FontWeight.w700,
                         ),
                       ),
