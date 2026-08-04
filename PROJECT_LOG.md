@@ -434,6 +434,10 @@ Both need the same three placeholders filled that the course workflow needed —
 
 **Verify JWT stays ON** — the function reads the caller's own JWT and every query below it runs under their RLS.
 
+**The guide answers in English, Hindi or Marathi**, matching whatever the person wrote — including Roman-script Hindi and Marathi, which are answered in Roman script rather than "corrected" into Devanagari. Two things never change language: track titles, quoted exactly so the link label matches the screen it opens and so a search for it still finds it; and the helpline digits. The app's own interface is still English throughout — this is the assistant only.
+
+Marathi is called out explicitly as not a dialect of Hindi, because the failure mode without that instruction is a Marathi question answered in Hindi on the grounds that it is close enough.
+
 **Voice input** uses `speech_to_text`, which drives the platform's own recogniser — Android's `SpeechRecognizer`, iOS's `SFSpeechRecognizer`. Nothing is uploaded, nothing is billed per minute, and whatever languages the handset already handles come back for free, which matters for a user base that switches between English and Hindi mid-sentence.
 
 **Dictation deliberately does not auto-send.** The transcript lands in the field and the user presses send. Recognisers mishear names and Hindi words often enough that auto-sending would spend one of the day's twenty questions on a garbled sentence nobody got to read.
