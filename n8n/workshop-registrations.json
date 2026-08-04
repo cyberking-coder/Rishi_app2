@@ -334,12 +334,12 @@
             "Email": "={{ $('Normalise').item.json.attendeeEmail }}",
             "Phone": "={{ $('Normalise').item.json.waNumber }}",
             "State": "={{ $('Normalise').item.json.attendeeState }}",
+            "Session": "={{ $('Normalise').item.json.workshopName }}",
             "Amount": "={{ $('Normalise').item.json.amount }}",
             "Currency": "={{ $('Normalise').item.json.currency }}",
             "Reason": "={{ $('Normalise').item.json.reason }}",
             "User ID": "={{ $('Normalise').item.json.userId }}",
-            "Session ID": "={{ $('Normalise').item.json.sessionId }}",
-            "Session": "={{ $('Normalise').item.json.workshopName }}"
+            "Session ID": "={{ $('Normalise').item.json.sessionId }}"
           },
           "matchingColumns": [],
           "schema": []
@@ -378,12 +378,12 @@
             "Email": "={{ $('Normalise (failed)').item.json.attendeeEmail }}",
             "Phone": "={{ $('Normalise (failed)').item.json.waNumber }}",
             "State": "={{ $('Normalise (failed)').item.json.attendeeState }}",
+            "Session": "={{ $('Normalise (failed)').item.json.workshopName }}",
             "Amount": "={{ $('Normalise (failed)').item.json.amount }}",
             "Currency": "={{ $('Normalise (failed)').item.json.currency }}",
             "Reason": "={{ $('Normalise (failed)').item.json.reason }}",
             "User ID": "={{ $('Normalise (failed)').item.json.userId }}",
-            "Session ID": "={{ $('Normalise (failed)').item.json.sessionId }}",
-            "Session": "={{ $('Normalise (failed)').item.json.workshopName }}"
+            "Session ID": "={{ $('Normalise (failed)').item.json.sessionId }}"
           },
           "matchingColumns": [],
           "schema": []
