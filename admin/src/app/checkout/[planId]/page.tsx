@@ -16,16 +16,17 @@ interface CourseRow {
   cover_image_url: string | null;
 }
 
-/** A workshop is described by the pop-up that advertises it. */
-interface PopupRow {
+/** A paid workshop is a live session with a price on it. */
+interface SessionRow {
   id: string;
-  title: string | null;
-  body: string | null;
-  image_url: string | null;
+  title: string;
+  description: string | null;
+  thumbnail_url: string | null;
   price_amount: number | null;
   currency: string;
   seat_limit: number | null;
-  enabled: boolean;
+  status: string;
+  starts_at: string;
 }
 
 interface PlanRow {
@@ -84,17 +85,25 @@ export default async function CheckoutPage({
         : undefined;
 
   if (payload.kind === "workshop") {
-    const { data: popup } = await db
-      .from("app_popups")
-      .select("id, title, body, image_url, price_amount, currency, seat_limit, enabled")
+    const { data: session } = await db
+      .from("live_sessions")
+      .select(
+        "id, title, description, thumbnail_url, price_amount, currency, seat_limit, status, starts_at",
+      )
       .eq("id", planId)
-      .maybeSingle<PopupRow>();
+      .maybeSingle<SessionRow>();
 
-    if (!popup || !popup.enabled) {
-      return <ErrorCard message="This workshop is no longer open." />;
+    if (!session || session.status !== "scheduled") {
+      return <ErrorCard message="This session is no longer open." />;
     }
-    if (!popup.price_amount || popup.price_amount <= 0) {
-      return <ErrorCard message="This workshop is not open for paid registration." />;
+    if (!session.price_amount || session.price_amount <= 0) {
+      return <ErrorCard message="This session is free to join — no payment is needed." />;
+    }
+    // A session that has already started cannot be joined by somebody who
+    // is only now paying for it, and taking the money anyway is worse
+    // than refusing it.
+    if (new Date(session.starts_at) < new Date()) {
+      return <ErrorCard message="This session has already started." />;
     }
 
     // Already registered: taking a second payment for the same seat is
@@ -104,29 +113,29 @@ export default async function CheckoutPage({
       .from("workshop_registrations")
       .select("id")
       .eq("user_id", payload.uid)
-      .eq("popup_id", popup.id)
+      .eq("live_session_id", session.id)
       .eq("status", "paid")
       .maybeSingle();
 
     if (existing) {
-      return <ErrorCard message="You are already registered for this workshop." />;
+      return <ErrorCard message="You are already registered for this session." />;
     }
 
-    if (popup.seat_limit !== null) {
-      const { data: taken } = await db.rpc("workshop_seats_taken", {
-        p_popup_id: popup.id,
+    if (session.seat_limit !== null) {
+      const { data: taken } = await db.rpc("live_session_seats_taken", {
+        p_session_id: session.id,
       });
-      seatsLeft = Math.max(0, popup.seat_limit - (taken ?? 0));
+      seatsLeft = Math.max(0, session.seat_limit - (taken ?? 0));
       if (seatsLeft === 0) {
-        return <ErrorCard message="This workshop is full." />;
+        return <ErrorCard message="This session is full." />;
       }
     }
 
-    title = popup.title ?? "Workshop";
-    description = popup.body;
-    coverUrl = popup.image_url;
-    priceAmount = popup.price_amount;
-    priceLabel = formatPrice(popup.price_amount / 100, popup.currency);
+    title = session.title;
+    description = session.description;
+    coverUrl = session.thumbnail_url;
+    priceAmount = session.price_amount;
+    priceLabel = formatPrice(session.price_amount / 100, session.currency);
   } else if (payload.kind === "course") {
     const { data: course } = await db
       .from("courses")

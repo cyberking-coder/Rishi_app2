@@ -29,33 +29,7 @@ class AccessRemoteDataSource {
       accessStartedAt: parse(profile?['access_started_at']),
       expiresAt: parse(profile?['access_expires_at']),
       popups: await _fetchPopups(),
-      registeredPopupIds: await _fetchRegistrations(userId),
     );
-  }
-
-  /// Workshops this user has already paid for.
-  ///
-  /// Read alongside the pop-ups so the card can say "You're registered"
-  /// instead of offering to charge them a second time. RLS limits this to
-  /// their own rows, so no filtering is needed beyond the status.
-  Future<Set<String>> _fetchRegistrations(String userId) async {
-    try {
-      final rows = await _client
-          .from('workshop_registrations')
-          .select('popup_id')
-          .eq('user_id', userId)
-          .eq('status', 'paid');
-
-      return {
-        for (final row in rows as List) (row as Map)['popup_id'] as String,
-      };
-    } catch (_) {
-      // Table absent (build newer than the database) or unreachable.
-      // Treated as "not registered", which shows the button — the
-      // checkout page and the webhook both refuse a second seat, so the
-      // worst case is a wasted tap rather than a double charge.
-      return const {};
-    }
   }
 
   /// Every enabled pop-up, ordered as the admin arranged them.
@@ -70,7 +44,7 @@ class AccessRemoteDataSource {
           .from('app_popups')
           .select(
             'id, title, body, image_url, weekday, starts_at, sort_order, '
-            'price_amount, currency, cta_label',
+            'cta_route, cta_label',
           )
           .eq('enabled', true)
           .order('sort_order', ascending: true);

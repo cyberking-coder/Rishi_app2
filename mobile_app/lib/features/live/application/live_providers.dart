@@ -17,6 +17,15 @@ final upcomingSessionsProvider =
   return ref.watch(liveSessionsDataSourceProvider).getUpcoming();
 });
 
+/// Sessions this user has paid for.
+///
+/// Separate from [upcomingSessionsProvider] rather than folded into it,
+/// so returning from checkout can refresh just this — the session list
+/// itself has not changed, only what this person may do with it.
+final paidSessionsProvider = FutureProvider.autoDispose<Set<String>>((ref) {
+  return ref.watch(liveSessionsDataSourceProvider).getPaidRegistrations();
+});
+
 /// Registers this device for reminders, once, after sign-in.
 ///
 /// A provider rather than a call site so it can't be run twice from two

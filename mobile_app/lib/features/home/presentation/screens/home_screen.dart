@@ -58,6 +58,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     // force-quit or manually re-navigate.
     if (state == AppLifecycleState.resumed) {
       ref.invalidate(accessStateProvider);
+      // Same reason, for a seat at a paid session: the person has just
+      // come back from paying in a browser, and the card should say
+      // "Join" rather than still offering to sell them the seat.
+      ref.invalidate(paidSessionsProvider);
     }
   }
 
@@ -74,14 +78,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
       // before the storage read returns, and two builds both passing the
       // check would open the dialog twice.
       _popupShown = true;
-      final registered = access.registeredPopupIds.contains(popup.id);
-      WidgetsBinding.instance.addPostFrameCallback(
-        (_) => _showPopup(popup, registered: registered),
-      );
+      WidgetsBinding.instance.addPostFrameCallback((_) => _showPopup(popup));
     }
   }
 
-  Future<void> _showPopup(AppPopup popup, {required bool registered}) async {
+  Future<void> _showPopup(AppPopup popup) async {
     final today = popup.todayKey;
     if (await PopupSeenStore.wasSeen(popup.id, today)) return;
     if (!mounted) return;
@@ -92,7 +93,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     // it and decided they were done.
     await PopupSeenStore.markSeen(popup.id, today);
     if (!mounted) return;
-    await NextEventPopup.show(context, popup, alreadyRegistered: registered);
+    await NextEventPopup.show(context, popup);
   }
 
   Future<void> _playAudio(AudioSummary audio) async {

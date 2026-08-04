@@ -23,10 +23,10 @@ export interface PaymentNotification {
   /** Only set for content_type: "course" — lets the message deep-link
    *  straight to the course instead of the generic app link. */
   course_id?: string;
-  /** Only set for content_type: "workshop" — the pop-up that describes
-   *  the event, so the message can name it and the admin can join a
+  /** Only set for content_type: "workshop" — the live session that was
+   *  paid for, so the message can name it and the admin can join a
    *  registration back to what was sold. */
-  popup_id?: string;
+  live_session_id?: string;
   /** Set when a coupon was applied, so the message can say what was saved. */
   coupon_code?: string;
   discount_amount?: number; // rupees

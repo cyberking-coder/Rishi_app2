@@ -18,9 +18,8 @@ interface Body {
   plan_id?: string;
   /** Set instead of plan_id to buy a single course. */
   course_id?: string;
-  /** Set instead of either to register for a paid workshop, which is
-   *  described by the pop-up that advertises it. */
-  popup_id?: string;
+  /** Set instead of either to register for a paid live session. */
+  live_session_id?: string;
 }
 
 Deno.serve(async (req) => {
@@ -54,30 +53,29 @@ Deno.serve(async (req) => {
     return jsonResponse({ error: "Invalid JSON body" }, 400);
   }
 
-  // A workshop is described by the pop-up that advertises it, so the
-  // token targets an app_popups.id. Checked here for a price as well as
-  // for existence: minting a token for a free or disabled pop-up would
+  // A paid live session. Checked here for a price as well as for
+  // existence: minting a token for a free or cancelled session would
   // send somebody to a checkout page with nothing to charge.
-  if (body.popup_id) {
-    const { data: popup, error: popupError } = await supabase
-      .from("app_popups")
-      .select("id, price_amount, enabled")
-      .eq("id", body.popup_id)
-      .eq("enabled", true)
+  if (body.live_session_id) {
+    const { data: session, error: sessionError } = await supabase
+      .from("live_sessions")
+      .select("id, price_amount, status")
+      .eq("id", body.live_session_id)
+      .eq("status", "scheduled")
       .maybeSingle();
 
-    if (popupError || !popup) {
-      return jsonResponse({ error: "Workshop not found" }, 404);
+    if (sessionError || !session) {
+      return jsonResponse({ error: "Session not found" }, 404);
     }
-    if (!popup.price_amount || popup.price_amount <= 0) {
+    if (!session.price_amount || session.price_amount <= 0) {
       return jsonResponse(
-        { error: "This workshop is not open for paid registration." },
+        { error: "This session is free to join — no payment is needed." },
         400,
       );
     }
 
     const workshopToken = await mintCheckoutToken(
-      { uid: userData.user.id, kind: "workshop", tid: popup.id },
+      { uid: userData.user.id, kind: "workshop", tid: session.id },
       TOKEN_TTL_SECONDS,
     );
     return jsonResponse({
@@ -112,7 +110,7 @@ Deno.serve(async (req) => {
 
   if (!body.plan_id) {
     return jsonResponse(
-      { error: "plan_id, course_id or popup_id is required" },
+      { error: "plan_id, course_id or live_session_id is required" },
       400,
     );
   }

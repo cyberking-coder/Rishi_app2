@@ -46,6 +46,16 @@ function dateTimeToIso(date: string, time: string): string | null {
   return new Date(`${date}T${t}`).toISOString();
 }
 
+/** Where the button can send somebody. Kept to a short list rather than a
+ *  free-text URL: the pop-up is an advert inside the app, not a way to
+ *  send members anywhere at all. The database enforces the same list. */
+const CTA_ROUTES = [
+  { value: "", label: "No button" },
+  { value: "/watch", label: "Live sessions" },
+  { value: "/courses", label: "Courses" },
+  { value: "/home", label: "Home" },
+];
+
 /** ISO-8601 weekday numbers, which is what the app compares against. */
 const WEEKDAYS = [
   { value: "", label: "Every day" },
@@ -141,16 +151,8 @@ function PopupCard({
   const [imageUrl, setImageUrl] = useState(popup?.image_url ?? "");
   const [imageUploading, setImageUploading] = useState(false);
 
-  // Entered in rupees, stored in paise. Kept as a string while typing so
-  // the field can be cleared — a number state would snap an empty box
-  // back to 0 on every keystroke.
-  const [priceRupees, setPriceRupees] = useState(
-    popup?.price_amount ? String(popup.price_amount / 100) : "",
-  );
+  const [ctaRoute, setCtaRoute] = useState(popup?.cta_route ?? "");
   const [ctaLabel, setCtaLabel] = useState(popup?.cta_label ?? "");
-  const [seatLimit, setSeatLimit] = useState(
-    popup?.seat_limit == null ? "" : String(popup.seat_limit),
-  );
 
   const dateRef = useRef<HTMLInputElement>(null);
   const timeRef = useRef<HTMLInputElement>(null);
@@ -199,20 +201,6 @@ function PopupCard({
       return toast.error("Give the pop-up a title or some text to show.");
     }
 
-    const rupees = priceRupees.trim() === "" ? 0 : Number(priceRupees);
-    if (Number.isNaN(rupees) || rupees < 0) {
-      return toast.error("Enter a valid fee, or leave it blank.");
-    }
-    // Rounded rather than truncated, and rounded here rather than left to
-    // the database: 499.995 has to land on a whole paisa before it
-    // becomes the amount somebody is charged.
-    const paise = Math.round(rupees * 100);
-
-    const seats = seatLimit.trim() === "" ? null : Number(seatLimit);
-    if (seats !== null && (!Number.isInteger(seats) || seats < 1)) {
-      return toast.error("Seats must be a whole number, or blank for no limit.");
-    }
-
     setBusy(true);
     const result = await savePopup({
       id: popup?.id,
@@ -223,10 +211,8 @@ function PopupCard({
       starts_at: dateTimeToIso(startDate, startTime),
       enabled,
       sort_order: position - 1,
-      price_amount: paise > 0 ? paise : null,
-      currency: popup?.currency ?? "INR",
+      cta_route: ctaRoute || null,
       cta_label: ctaLabel || null,
-      seat_limit: seats,
     });
     setBusy(false);
     if (!result.ok) return toast.error(result.error);
@@ -366,58 +352,40 @@ function PopupCard({
 
           <div className="space-y-3 rounded-md border p-4">
             <div>
-              <Label>Paid registration (optional)</Label>
+              <Label>Button (optional)</Label>
               <p className="pt-1 text-xs text-muted-foreground">
-                Set a fee and the pop-up gets a button that takes payment
-                and sends a WhatsApp confirmation. Leave it blank and the
-                pop-up is an announcement with a Close button.
+                Adds a button that opens a screen in the app. To sell a
+                workshop, point it at Live sessions and put the fee on the
+                session itself under Live sessions &rarr; Schedule — that
+                is where members pay and where the join link lives.
               </p>
             </div>
 
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1">
-                <Label className="text-xs text-muted-foreground">
-                  Fee (₹)
-                </Label>
-                <Input
-                  type="number"
-                  min={0}
-                  step="1"
-                  inputMode="decimal"
-                  value={priceRupees}
-                  onChange={(e) => setPriceRupees(e.target.value)}
-                  placeholder="499"
-                />
+                <Label className="text-xs text-muted-foreground">Opens</Label>
+                <NativeSelect
+                  value={ctaRoute}
+                  onChange={(e) => setCtaRoute(e.target.value)}
+                >
+                  {CTA_ROUTES.map((r) => (
+                    <NativeOption key={r.value} value={r.value}>
+                      {r.label}
+                    </NativeOption>
+                  ))}
+                </NativeSelect>
               </div>
               <div className="space-y-1">
                 <Label className="text-xs text-muted-foreground">
-                  Seats (blank = no limit)
+                  Button text
                 </Label>
                 <Input
-                  type="number"
-                  min={1}
-                  step="1"
-                  value={seatLimit}
-                  onChange={(e) => setSeatLimit(e.target.value)}
-                  placeholder="50"
+                  value={ctaLabel}
+                  onChange={(e) => setCtaLabel(e.target.value)}
+                  placeholder="Register Now"
+                  disabled={ctaRoute === ""}
                 />
               </div>
-            </div>
-
-            <div className="space-y-1">
-              <Label className="text-xs text-muted-foreground">
-                Button text
-              </Label>
-              <Input
-                value={ctaLabel}
-                onChange={(e) => setCtaLabel(e.target.value)}
-                placeholder="Register Now"
-              />
-              <p className="text-xs text-muted-foreground">
-                The fee is added automatically — the button reads
-                &ldquo;{ctaLabel.trim() || "Register Now"}
-                {priceRupees.trim() ? ` • ₹${priceRupees.trim()}` : ""}&rdquo;.
-              </p>
             </div>
           </div>
 

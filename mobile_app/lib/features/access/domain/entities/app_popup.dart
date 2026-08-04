@@ -17,11 +17,14 @@ class AppPopup {
 
   final int sortOrder;
 
-  /// Registration fee in **paise**, matching courses.price_amount. Null or
-  /// zero means this pop-up is an announcement with no button.
-  final int? priceAmount;
-
-  final String currency;
+  /// Where the button goes — an in-app route such as '/watch'. Null means
+  /// the pop-up has no button beyond Close.
+  ///
+  /// A route, not a URL. The pop-up advertises; the paying happens on the
+  /// screen that owns the thing being sold, next to it. Letting an admin
+  /// type an arbitrary link here would turn the pop-up into a way to send
+  /// members anywhere at all.
+  final String? ctaRoute;
 
   /// Wording on the button. Null falls back to "Register Now".
   final String? ctaLabel;
@@ -34,8 +37,7 @@ class AppPopup {
     this.weekday,
     this.startsAt,
     this.sortOrder = 0,
-    this.priceAmount,
-    this.currency = 'INR',
+    this.ctaRoute,
     this.ctaLabel,
   });
 
@@ -49,25 +51,12 @@ class AppPopup {
             ? null
             : DateTime.tryParse(map['starts_at'] as String)?.toLocal(),
         sortOrder: (map['sort_order'] as num?)?.toInt() ?? 0,
-        priceAmount: (map['price_amount'] as num?)?.toInt(),
-        currency: map['currency'] as String? ?? 'INR',
+        ctaRoute: map['cta_route'] as String?,
         ctaLabel: map['cta_label'] as String?,
       );
 
-  /// Whether this pop-up is selling a place at something.
-  bool get isPaidWorkshop => (priceAmount ?? 0) > 0;
-
-  /// The fee as it should read on the button.
-  ///
-  /// Whole rupees drop the decimals — "₹499" rather than "₹499.00", which
-  /// on a price tag reads as an accountant's number rather than a price.
-  String get priceLabel {
-    final rupees = (priceAmount ?? 0) / 100;
-    final symbol = currency == 'INR' ? '₹' : '$currency ';
-    return rupees % 1 == 0
-        ? '$symbol${rupees.toStringAsFixed(0)}'
-        : '$symbol${rupees.toStringAsFixed(2)}';
-  }
+  /// Whether the pop-up has somewhere to send people.
+  bool get hasCta => ctaRoute != null && ctaRoute!.isNotEmpty;
 
   String get ctaText => (ctaLabel?.trim().isNotEmpty ?? false)
       ? ctaLabel!.trim()

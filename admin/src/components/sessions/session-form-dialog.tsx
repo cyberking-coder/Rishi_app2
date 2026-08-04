@@ -76,6 +76,16 @@ export function SessionFormDialog({
   );
   const [uploading, setUploading] = useState(false);
 
+  // Entered in rupees, stored in paise. Kept as a string while typing so
+  // the box can be cleared — a number state snaps an empty field back to
+  // 0 on every keystroke.
+  const [priceRupees, setPriceRupees] = useState(
+    session?.price_amount ? String(session.price_amount / 100) : "",
+  );
+  const [seatLimit, setSeatLimit] = useState(
+    session?.seat_limit == null ? "" : String(session.seat_limit),
+  );
+
   function reset() {
     if (editing) return;
     setTitle("");
@@ -84,6 +94,8 @@ export function SessionFormDialog({
     setStartsAt("");
     setDuration("60");
     setThumbnailUrl("");
+    setPriceRupees("");
+    setSeatLimit("");
   }
 
   async function onPickThumbnail(file: File) {
@@ -106,6 +118,16 @@ export function SessionFormDialog({
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
+
+    const rupees = priceRupees.trim() === "" ? 0 : Number(priceRupees);
+    if (Number.isNaN(rupees) || rupees < 0) {
+      return toast.error("Enter a valid fee, or leave it blank for free.");
+    }
+    const seats = seatLimit.trim() === "" ? null : Number(seatLimit);
+    if (seats !== null && (!Number.isInteger(seats) || seats < 1)) {
+      return toast.error("Seats must be a whole number, or blank for no limit.");
+    }
+
     setBusy(true);
     try {
       const payload = {
@@ -117,6 +139,11 @@ export function SessionFormDialog({
         startsAt: istInputToIso(startsAt),
         durationMinutes: Number(duration),
         thumbnailUrl: thumbnailUrl || undefined,
+        // Rounded here rather than left to the database: 499.995 has to
+        // land on a whole paisa before it becomes an amount somebody is
+        // charged.
+        priceAmount: rupees > 0 ? Math.round(rupees * 100) : null,
+        seatLimit: seats,
       };
 
       const result = session
@@ -171,6 +198,56 @@ export function SessionFormDialog({
               placeholder="Sunday morning satsang"
               disabled={busy}
             />
+          </div>
+
+          <div className="space-y-3 rounded-md border p-4">
+            <div>
+              <Label>Paid session (optional)</Label>
+              <p className="pt-1 text-xs text-muted-foreground">
+                Set a fee and members see &ldquo;Register &bull;
+                &nbsp;₹499&rdquo; instead of a join button. They pay, get a
+                WhatsApp confirmation, and only then can open the meeting
+                link. Leave it blank and the session is free to join, as
+                every existing session is.
+              </p>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label htmlFor="ls-price" className="text-xs text-muted-foreground">
+                  Fee (₹)
+                </Label>
+                <Input
+                  id="ls-price"
+                  type="number"
+                  min={0}
+                  step="1"
+                  inputMode="decimal"
+                  value={priceRupees}
+                  onChange={(e) => setPriceRupees(e.target.value)}
+                  placeholder="499"
+                  disabled={busy}
+                />
+              </div>
+              <div>
+                <Label htmlFor="ls-seats" className="text-xs text-muted-foreground">
+                  Seats (blank = no limit)
+                </Label>
+                <Input
+                  id="ls-seats"
+                  type="number"
+                  min={1}
+                  step="1"
+                  value={seatLimit}
+                  onChange={(e) => setSeatLimit(e.target.value)}
+                  placeholder="50"
+                  disabled={busy}
+                />
+              </div>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              The meeting link of a paid session is hidden from anyone who
+              has not paid — it is not stored on the row members can read.
+            </p>
           </div>
 
           <div>

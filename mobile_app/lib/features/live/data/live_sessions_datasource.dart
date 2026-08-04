@@ -21,7 +21,7 @@ class LiveSessionsDataSource {
         .from('live_sessions')
         .select(
           'id, title, description, join_url, thumbnail_url, starts_at, '
-          'duration_minutes, status',
+          'duration_minutes, status, price_amount, currency, seat_limit',
         )
         .gte('starts_at', cutoff.toIso8601String())
         .order('starts_at', ascending: true);
@@ -30,6 +30,44 @@ class LiveSessionsDataSource {
       for (final row in rows as List)
         LiveSession.fromMap(Map<String, dynamic>.from(row as Map)),
     ];
+  }
+
+  /// Session ids this user has a paid seat at.
+  ///
+  /// RLS limits the read to their own rows, so there is nothing to filter
+  /// beyond the status.
+  Future<Set<String>> getPaidRegistrations() async {
+    final userId = _client.auth.currentUser?.id;
+    if (userId == null) return const {};
+
+    final rows = await _client
+        .from('workshop_registrations')
+        .select('live_session_id')
+        .eq('user_id', userId)
+        .eq('status', 'paid');
+
+    return {
+      for (final row in rows as List)
+        if ((row as Map)['live_session_id'] != null)
+          row['live_session_id'] as String,
+    };
+  }
+
+  /// The meeting link, if this user is entitled to it.
+  ///
+  /// Always fetched rather than read off the session row. A paid
+  /// session's row carries an empty join_url by design — the real link
+  /// lives in a table members cannot select, and this function is the one
+  /// place that decides whether to hand it over. A free session returns
+  /// its link unchanged, so the same call works for both and the screen
+  /// never has to know which kind it is holding.
+  Future<String?> getJoinUrl(String sessionId) async {
+    final url = await _client.rpc(
+      'live_session_join_url',
+      params: {'p_session_id': sessionId},
+    );
+    final text = url as String?;
+    return (text == null || text.isEmpty) ? null : text;
   }
 
   /// Records this device's FCM token so reminders can reach it.

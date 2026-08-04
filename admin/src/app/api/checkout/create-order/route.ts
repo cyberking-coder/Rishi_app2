@@ -70,7 +70,7 @@ export async function POST(req: NextRequest) {
 
   const db = createAdminClient();
 
-  // A workshop is priced from the pop-up that advertises it.
+  // A workshop is a live session with a price on it.
   if (payload.kind === "workshop") {
     return await createWorkshopOrder(db, payload.uid, payload.tid, {
       name,
@@ -143,9 +143,9 @@ interface Billing {
 }
 
 /**
- * Builds a Razorpay order for a workshop seat.
+ * Builds a Razorpay order for a seat at a paid live session.
  *
- * No coupon path: workshops are one-off events at a fixed price, and the
+ * No coupon path: sessions are one-off events at a fixed price, and the
  * coupons table is scoped to a course id, so there is nothing here for a
  * code to apply to. The checkout page hides the field for the same
  * reason.
@@ -154,25 +154,31 @@ async function createWorkshopOrder(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   db: any,
   userId: string,
-  popupId: string,
+  sessionId: string,
   billing: Billing,
 ) {
-  const { data: popup } = await db
-    .from("app_popups")
-    .select("id, title, price_amount, currency, seat_limit, enabled")
-    .eq("id", popupId)
+  const { data: session } = await db
+    .from("live_sessions")
+    .select("id, title, price_amount, currency, seat_limit, status, starts_at")
+    .eq("id", sessionId)
     .maybeSingle();
 
-  if (!popup || !popup.enabled) {
+  if (!session || session.status !== "scheduled") {
     return NextResponse.json(
-      { error: "This workshop is no longer open." },
+      { error: "This session is no longer open." },
       { status: 404 },
     );
   }
-  if (!popup.price_amount || popup.price_amount <= 0) {
+  if (!session.price_amount || session.price_amount <= 0) {
     return NextResponse.json(
-      { error: "This workshop is not open for paid registration." },
+      { error: "This session is free to join — no payment is needed." },
       { status: 400 },
+    );
+  }
+  if (new Date(session.starts_at) < new Date()) {
+    return NextResponse.json(
+      { error: "This session has already started." },
+      { status: 409 },
     );
   }
 
@@ -183,41 +189,41 @@ async function createWorkshopOrder(
     .from("workshop_registrations")
     .select("id")
     .eq("user_id", userId)
-    .eq("popup_id", popup.id)
+    .eq("live_session_id", session.id)
     .eq("status", "paid")
     .maybeSingle();
 
   if (existing) {
     return NextResponse.json(
-      { error: "You are already registered for this workshop." },
+      { error: "You are already registered for this session." },
       { status: 409 },
     );
   }
 
-  if (popup.seat_limit !== null) {
-    const { data: taken } = await db.rpc("workshop_seats_taken", {
-      p_popup_id: popup.id,
+  if (session.seat_limit !== null) {
+    const { data: taken } = await db.rpc("live_session_seats_taken", {
+      p_session_id: session.id,
     });
-    if ((taken ?? 0) >= popup.seat_limit) {
+    if ((taken ?? 0) >= session.seat_limit) {
       return NextResponse.json(
-        { error: "This workshop is full." },
+        { error: "This session is full." },
         { status: 409 },
       );
     }
   }
 
-  const title = popup.title ?? "Workshop";
+  const title = session.title ?? "Live session";
 
   try {
     const order = await createRazorpayOrder({
-      amountRupees: popup.price_amount / 100,
-      currency: popup.currency,
+      amountRupees: session.price_amount / 100,
+      currency: session.currency,
       // What razorpay-webhook reads back to know who paid, for what, and
-      // how to reach them. popup_id is what makes it a workshop payment
-      // rather than a course or a subscription.
+      // how to reach them. live_session_id is what makes it a seat at
+      // an event rather than a course or a subscription.
       notes: {
         user_id: userId,
-        popup_id: popup.id,
+        live_session_id: session.id,
         billing_name: billing.name,
         billing_phone: billing.phone,
         billing_email: billing.email,
@@ -237,9 +243,9 @@ async function createWorkshopOrder(
       .from("workshop_registrations")
       .insert({
         user_id: userId,
-        popup_id: popup.id,
-        amount: popup.price_amount,
-        currency: popup.currency,
+        live_session_id: session.id,
+        amount: session.price_amount,
+        currency: session.currency,
         status: "pending",
         razorpay_order_id: order.id,
         billing_name: billing.name,

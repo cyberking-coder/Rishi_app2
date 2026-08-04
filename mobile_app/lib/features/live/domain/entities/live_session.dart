@@ -13,6 +13,15 @@ class LiveSession {
   final int durationMinutes;
   final String status;
 
+  /// Registration fee in **paise**. Null or zero means free to join,
+  /// which is every session that existed before this.
+  final int? priceAmount;
+
+  final String currency;
+
+  /// Null = unlimited.
+  final int seatLimit;
+
   const LiveSession({
     required this.id,
     required this.title,
@@ -22,9 +31,28 @@ class LiveSession {
     required this.status,
     this.description,
     this.thumbnailUrl,
+    this.priceAmount,
+    this.currency = 'INR',
+    this.seatLimit = 0,
   });
 
   bool get isCancelled => status == 'cancelled';
+
+  /// Whether a seat has to be paid for.
+  ///
+  /// A paid session's [joinUrl] is always empty — the database blanks it
+  /// on the way in and keeps the real link in a table members cannot
+  /// read. The link is fetched separately, once a registration exists.
+  bool get isPaid => (priceAmount ?? 0) > 0;
+
+  /// The fee as it should read on a button.
+  String get priceLabel {
+    final rupees = (priceAmount ?? 0) / 100;
+    final symbol = currency == 'INR' ? '₹' : '$currency ';
+    return rupees % 1 == 0
+        ? '$symbol${rupees.toStringAsFixed(0)}'
+        : '$symbol${rupees.toStringAsFixed(2)}';
+  }
 
   DateTime get endsAt => startsAt.add(Duration(minutes: durationMinutes));
 
@@ -54,5 +82,8 @@ class LiveSession {
             DateTime.parse(map['starts_at'] as String).toLocal(),
         durationMinutes: (map['duration_minutes'] as num?)?.toInt() ?? 60,
         status: map['status'] as String? ?? 'scheduled',
+        priceAmount: (map['price_amount'] as num?)?.toInt(),
+        currency: map['currency'] as String? ?? 'INR',
+        seatLimit: (map['seat_limit'] as num?)?.toInt() ?? 0,
       );
 }

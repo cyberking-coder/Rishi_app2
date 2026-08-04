@@ -465,25 +465,29 @@ The pop-up used to be three columns on the singleton `app_config` row, which all
 
 The migration copies the existing pop-up across as an every-day one, guarded on `app_popups` being empty so re-running it cannot duplicate the row.
 
-### Paid workshop registration (from a pop-up)
+### Paid live sessions (workshops)
 
-**Migration**: `20260801000013_workshop_registrations.sql`. **Workflow**: `n8n/workshop-registrations.json`. **Secret**: `N8N_WORKSHOP_WEBHOOK_URL`.
+**Migrations**: `20260801000013` + `20260801000014_paid_live_sessions.sql`. **Workflow**: `n8n/workshop-registrations.json`. **Secret**: `N8N_WORKSHOP_WEBHOOK_URL`.
 
-Give a pop-up a fee and it grows a **Register Now • ₹499** button. Tapping it opens the same external web checkout the courses and the membership already use, `razorpay-webhook` settles it, and n8n sends the WhatsApp confirmation. Leave the fee blank and the pop-up stays an announcement with a Close button.
+Put a fee on a live session when scheduling it and members see **Register • ₹499** instead of a join button. They pay on the same external checkout the courses use, `razorpay-webhook` records the seat, n8n sends the WhatsApp, and only then does the join link become reachable. A pop-up can carry a button that opens the sessions screen, so "Register now" and the thing being registered for are one tap apart.
 
-**The price lives on the pop-up, not in a `workshops` table.** From the member's side the advert and the thing being sold are one card with one button; a separate table would have needed its own admin screen, its own scheduling and its own way of being shown. What does get its own table is `workshop_registrations` — that is a receipt: it has money on it, it must survive the pop-up being edited, and it is the answer to "who is coming".
+**The price is on the session, not on the pop-up.** The first cut hung it on the pop-up, which made the advert and the event two objects that had to be kept in step by hand — a pop-up saying ₹499 with no session behind it, or a session with no way to pay for it. A workshop *is* the live session: one row, one price, one join link. The pop-up went back to being an advert.
 
-**Paise, not rupees** (`price_amount`), matching `courses.price_amount`. Subscriptions store rupees and courses store paise; the newer per-item convention wins so the two things a member buys one at a time agree. The admin form takes rupees and converts.
+**A paid session's join link is not on the row anybody can read.** `live_sessions` is readable by every signed-in user — it has to be, or nobody could see a session exists — which is fine for a title and fatal for a paid link: the URL could be read straight from the API and the meeting walked into. A price on a row whose payload is public is not a price. A `before insert or update` trigger moves the link into `live_session_join_links` (admin-only) the moment a price is set, and back again if the price is removed. `live_session_join_url()` is the single place that decides who gets it: free sessions hand it over, paid ones want a paid registration, staff always get it.
 
-**Both unique indexes are partial, so nothing may upsert.** `uq_workshop_registrations_paid` is `where status = 'paid'` and the order index is `where razorpay_order_id is not null`. Postgres refuses a partial index as an ON CONFLICT target unless the statement repeats its predicate, which PostgREST cannot express — this exact trap has already cost three separate bugs on `course_purchases`. Both writers update-then-insert.
+Two consequences worth remembering:
+- The **app fetches the link at the moment of joining**, never from the session it loaded earlier. A URL sitting in app memory since the list loaded is exactly what this must not depend on.
+- The **admin sessions page re-joins the protected link** back onto the row before rendering the edit form. Without that, editing a paid session would show an empty link box and saving would blank it.
 
-**A second payment for a held seat is recorded as `duplicate`, not rejected.** Checkout refuses a workshop somebody is already registered for, but it cannot close the race (two tabs, a redelivered payment). Colliding with the index would 500 the handler and make Razorpay retry a payment that can never be recorded, so the refund owed is made visible instead.
+**Both unique indexes on `workshop_registrations` are partial, so nothing may upsert** — Postgres refuses a partial index as an ON CONFLICT target unless the statement repeats its predicate, which PostgREST cannot express. Both writers update-then-insert. This trap has now cost this codebase four separate bugs.
 
-**The handler grants nothing.** Unlike a course purchase there is no entitlement to reconcile, no expiry to compare, no lapsed row to supersede — only "did this person pay for this seat". It does still fill blank `display_name`/`phone` on the profile from the checkout form, never overwriting what a member set themselves.
+**A second payment for a held seat is recorded as `duplicate`.** Checkout refuses a session somebody is registered for, but cannot close the race; colliding with the index would 500 and make Razorpay retry a payment that can never be recorded, so the refund owed is made visible instead.
 
-**Seat count comes from `workshop_seats_taken()`**, one function used by the checkout page, the order route and the admin, because three separate counts drift the moment one forgets to filter on status.
+**Checkout refuses a session that has already started**, on the page and again in the order route. Taking money for a meeting somebody cannot now attend is worse than refusing it.
 
-The Sheets tab (`Workshops`) is the attendee list — filter `Event = Registered`. Two Wati templates are needed: `workshop_registration_success` (name, workshop, amount) and `workshop_payment_failed` (name, workshop, reason). The failure message has to say plainly that no seat was held, or somebody turns up on the day.
+**The pop-up's button is a route, not a URL** — `/watch`, `/courses` or `/home`, enforced by a CHECK constraint and by a fixed list in the admin. An arbitrary link there would turn the pop-up into a way to send members anywhere at all.
+
+The Sheets tab (`Workshops`) is the attendee list — filter `Event = Registered`. Two Wati templates: `workshop_registration_success` (name, session, amount) and `workshop_payment_failed` (name, session, reason). The failure message must say plainly that no seat was held, or somebody turns up on the day.
 
 ### Bug-fix chronology — Phases 3b through 5
 

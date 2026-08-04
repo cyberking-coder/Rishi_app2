@@ -30,16 +30,11 @@ class AccessState {
   /// half in a query and half on screen.
   final List<AppPopup> popups;
 
-  /// Workshops this user has already paid for, so the card offers them a
-  /// seat they hold rather than a second charge.
-  final Set<String> registeredPopupIds;
-
   const AccessState({
     required this.role,
     required this.accessStartedAt,
     required this.expiresAt,
     this.popups = const [],
-    this.registeredPopupIds = const {},
   });
 
   UserTier get tier {

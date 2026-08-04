@@ -24,8 +24,12 @@ export default async function SessionsPage() {
   // embed that fails takes the whole select down with it, and the
   // reminder log is the least important column on the page — it must not
   // be able to blank the schedule.
-  const [{ data: sessions }, { data: reminders }, { count: deviceCount }] =
-    await Promise.all([
+  const [
+    { data: sessions },
+    { data: reminders },
+    { count: deviceCount },
+    { data: protectedLinks },
+  ] = await Promise.all([
       supabase
         .from("live_sessions")
         .select("*")
@@ -38,7 +42,21 @@ export default async function SessionsPage() {
       supabase
         .from("push_tokens")
         .select("token", { count: "exact", head: true }),
+      // A paid session's row carries no join link — the database moves it
+      // somewhere members cannot read. Admins can, and the edit form has
+      // to show the real link or saving would blank it.
+      supabase
+        .from("live_session_join_links")
+        .select("session_id, join_url")
+        .returns<{ session_id: string; join_url: string }[]>(),
     ]);
+
+  const linkBySession = new Map(
+    (protectedLinks ?? []).map((l) => [l.session_id, l.join_url]),
+  );
+  for (const s of sessions ?? []) {
+    if (!s.join_url) s.join_url = linkBySession.get(s.id) ?? "";
+  }
 
   const sentBySession = new Map<string, number[]>();
   for (const r of reminders ?? []) {

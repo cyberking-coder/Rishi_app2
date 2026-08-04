@@ -185,21 +185,21 @@ async function processEvent(
   }
   if (
     !notes.user_id ||
-    (!notes.plan_id && !notes.course_id && !notes.popup_id)
+    (!notes.plan_id && !notes.course_id && !notes.live_session_id)
   ) {
     console.log("[razorpay-webhook] order notes incomplete, trying payment.notes");
     notes = payment.notes ?? {};
   }
 
-  // A workshop seat carries popup_id. It grants no content access at all
-  // — it books a place at an event — so it branches out before any of
-  // the access-granting paths below.
-  if (notes.popup_id) {
+  // A seat at a paid live session carries live_session_id. It grants no
+  // content access at all — it books a place at an event — so it
+  // branches out before any of the access-granting paths below.
+  if (notes.live_session_id) {
     return await handleWorkshopRegistration(supabase, {
       eventType,
       payment,
       userId: notes.user_id,
-      popupId: notes.popup_id,
+      sessionId: notes.live_session_id,
       billing: {
         email: notes.billing_email ?? null,
         name: notes.billing_name ?? null,
@@ -440,35 +440,35 @@ async function handleWorkshopRegistration(
     // deno-lint-ignore no-explicit-any
     payment: any;
     userId?: string;
-    popupId: string;
+    sessionId: string;
     billing: CourseBilling;
   },
 ): Promise<Response> {
-  const { eventType, payment, userId, popupId, billing } = args;
+  const { eventType, payment, userId, sessionId, billing } = args;
 
   if (!userId) {
     console.error("[razorpay-webhook] workshop registration missing user_id");
     return jsonResponse({ error: "Payment missing user_id note" }, 400);
   }
 
-  const { data: popup } = await supabase
-    .from("app_popups")
+  const { data: session } = await supabase
+    .from("live_sessions")
     .select("id, title")
-    .eq("id", popupId)
+    .eq("id", sessionId)
     .maybeSingle();
 
-  if (!popup) {
-    console.error("[razorpay-webhook] unknown workshop on notes", { popupId });
-    return jsonResponse({ error: "Unknown workshop on payment notes" }, 404);
+  if (!session) {
+    console.error("[razorpay-webhook] unknown session on notes", { sessionId });
+    return jsonResponse({ error: "Unknown session on payment notes" }, 404);
   }
 
-  const title = popup.title ?? "Workshop";
+  const title = session.title ?? "Live session";
   const amountRupees = payment.amount / 100;
   const status = eventType === "payment.failed" ? "failed" : "paid";
 
   const patch = {
     user_id: userId,
-    popup_id: popupId,
+    live_session_id: sessionId,
     amount: payment.amount,
     currency: payment.currency ?? "INR",
     status,
@@ -492,14 +492,14 @@ async function handleWorkshopRegistration(
       .from("workshop_registrations")
       .select("id, razorpay_order_id")
       .eq("user_id", userId)
-      .eq("popup_id", popupId)
+      .eq("live_session_id", sessionId)
       .eq("status", "paid")
       .maybeSingle();
 
     if (incumbent && incumbent.razorpay_order_id !== payment.order_id) {
       console.error(
         `[razorpay-webhook] DUPLICATE WORKSHOP REGISTRATION - refund owed: ` +
-          `user ${userId} already registered for ${popupId} via order ` +
+          `user ${userId} already registered for ${sessionId} via order ` +
           `${incumbent.razorpay_order_id}; recording ${payment.id} ` +
           `(order ${payment.order_id}) as duplicate`,
       );
@@ -557,7 +557,7 @@ async function handleWorkshopRegistration(
 
   console.log("[razorpay-webhook] workshop registration recorded", {
     userId,
-    popupId,
+    sessionId,
     status,
   });
 
@@ -611,7 +611,7 @@ async function handleWorkshopRegistration(
       state: billing.state,
       plan_name: title,
       content_type: "workshop",
-      popup_id: popupId,
+      live_session_id: sessionId,
       amount: amountRupees,
       currency: payment.currency ?? "INR",
       reason: status === "failed"

@@ -54,6 +54,9 @@ export async function createLiveSession(input: {
   startsAt: string;
   durationMinutes: number;
   thumbnailUrl?: string;
+  /** Paise. Null or 0 = free to join. */
+  priceAmount?: number | null;
+  seatLimit?: number | null;
 }): Promise<ActionResult> {
   await requireAdmin();
   const db = createAdminClient();
@@ -68,6 +71,8 @@ export async function createLiveSession(input: {
     starts_at: checked.startsAt,
     duration_minutes: Math.round(input.durationMinutes),
     thumbnail_url: input.thumbnailUrl || null,
+    price_amount: input.priceAmount ?? null,
+    seat_limit: input.seatLimit ?? null,
   });
 
   if (error) return { ok: false, error: error.message };
@@ -83,6 +88,8 @@ export async function updateLiveSession(input: {
   startsAt: string;
   durationMinutes: number;
   thumbnailUrl?: string | null;
+  priceAmount?: number | null;
+  seatLimit?: number | null;
 }): Promise<ActionResult> {
   await requireAdmin();
   const db = createAdminClient();
@@ -99,6 +106,8 @@ export async function updateLiveSession(input: {
       starts_at: checked.startsAt,
       duration_minutes: Math.round(input.durationMinutes),
       thumbnail_url: input.thumbnailUrl || null,
+      price_amount: input.priceAmount ?? null,
+      seat_limit: input.seatLimit ?? null,
     })
     .eq("id", input.id);
 

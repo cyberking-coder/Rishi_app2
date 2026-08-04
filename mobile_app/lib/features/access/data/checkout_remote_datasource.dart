@@ -61,15 +61,15 @@ class CheckoutRemoteDataSource {
     return Uri.parse('$checkoutBaseUrl/checkout/$courseId?token=$token');
   }
 
-  /// Mints a checkout link for a paid workshop.
+  /// Mints a checkout link for a seat at a paid live session.
   ///
-  /// The target is the pop-up that advertises it — a workshop has no
-  /// other record until somebody registers, and giving it one would mean
-  /// a second admin screen for something the pop-up already describes.
-  Future<Uri> getWorkshopCheckoutUrl(String popupId) async {
+  /// The session is the thing being sold — the pop-up that advertises it
+  /// only points here, so there is one price in one place rather than an
+  /// advert and an event that have to be kept in step by hand.
+  Future<Uri> getSessionCheckoutUrl(String sessionId) async {
     final response = await _client.functions.invoke(
       'mint-checkout-token',
-      body: {'popup_id': popupId},
+      body: {'live_session_id': sessionId},
     );
 
     if (response.status != 200) {
@@ -80,6 +80,6 @@ class CheckoutRemoteDataSource {
     }
 
     final token = (response.data as Map)['token'] as String;
-    return Uri.parse('$checkoutBaseUrl/checkout/$popupId?token=$token');
+    return Uri.parse('$checkoutBaseUrl/checkout/$sessionId?token=$token');
   }
 }

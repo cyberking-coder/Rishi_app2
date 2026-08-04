@@ -16,12 +16,9 @@ export interface AppPopup {
   starts_at: string | null;
   enabled: boolean;
   sort_order: number;
-  /** Paise, matching courses.price_amount. Null or 0 = announcement only,
-   *  no registration button. */
-  price_amount: number | null;
-  currency: string;
+  /** In-app route the button opens, e.g. '/watch'. Null = no button. */
+  cta_route: string | null;
   cta_label: string | null;
-  seat_limit: number | null;
 }
 
 export type PopupDraft = Omit<AppPopup, "id"> & { id?: string };
@@ -35,7 +32,7 @@ export async function listPopups(): Promise<AppPopup[]> {
     .from("app_popups")
     .select(
       "id, title, body, image_url, weekday, starts_at, enabled, sort_order, " +
-        "price_amount, currency, cta_label, seat_limit",
+        "cta_route, cta_label",
     )
     .order("sort_order", { ascending: true })
     .returns<AppPopup[]>();
@@ -84,10 +81,8 @@ export async function savePopup(input: PopupDraft): Promise<ActionResult> {
     starts_at: input.starts_at || null,
     enabled: input.enabled,
     sort_order: input.sort_order,
-    price_amount: input.price_amount ?? null,
-    currency: input.currency || "INR",
+    cta_route: input.cta_route || null,
     cta_label: input.cta_label || null,
-    seat_limit: input.seat_limit ?? null,
   };
 
   const { error } = input.id

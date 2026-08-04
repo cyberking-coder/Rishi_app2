@@ -118,8 +118,8 @@
             },
             {
               "id": "w2000000-0000-4000-8000-00000000000b",
-              "name": "popupId",
-              "value": "={{ $json.body.popup_id || '' }}",
+              "name": "sessionId",
+              "value": "={{ $json.body.live_session_id || '' }}",
               "type": "string"
             },
             {
@@ -152,7 +152,7 @@
         220,
         -120
       ],
-      "notes": "plan_name carries the workshop's title — the payload is shared with course and subscription payments, so the field keeps its original name."
+      "notes": "plan_name carries the session's title — the payload is shared with course and subscription payments, so the field keeps its original name."
     },
     {
       "parameters": {
@@ -220,8 +220,8 @@
             },
             {
               "id": "w2000000-0000-4000-8000-00000000000b",
-              "name": "popupId",
-              "value": "={{ $json.body.popup_id || '' }}",
+              "name": "sessionId",
+              "value": "={{ $json.body.live_session_id || '' }}",
               "type": "string"
             },
             {
@@ -334,12 +334,12 @@
             "Email": "={{ $('Normalise').item.json.attendeeEmail }}",
             "Phone": "={{ $('Normalise').item.json.waNumber }}",
             "State": "={{ $('Normalise').item.json.attendeeState }}",
-            "Workshop": "={{ $('Normalise').item.json.workshopName }}",
             "Amount": "={{ $('Normalise').item.json.amount }}",
             "Currency": "={{ $('Normalise').item.json.currency }}",
             "Reason": "={{ $('Normalise').item.json.reason }}",
             "User ID": "={{ $('Normalise').item.json.userId }}",
-            "Workshop ID": "={{ $('Normalise').item.json.popupId }}"
+            "Session ID": "={{ $('Normalise').item.json.sessionId }}",
+            "Session": "={{ $('Normalise').item.json.workshopName }}"
           },
           "matchingColumns": [],
           "schema": []
@@ -378,12 +378,12 @@
             "Email": "={{ $('Normalise (failed)').item.json.attendeeEmail }}",
             "Phone": "={{ $('Normalise (failed)').item.json.waNumber }}",
             "State": "={{ $('Normalise (failed)').item.json.attendeeState }}",
-            "Workshop": "={{ $('Normalise (failed)').item.json.workshopName }}",
             "Amount": "={{ $('Normalise (failed)').item.json.amount }}",
             "Currency": "={{ $('Normalise (failed)').item.json.currency }}",
             "Reason": "={{ $('Normalise (failed)').item.json.reason }}",
             "User ID": "={{ $('Normalise (failed)').item.json.userId }}",
-            "Workshop ID": "={{ $('Normalise (failed)').item.json.popupId }}"
+            "Session ID": "={{ $('Normalise (failed)').item.json.sessionId }}",
+            "Session": "={{ $('Normalise (failed)').item.json.workshopName }}"
           },
           "matchingColumns": [],
           "schema": []

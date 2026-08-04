@@ -227,6 +227,11 @@ export interface LiveSession {
   starts_at: string;
   duration_minutes: number;
   status: "scheduled" | "cancelled";
+  /** Paise. Null or 0 = free to join. A priced session's join_url is
+   *  blanked on the row and kept out of members' reach. */
+  price_amount: number | null;
+  currency: string;
+  seat_limit: number | null;
   created_at: string;
   updated_at: string;
 }

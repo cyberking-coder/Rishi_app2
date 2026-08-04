@@ -1,7 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../../../app/theme/app_theme.dart';
+import '../../../../core/config/checkout_config.dart';
+import '../../../access/application/access_providers.dart';
+import '../../application/live_providers.dart';
 import '../../domain/entities/live_session.dart';
 
 /// Opens the meeting in Zoom (or the browser, if Zoom isn't installed).
@@ -9,8 +13,44 @@ import '../../domain/entities/live_session.dart';
 /// externalApplication rather than an in-app webview: a meeting needs the
 /// camera and microphone, and a webview would either fail at that or ask
 /// for permissions the app has no other reason to hold.
-Future<void> joinSession(BuildContext context, LiveSession session) async {
-  final uri = Uri.tryParse(session.joinUrl);
+///
+/// The link is asked for at the moment of joining rather than read off
+/// the session. A paid session carries no link on its row at all — the
+/// database keeps it out of reach and hands it over only to somebody with
+/// a paid seat, so a URL that has been sitting in app memory since the
+/// list loaded is exactly the thing this must not rely on.
+Future<void> joinSession(
+  BuildContext context,
+  WidgetRef ref,
+  LiveSession session,
+) async {
+  String? url = session.joinUrl.isNotEmpty ? session.joinUrl : null;
+
+  if (url == null) {
+    try {
+      url = await ref
+          .read(liveSessionsDataSourceProvider)
+          .getJoinUrl(session.id);
+    } catch (_) {
+      url = null;
+    }
+  }
+
+  if (!context.mounted) return;
+
+  if (url == null) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text(
+          'The meeting link is not available yet. If you have just '
+          'registered, give it a moment and try again.',
+        ),
+      ),
+    );
+    return;
+  }
+
+  final uri = Uri.tryParse(url);
   if (uri == null) return;
 
   final opened = await launchUrl(uri, mode: LaunchMode.externalApplication);
@@ -21,26 +61,70 @@ Future<void> joinSession(BuildContext context, LiveSession session) async {
   }
 }
 
+/// Sends somebody to the external checkout for a seat.
+Future<void> registerForSession(
+  BuildContext context,
+  WidgetRef ref,
+  LiveSession session,
+) async {
+  if (!isCheckoutConfigured) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Registration is not set up yet.')),
+    );
+    return;
+  }
+
+  try {
+    final url = await ref
+        .read(checkoutRemoteDataSourceProvider)
+        .getSessionCheckoutUrl(session.id);
+
+    final opened = await launchUrl(url, mode: LaunchMode.externalApplication);
+    if (!opened) throw Exception('Could not open checkout');
+  } catch (e) {
+    if (!context.mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          e.toString().replaceFirst(RegExp(r'^Exception: '), ''),
+        ),
+      ),
+    );
+  }
+}
+
 /// The thumbnail the reminder is telling people to tap.
 ///
 /// Everything on it exists to answer one question — can I join right now,
 /// and if not, when? — so the countdown and the live badge are the two
 /// loudest things on the card.
-class LiveSessionCard extends StatelessWidget {
+class LiveSessionCard extends ConsumerWidget {
   final LiveSession session;
 
   const LiveSessionCard({super.key, required this.session});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final live = session.isLiveNow;
     final over = session.isOver;
     final dimmed = session.isCancelled || over;
 
+    // Absent while the registration list is still loading, which is why
+    // this is read as a nullable rather than defaulting to false: showing
+    // "Register • ₹499" to somebody who has already paid, for the half
+    // second before the answer arrives, is the one wrong state here.
+    final paid = ref.watch(paidSessionsProvider).valueOrNull;
+    final registered = paid == null ? null : paid.contains(session.id);
+    final needsPayment = session.isPaid && registered == false;
+
     return Opacity(
       opacity: dimmed ? 0.55 : 1,
       child: GestureDetector(
-        onTap: dimmed ? null : () => joinSession(context, session),
+        onTap: dimmed
+            ? null
+            : needsPayment
+                ? () => registerForSession(context, ref, session)
+                : () => joinSession(context, ref, session),
         child: Container(
           decoration: AppTheme.claySurface(),
           child: Column(
@@ -151,14 +235,67 @@ class LiveSessionCard extends StatelessWidget {
                     ],
                     if (!dimmed) ...[
                       const SizedBox(height: 12),
-                      SizedBox(
-                        width: double.infinity,
-                        child: FilledButton.icon(
-                          onPressed: () => joinSession(context, session),
-                          icon: const Icon(Icons.open_in_new_rounded, size: 18),
-                          label: Text(live ? 'Join now' : 'Open meeting link'),
+                      if (session.isPaid && registered == null)
+                        // The list has loaded but the registration has
+                        // not. A disabled placeholder rather than a
+                        // guessed label.
+                        const SizedBox(
+                          height: 48,
+                          child: Center(
+                            child: SizedBox(
+                              height: 20,
+                              width: 20,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: AppTheme.sage,
+                              ),
+                            ),
+                          ),
+                        )
+                      else if (needsPayment)
+                        SizedBox(
+                          width: double.infinity,
+                          child: FilledButton.icon(
+                            onPressed: () =>
+                                registerForSession(context, ref, session),
+                            icon: const Icon(Icons.lock_open_rounded, size: 18),
+                            label: Text(
+                              // The fee on the button, never a screen
+                              // later: nobody should discover the price
+                              // after committing to the tap.
+                              'Register  •  ${session.priceLabel}',
+                            ),
+                          ),
+                        )
+                      else ...[
+                        if (session.isPaid) ...[
+                          Row(children: [
+                            const Icon(Icons.check_circle_rounded,
+                                size: 16, color: AppTheme.sageDark),
+                            const SizedBox(width: 6),
+                            Text(
+                              'You are registered',
+                              style: Theme.of(context)
+                                  .textTheme
+                                  .bodySmall
+                                  ?.copyWith(
+                                    color: AppTheme.sageDark,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                            ),
+                          ]),
+                          const SizedBox(height: 8),
+                        ],
+                        SizedBox(
+                          width: double.infinity,
+                          child: FilledButton.icon(
+                            onPressed: () => joinSession(context, ref, session),
+                            icon:
+                                const Icon(Icons.open_in_new_rounded, size: 18),
+                            label: Text(live ? 'Join now' : 'Open meeting link'),
+                          ),
                         ),
-                      ),
+                      ],
                     ],
                   ],
                 ),
