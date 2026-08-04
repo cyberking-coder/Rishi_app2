@@ -447,6 +447,24 @@ Three platform requirements, all of which fail quietly or at review time rather 
 - A `<queries>` entry for `android.speech.RecognitionService`. Without it, Android 11+ package-visibility hides every recogniser and `initialize()` returns false on a perfectly capable handset.
 - `NSMicrophoneUsageDescription` **and** `NSSpeechRecognitionUsageDescription` in `Info.plist`. The microphone string already existed for the audio framework and said the app "does not record" — that stopped being true when voice input shipped, and an understated purpose string is what App Review rejects.
 
+### Scheduled pop-ups (more than one, pinned to a weekday)
+
+**Migration**: `20260801000012_scheduled_popups.sql`. **Table**: `app_popups`. **Admin**: Settings.
+
+The pop-up used to be three columns on the singleton `app_config` row, which allowed exactly one message. A Monday message and a Wednesday message is not a variation on that — it is a list, and a list belongs in rows.
+
+**`weekday` is ISO-8601** (1 = Monday … 7 = Sunday), null = every day. It repeats weekly. `starts_at` is separate and means "not before", so a message can be written now and start appearing three Mondays out.
+
+**The weekday is read in IST, not the device's zone.** The day is chosen by an admin in India who means *their* Monday; a phone on London time would otherwise show the Monday message on Sunday evening. Same pinning as live sessions, the daily audio and the n8n crons.
+
+**Shown once per person per day, not once per launch.** `PopupSeenStore` records pop-up id + IST date in secure storage. Without it, "show it on Monday" means "show it on every launch all Monday", which is how a message people were glad to read once becomes the reason they stop opening the app. It is marked seen *before* the dialog closes, so swiping the app away still counts; and the read fails open, so a broken keystore shows the pop-up an extra time rather than suppressing it forever.
+
+**First match wins, by `sort_order`.** Two pop-ups both set to Monday would otherwise alternate at random between launches — which looks like a bug from the outside and is impossible to report.
+
+**`app_config`'s `popup_*` columns are deliberately left in place**, frozen rather than dropped. Installed builds still read them, and dropping the columns would take the pop-up away from everyone who has not updated. The app reads `app_popups` and falls back to those columns if the table is missing, so a build newer than the database still shows something.
+
+The migration copies the existing pop-up across as an every-day one, guarded on `app_popups` being empty so re-running it cannot duplicate the row.
+
 ### Bug-fix chronology — Phases 3b through 5
 
 Every one of these was found by testing on a real device, not by review.

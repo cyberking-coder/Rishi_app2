@@ -2,20 +2,20 @@ import 'package:flutter/material.dart';
 
 import '../../../app/theme/app_theme.dart';
 import '../../../app/widgets/lotus_logo.dart';
-import '../domain/access_state.dart';
+import '../domain/entities/app_popup.dart';
 
 /// Modal advertising the next retreat. Shown from the configured start date
 /// while the user still has access — always closeable.
 class NextEventPopup extends StatelessWidget {
-  final AccessState access;
-  const NextEventPopup({super.key, required this.access});
+  final AppPopup popup;
+  const NextEventPopup({super.key, required this.popup});
 
-  static Future<void> show(BuildContext context, AccessState access) {
+  static Future<void> show(BuildContext context, AppPopup popup) {
     return showDialog<void>(
       context: context,
       barrierDismissible: true,
       barrierColor: Colors.black.withValues(alpha: 0.35),
-      builder: (_) => NextEventPopup(access: access),
+      builder: (_) => NextEventPopup(popup: popup),
     );
   }
 
@@ -24,20 +24,20 @@ class NextEventPopup extends StatelessWidget {
     return Dialog(
       backgroundColor: Colors.transparent,
       insetPadding: const EdgeInsets.symmetric(horizontal: 28),
-      child: _PopupCard(access: access, showClose: true),
+      child: _PopupCard(popup: popup, showClose: true),
     );
   }
 }
 
 class _PopupCard extends StatelessWidget {
-  final AccessState access;
+  final AppPopup popup;
   final bool showClose;
-  const _PopupCard({required this.access, required this.showClose});
+  const _PopupCard({required this.popup, required this.showClose});
 
   @override
   Widget build(BuildContext context) {
     final hasImage =
-        access.popupImageUrl != null && access.popupImageUrl!.isNotEmpty;
+        popup.imageUrl != null && popup.imageUrl!.isNotEmpty;
 
     return Container(
       decoration: BoxDecoration(
@@ -72,7 +72,7 @@ class _PopupCard extends StatelessWidget {
                     child: ConstrainedBox(
                       constraints: const BoxConstraints(maxHeight: 320),
                       child: Image.network(
-                        access.popupImageUrl!,
+                        popup.imageUrl!,
                         width: double.infinity,
                         fit: BoxFit.contain,
                         errorBuilder: (_, __, ___) => const SizedBox.shrink(),
@@ -83,8 +83,8 @@ class _PopupCard extends StatelessWidget {
                   const LotusLogo(size: 56),
                 const SizedBox(height: 18),
                 Text(
-                  access.popupTitle?.isNotEmpty == true
-                      ? access.popupTitle!
+                  popup.title?.isNotEmpty == true
+                      ? popup.title!
                       : 'Our Next Gathering',
                   textAlign: TextAlign.center,
                   style: const TextStyle(
@@ -93,10 +93,10 @@ class _PopupCard extends StatelessWidget {
                     color: AppTheme.textPrimary,
                   ),
                 ),
-                if (access.popupBody?.isNotEmpty == true) ...[
+                if (popup.body?.isNotEmpty == true) ...[
                   const SizedBox(height: 12),
                   Text(
-                    access.popupBody!,
+                    popup.body!,
                     textAlign: TextAlign.center,
                     style: const TextStyle(
                       fontSize: 14,
@@ -130,17 +130,5 @@ class _PopupCard extends StatelessWidget {
         ],
       ),
     );
-  }
-}
-
-/// The same card rendered inline (no close button) — used as the entire home
-/// body once access has expired.
-class NextEventInlineCard extends StatelessWidget {
-  final AccessState access;
-  const NextEventInlineCard({super.key, required this.access});
-
-  @override
-  Widget build(BuildContext context) {
-    return _PopupCard(access: access, showClose: false);
   }
 }

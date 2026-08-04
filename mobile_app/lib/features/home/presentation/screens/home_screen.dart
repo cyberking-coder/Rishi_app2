@@ -5,7 +5,9 @@ import 'package:go_router/go_router.dart';
 import '../../../../app/theme/app_theme.dart';
 import '../../../../app/widgets/botanical.dart';
 import '../../../access/application/access_providers.dart';
+import '../../../access/data/popup_seen_store.dart';
 import '../../../access/domain/access_state.dart';
+import '../../../access/domain/entities/app_popup.dart';
 import '../../../access/presentation/next_event_popup.dart';
 import '../../../audio/application/audio_providers.dart';
 import '../../../audio/domain/entities/audio_track.dart';
@@ -65,12 +67,29 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
       ref.read(downloadRepositoryProvider).purgeAll();
       return;
     }
-    if (access.hasAccess && access.shouldShowPopup && !_popupShown) {
+
+    final popup = access.todaysPopup;
+    if (access.hasAccess && popup != null && !_popupShown) {
+      // Latched before the async gap, not after: build can run again
+      // before the storage read returns, and two builds both passing the
+      // check would open the dialog twice.
       _popupShown = true;
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted) NextEventPopup.show(context, access);
-      });
+      WidgetsBinding.instance.addPostFrameCallback((_) => _showPopup(popup));
     }
+  }
+
+  Future<void> _showPopup(AppPopup popup) async {
+    final today = popup.todayKey;
+    if (await PopupSeenStore.wasSeen(popup.id, today)) return;
+    if (!mounted) return;
+
+    // Recorded before the dialog closes rather than after, so dismissing
+    // it by swiping the app away still counts as seen. The alternative
+    // shows it again on the next launch to somebody who has already read
+    // it and decided they were done.
+    await PopupSeenStore.markSeen(popup.id, today);
+    if (!mounted) return;
+    await NextEventPopup.show(context, popup);
   }
 
   Future<void> _playAudio(AudioSummary audio) async {

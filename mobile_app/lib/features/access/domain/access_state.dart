@@ -1,3 +1,5 @@
+import 'entities/app_popup.dart';
+
 /// admin: staff role, unlimited access to everything.
 /// retreat: an active (possibly unlimited) access window was granted.
 /// free: never granted a window (self-signup default) or it expired.
@@ -22,22 +24,17 @@ class AccessState {
   /// [tier]) — active iff in the future, regardless of [accessStartedAt].
   final DateTime? expiresAt;
 
-  /// Pop-up content (admin-editable). Null fields mean "not configured".
-  final bool popupEnabled;
-  final DateTime? popupStartAt;
-  final String? popupTitle;
-  final String? popupBody;
-  final String? popupImageUrl;
+  /// Every enabled pop-up, in the order an admin arranged them. Which one
+  /// (if any) belongs on screen today is [todaysPopup]'s job — the list
+  /// is carried whole so the decision is made in one place rather than
+  /// half in a query and half on screen.
+  final List<AppPopup> popups;
 
   const AccessState({
     required this.role,
     required this.accessStartedAt,
     required this.expiresAt,
-    required this.popupEnabled,
-    required this.popupStartAt,
-    required this.popupTitle,
-    required this.popupBody,
-    required this.popupImageUrl,
+    this.popups = const [],
   });
 
   UserTier get tier {
@@ -63,24 +60,24 @@ class AccessState {
     return diff.isNegative ? 0 : diff.inDays;
   }
 
-  /// Whether the next-event pop-up should be shown right now.
-  bool get shouldShowPopup {
-    if (!popupEnabled) return false;
-    if (popupStartAt != null && popupStartAt!.isAfter(DateTime.now())) {
-      return false;
+  /// The pop-up due on screen right now, or null.
+  ///
+  /// First match wins, by the admin's ordering. Two pop-ups both set to
+  /// Monday would otherwise alternate at random between launches, which
+  /// looks like a bug from the outside and is impossible to report.
+  AppPopup? get todaysPopup {
+    for (final popup in popups) {
+      if (popup.isDueNow()) return popup;
     }
-    return (popupTitle != null && popupTitle!.isNotEmpty) ||
-        (popupBody != null && popupBody!.isNotEmpty);
+    return null;
   }
+
+  /// Whether a pop-up should be shown right now.
+  bool get shouldShowPopup => todaysPopup != null;
 
   static const empty = AccessState(
     role: null,
     accessStartedAt: null,
     expiresAt: null,
-    popupEnabled: false,
-    popupStartAt: null,
-    popupTitle: null,
-    popupBody: null,
-    popupImageUrl: null,
   );
 }

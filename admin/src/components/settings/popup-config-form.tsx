@@ -3,11 +3,17 @@
 import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { CalendarDays, Clock, ImagePlus, X } from "lucide-react";
-import { savePopupConfig, uploadPopupImage, type PopupConfig } from "@/app/actions/config";
+import { CalendarDays, Clock, ImagePlus, Plus, Trash2, X } from "lucide-react";
+import {
+  deletePopup,
+  savePopup,
+  uploadPopupImage,
+  type AppPopup,
+} from "@/app/actions/config";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { NativeSelect, NativeOption } from "@/components/ui/native-select";
 import { Textarea } from "@/components/ui/textarea";
 import {
   Card,
@@ -40,15 +46,111 @@ function dateTimeToIso(date: string, time: string): string | null {
   return new Date(`${date}T${t}`).toISOString();
 }
 
-export function PopupConfigForm({ initial }: { initial: PopupConfig }) {
+/** ISO-8601 weekday numbers, which is what the app compares against. */
+const WEEKDAYS = [
+  { value: "", label: "Every day" },
+  { value: "1", label: "Monday" },
+  { value: "2", label: "Tuesday" },
+  { value: "3", label: "Wednesday" },
+  { value: "4", label: "Thursday" },
+  { value: "5", label: "Friday" },
+  { value: "6", label: "Saturday" },
+  { value: "7", label: "Sunday" },
+];
+
+export function PopupConfigForm({ initial }: { initial: AppPopup[] }) {
   const router = useRouter();
+
+  // Drafts for pop-ups that have not been saved yet. Held separately from
+  // the server list so an unsaved card is never confused for a stored row
+  // — the two need different save calls and different image paths.
+  const [drafts, setDrafts] = useState<number[]>(
+    initial.length === 0 ? [0] : [],
+  );
+
+  return (
+    <div className="max-w-2xl space-y-5">
+      <Card>
+        <CardHeader>
+          <CardTitle>In-app pop-ups</CardTitle>
+          <CardDescription>
+            Each pop-up can run every day or on one day of the week — a
+            Monday message and a Wednesday message, for instance. Days are
+            read in IST, and each pop-up is shown once per day per person
+            rather than on every launch.
+            <br />
+            <br />
+            If two pop-ups match the same day, the one higher up this list
+            wins. Only that one is shown.
+          </CardDescription>
+        </CardHeader>
+      </Card>
+
+      {initial.map((popup, index) => (
+        <PopupCard
+          key={popup.id}
+          popup={popup}
+          position={index + 1}
+          onDone={() => router.refresh()}
+        />
+      ))}
+
+      {drafts.map((key) => (
+        <PopupCard
+          key={`draft-${key}`}
+          popup={null}
+          position={initial.length + drafts.indexOf(key) + 1}
+          onDone={() => {
+            setDrafts((d) => d.filter((k) => k !== key));
+            router.refresh();
+          }}
+        />
+      ))}
+
+      <Button
+        type="button"
+        variant="outline"
+        onClick={() => setDrafts((d) => [...d, Date.now()])}
+      >
+        <Plus className="mr-2 h-4 w-4" />
+        Add a pop-up
+      </Button>
+    </div>
+  );
+}
+
+function PopupCard({
+  popup,
+  position,
+  onDone,
+}: {
+  popup: AppPopup | null;
+  position: number;
+  onDone: () => void;
+}) {
   const [busy, setBusy] = useState(false);
 
-  const [enabled, setEnabled] = useState(initial.popup_enabled);
-  const [startDate, setStartDate] = useState(isoToDate(initial.popup_start_at));
-  const [startTime, setStartTime] = useState(isoToTime(initial.popup_start_at));
+  const [enabled, setEnabled] = useState(popup?.enabled ?? true);
+  const [weekday, setWeekday] = useState(
+    popup?.weekday == null ? "" : String(popup.weekday),
+  );
+  const [startDate, setStartDate] = useState(isoToDate(popup?.starts_at ?? null));
+  const [startTime, setStartTime] = useState(isoToTime(popup?.starts_at ?? null));
+  const [title, setTitle] = useState(popup?.title ?? "");
+  const [body, setBody] = useState(popup?.body ?? "");
+  const [imageUrl, setImageUrl] = useState(popup?.image_url ?? "");
+  const [imageUploading, setImageUploading] = useState(false);
+
   const dateRef = useRef<HTMLInputElement>(null);
   const timeRef = useRef<HTMLInputElement>(null);
+  const imageInputRef = useRef<HTMLInputElement>(null);
+
+  // An unsaved pop-up has no id yet, so its image needs some other stable
+  // name. Generated once per card so re-picking a file overwrites the
+  // previous attempt instead of littering the bucket.
+  const uploadKeyRef = useRef(
+    popup?.id ?? `draft-${Math.random().toString(36).slice(2, 10)}`,
+  );
 
   function openPicker(ref: React.RefObject<HTMLInputElement | null>) {
     // showPicker() reliably opens the native calendar/clock on click.
@@ -58,11 +160,6 @@ export function PopupConfigForm({ initial }: { initial: PopupConfig }) {
       ref.current?.focus();
     }
   }
-  const [title, setTitle] = useState(initial.popup_title ?? "");
-  const [body, setBody] = useState(initial.popup_body ?? "");
-  const [imageUrl, setImageUrl] = useState(initial.popup_image_url ?? "");
-  const [imageUploading, setImageUploading] = useState(false);
-  const imageInputRef = useRef<HTMLInputElement>(null);
 
   async function handleImageFile(file: File) {
     setImageUploading(true);
@@ -73,7 +170,12 @@ export function PopupConfigForm({ initial }: { initial: PopupConfig }) {
       reader.onerror = reject;
       reader.readAsDataURL(file);
     });
-    const result = await uploadPopupImage(base64, file.type, ext);
+    const result = await uploadPopupImage(
+      base64,
+      file.type,
+      ext,
+      uploadKeyRef.current,
+    );
     setImageUploading(false);
     if (!result.ok) return toast.error(result.error);
     setImageUrl(result.url);
@@ -81,53 +183,97 @@ export function PopupConfigForm({ initial }: { initial: PopupConfig }) {
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
+
+    if (!title.trim() && !body.trim()) {
+      return toast.error("Give the pop-up a title or some text to show.");
+    }
+
     setBusy(true);
-    const result = await savePopupConfig({
-      popup_enabled: enabled,
-      popup_start_at: dateTimeToIso(startDate, startTime),
-      popup_title: title || null,
-      popup_body: body || null,
-      popup_image_url: imageUrl || null,
+    const result = await savePopup({
+      id: popup?.id,
+      title: title || null,
+      body: body || null,
+      image_url: imageUrl || null,
+      weekday: weekday === "" ? null : Number(weekday),
+      starts_at: dateTimeToIso(startDate, startTime),
+      enabled,
+      sort_order: position - 1,
     });
     setBusy(false);
     if (!result.ok) return toast.error(result.error);
-    toast.success("Pop-up settings saved");
-    router.refresh();
+    toast.success("Pop-up saved");
+    onDone();
   }
 
+  async function onDelete() {
+    if (!popup) return onDone();
+    if (!confirm("Delete this pop-up? This cannot be undone.")) return;
+
+    setBusy(true);
+    const result = await deletePopup(popup.id);
+    setBusy(false);
+    if (!result.ok) return toast.error(result.error);
+    toast.success("Pop-up deleted");
+    onDone();
+  }
+
+  const dayLabel =
+    WEEKDAYS.find((d) => d.value === weekday)?.label ?? "Every day";
+
   return (
-    <Card className="max-w-2xl">
+    <Card>
       <CardHeader>
-        <CardTitle>Next-event pop-up</CardTitle>
-        <CardDescription>
-          Shown to attendees from the start time below. They can close it while
-          their access is active; after access ends it becomes the home screen.
-        </CardDescription>
+        <CardTitle className="flex items-center justify-between text-base">
+          <span>
+            {position}. {title.trim() || "Untitled pop-up"}
+          </span>
+          <span className="text-sm font-normal text-muted-foreground">
+            {enabled ? dayLabel : "Off"}
+          </span>
+        </CardTitle>
       </CardHeader>
       <CardContent>
         <form onSubmit={onSubmit} className="space-y-5">
           <div className="flex items-center gap-2">
             <input
-              id="enabled"
+              id={`enabled-${uploadKeyRef.current}`}
               type="checkbox"
               checked={enabled}
               onChange={(e) => setEnabled(e.target.checked)}
               className="h-4 w-4 accent-primary"
             />
-            <Label htmlFor="enabled">Enable pop-up</Label>
+            <Label htmlFor={`enabled-${uploadKeyRef.current}`}>
+              Enable pop-up
+            </Label>
           </div>
 
           <div className="space-y-2">
-            <Label>Show from</Label>
+            <Label htmlFor={`weekday-${uploadKeyRef.current}`}>Show on</Label>
+            <NativeSelect
+              id={`weekday-${uploadKeyRef.current}`}
+              value={weekday}
+              onChange={(e) => setWeekday(e.target.value)}
+            >
+              {WEEKDAYS.map((d) => (
+                <NativeOption key={d.value} value={d.value}>
+                  {d.label}
+                </NativeOption>
+              ))}
+            </NativeSelect>
+            <p className="text-xs text-muted-foreground">
+              Repeats weekly. The day is read in IST, so it matches the day
+              you would call it here regardless of where the user is.
+            </p>
+          </div>
+
+          <div className="space-y-2">
+            <Label>Not before</Label>
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1">
-                <Label htmlFor="startDate" className="text-xs text-muted-foreground">
-                  Date
-                </Label>
+                <Label className="text-xs text-muted-foreground">Date</Label>
                 <div className="relative">
                   <Input
                     ref={dateRef}
-                    id="startDate"
                     type="date"
                     value={startDate}
                     onChange={(e) => setStartDate(e.target.value)}
@@ -144,13 +290,10 @@ export function PopupConfigForm({ initial }: { initial: PopupConfig }) {
                 </div>
               </div>
               <div className="space-y-1">
-                <Label htmlFor="startTime" className="text-xs text-muted-foreground">
-                  Time
-                </Label>
+                <Label className="text-xs text-muted-foreground">Time</Label>
                 <div className="relative">
                   <Input
                     ref={timeRef}
-                    id="startTime"
                     type="time"
                     value={startTime}
                     onChange={(e) => setStartTime(e.target.value)}
@@ -168,15 +311,14 @@ export function PopupConfigForm({ initial }: { initial: PopupConfig }) {
               </div>
             </div>
             <p className="text-xs text-muted-foreground">
-              Leave the date blank to show immediately. Set this to day 6 of
-              the retreat.
+              Leave blank to start straight away. Use it to write a message
+              now that should only begin appearing later.
             </p>
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="title">Title</Label>
+            <Label>Title</Label>
             <Input
-              id="title"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
               placeholder="Our Next Retreat"
@@ -184,9 +326,8 @@ export function PopupConfigForm({ initial }: { initial: PopupConfig }) {
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="body">Details</Label>
+            <Label>Details</Label>
             <Textarea
-              id="body"
               rows={4}
               value={body}
               onChange={(e) => setBody(e.target.value)}
@@ -225,21 +366,40 @@ export function PopupConfigForm({ initial }: { initial: PopupConfig }) {
                 </button>
               </div>
             ) : null}
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              disabled={imageUploading}
-              onClick={() => imageInputRef.current?.click()}
-            >
-              <ImagePlus className="mr-2 h-4 w-4" />
-              {imageUploading ? "Uploading…" : imageUrl ? "Change image" : "Choose file"}
-            </Button>
+            <div>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                disabled={imageUploading}
+                onClick={() => imageInputRef.current?.click()}
+              >
+                <ImagePlus className="mr-2 h-4 w-4" />
+                {imageUploading
+                  ? "Uploading…"
+                  : imageUrl
+                    ? "Change image"
+                    : "Choose file"}
+              </Button>
+            </div>
           </div>
 
-          <Button type="submit" disabled={busy}>
-            {busy ? "Saving…" : "Save settings"}
-          </Button>
+          <div className="flex items-center gap-3">
+            <Button type="submit" disabled={busy}>
+              {busy ? "Saving…" : popup ? "Save changes" : "Create pop-up"}
+            </Button>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              disabled={busy}
+              onClick={onDelete}
+              className="text-destructive hover:text-destructive"
+            >
+              <Trash2 className="mr-2 h-4 w-4" />
+              {popup ? "Delete" : "Discard"}
+            </Button>
+          </div>
         </form>
       </CardContent>
     </Card>
