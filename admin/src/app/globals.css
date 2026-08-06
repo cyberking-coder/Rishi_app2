@@ -62,3 +62,27 @@
     @apply bg-background text-foreground;
   }
 }
+
+/* iOS Safari zooms the whole page whenever a form field with a font
+ * smaller than 16px is focused, and it does not zoom back out. On the
+ * checkout page that means somebody typing their phone number ends up
+ * looking at a page twice its intended size, mid-payment, with the
+ * submit button off screen.
+ *
+ * The usual "fix" — maximum-scale=1 on the viewport — is not used here.
+ * It stops the zoom by taking pinch-zoom away from everybody, including
+ * people who need it to read at all.
+ *
+ * Deliberately outside @layer base and marked important: it exists to
+ * beat Tailwind's text-sm utility on the shared Input, Textarea and
+ * NativeSelect components, and a rule that loses to the thing it is
+ * correcting is worse than no rule. Checkboxes and radios are excluded
+ * because their size comes from width/height, not font-size.
+ */
+@media (max-width: 640px) {
+  input:not([type="checkbox"]):not([type="radio"]),
+  select,
+  textarea {
+    font-size: 16px !important;
+  }
+}
