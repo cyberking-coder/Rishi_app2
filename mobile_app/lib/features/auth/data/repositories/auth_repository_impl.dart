@@ -61,7 +61,30 @@ class AuthRepositoryImpl implements AuthRepository {
   }
 
   @override
+  Future<AppUser> signInWithApple() async {
+    try {
+      final user = await _remote.signInWithAppleAndRegisterDevice();
+      return _toAppUser(user);
+    } on AuthFailure {
+      rethrow;
+    } catch (e) {
+      throw AuthFailure.unknown(e.toString());
+    }
+  }
+
+  @override
   Future<void> logout() => _remote.signOut();
+
+  @override
+  Future<void> deleteAccount() async {
+    try {
+      await _remote.deleteAccount();
+    } on AuthFailure {
+      rethrow;
+    } catch (e) {
+      throw AuthFailure.unknown(e.toString());
+    }
+  }
 
   @override
   Future<void> sendPasswordResetEmail({required String email}) async {

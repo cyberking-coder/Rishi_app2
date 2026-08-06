@@ -23,7 +23,18 @@ abstract class AuthRepository {
   /// via native Google Sign-In, then registers this device.
   Future<AppUser> signInWithGoogle();
 
+  /// The same, via Sign in with Apple. iOS only in practice — the button
+  /// that calls this is not shown elsewhere.
+  Future<AppUser> signInWithApple();
+
   Future<void> logout();
+
+  /// Permanently deletes the caller's own account.
+  ///
+  /// Identity and personal history go; purchase records survive with no
+  /// user attached, because they are financial records the business is
+  /// required to keep. Signs out on success.
+  Future<void> deleteAccount();
 
   Future<void> sendPasswordResetEmail({required String email});
 

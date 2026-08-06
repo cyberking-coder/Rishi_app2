@@ -49,6 +49,18 @@ class AuthController extends Notifier<AuthState> {
     }
   }
 
+  Future<void> signInWithApple() async {
+    state = const AuthLoading();
+    try {
+      final user = await ref.read(appleSignInUseCaseProvider).call();
+      state = AuthAuthenticated(user);
+    } on AuthFailure catch (failure) {
+      state = AuthFailureState(failure);
+    } catch (e) {
+      state = AuthFailureState(AuthFailure.unknown(e.toString()));
+    }
+  }
+
   Future<void> signInWithGoogle() async {
     state = const AuthLoading();
     try {

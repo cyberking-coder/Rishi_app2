@@ -7,6 +7,7 @@ import '../../../../app/widgets/botanical.dart';
 import '../../../../app/widgets/lotus_logo.dart';
 import '../../application/auth_providers.dart';
 import '../../application/auth_state.dart';
+import '../widgets/apple_sign_in_button.dart';
 import '../widgets/auth_scaffold.dart';
 import '../widgets/auth_text_field.dart';
 import '../widgets/auth_validators.dart';
@@ -174,6 +175,10 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
                   const AuthDivider(),
                   const SizedBox(height: 20),
                   GoogleSignInButton(enabled: !isLoading, outlined: true),
+                  if (AppleSignInButton.isSupported) ...[
+                    const SizedBox(height: 12),
+                    AppleSignInButton(enabled: !isLoading),
+                  ],
                   const SizedBox(height: 14),
                   Center(
                     child: TextButton(

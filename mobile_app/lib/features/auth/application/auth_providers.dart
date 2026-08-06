@@ -7,6 +7,8 @@ import '../data/repositories/auth_repository_impl.dart';
 import '../domain/entities/app_user.dart';
 import '../domain/repositories/auth_repository.dart';
 import '../domain/usecases/forgot_password_usecase.dart';
+import '../domain/usecases/apple_sign_in_usecase.dart';
+import '../domain/usecases/delete_account_usecase.dart';
 import '../domain/usecases/google_sign_in_usecase.dart';
 import '../domain/usecases/login_usecase.dart';
 import '../domain/usecases/logout_usecase.dart';
@@ -43,6 +45,14 @@ final signUpUseCaseProvider = Provider<SignUpUseCase>((ref) {
 
 final googleSignInUseCaseProvider = Provider<GoogleSignInUseCase>((ref) {
   return GoogleSignInUseCase(ref.watch(authRepositoryProvider));
+});
+
+final appleSignInUseCaseProvider = Provider<AppleSignInUseCase>((ref) {
+  return AppleSignInUseCase(ref.watch(authRepositoryProvider));
+});
+
+final deleteAccountUseCaseProvider = Provider<DeleteAccountUseCase>((ref) {
+  return DeleteAccountUseCase(ref.watch(authRepositoryProvider));
 });
 
 final authControllerProvider =

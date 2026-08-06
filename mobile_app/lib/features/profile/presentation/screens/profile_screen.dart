@@ -5,9 +5,11 @@ import 'package:go_router/go_router.dart';
 import '../../../../app/theme/app_theme.dart';
 import '../../../../app/widgets/botanical.dart';
 import '../../../../core/device/device_info_service.dart';
+import '../../../../core/errors/auth_failure.dart';
 import '../../../access/application/access_providers.dart';
 import '../../../access/domain/access_state.dart';
 import '../../../auth/application/auth_providers.dart';
+import '../../../downloads/application/download_providers.dart';
 import '../../../lms/application/lms_providers.dart';
 import '../../../lms/domain/entities/course_summary.dart';
 import '../../application/profile_providers.dart';
@@ -815,9 +817,115 @@ class _SettingsSheetState extends ConsumerState<_SettingsSheet> {
                       const TextStyle(color: _kSub, fontSize: 12, height: 1.6)),
             ),
           ],
+
+          const SizedBox(height: 20),
+          const Divider(color: AppTheme.border),
+          const SizedBox(height: 12),
+
+          // ── Delete account ──
+          // Required by App Store Guideline 5.1.1(v): an app that creates
+          // accounts must let somebody delete theirs from inside it.
+          // Directing them to an email address does not satisfy the rule,
+          // and it is the wrong answer for the person as well.
+          //
+          // Last in the sheet and behind a divider — findable, not
+          // adjacent to Logout, which somebody taps in a hurry.
+          _SheetTile(
+            icon: Icons.delete_forever_outlined,
+            iconColor: AppTheme.danger,
+            title: 'Delete my account',
+            onTap: _confirmDelete,
+          ),
         ],
       ),
     );
+  }
+
+  Future<void> _confirmDelete() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: _kSurface,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(AppTheme.radiusCard),
+        ),
+        title: const Text('Delete your account?',
+            style: TextStyle(
+                color: _kText, fontSize: 19, fontWeight: FontWeight.w700)),
+        content: const Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'This cannot be undone. Your account, your listening history '
+              'and your downloads will be deleted, and any access you have '
+              'paid for ends immediately.',
+              style: TextStyle(color: _kSub, fontSize: 14, height: 1.5),
+            ),
+            SizedBox(height: 12),
+            // Said plainly rather than buried in a policy page. Somebody
+            // deleting an account is entitled to know what does not go,
+            // and "we keep your payment records" is better heard now than
+            // discovered later.
+            Text(
+              'Records of payments are kept, without your name attached, '
+              'because the law requires it.',
+              style: TextStyle(color: _kSub, fontSize: 13, height: 1.5),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Keep my account',
+                style: TextStyle(
+                    color: _kAccent, fontWeight: FontWeight.w600)),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Delete',
+                style: TextStyle(
+                    color: AppTheme.danger, fontWeight: FontWeight.w700)),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true || !mounted) return;
+
+    // Captured before the awaits: the sheet's own context is disposed the
+    // moment it closes, and both of these outlive it.
+    final messenger = ScaffoldMessenger.of(context);
+    final router = GoRouter.of(context);
+
+    Navigator.pop(context);
+
+    try {
+      // Local copies of paid audio are encrypted against this account and
+      // are worthless once it is gone. Purged first so a failure here
+      // cannot leave files behind that nothing will ever clean up.
+      await ref.read(downloadRepositoryProvider).purgeAll();
+    } catch (_) {
+      // Not a reason to keep the account alive.
+    }
+
+    try {
+      await ref.read(deleteAccountUseCaseProvider).call();
+      router.go('/login');
+      messenger.showSnackBar(
+        const SnackBar(content: Text('Your account has been deleted.')),
+      );
+    } catch (e) {
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text(
+            e is AuthFailure
+                ? e.message
+                : 'Could not delete your account. Please try again.',
+          ),
+        ),
+      );
+    }
   }
 }
 

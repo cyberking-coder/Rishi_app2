@@ -507,6 +507,26 @@ The currency default *was* changed: `subscription_plans.currency` defaulted to `
 
 **A 100%-off code is refused on the membership.** Access windows are opened by `razorpay-webhook` when a payment lands; a free order produces no payment, so there would be nothing to open one from. Implementing it would put "how long does access last" in two places. Courses keep their free path — that grant is a row insert, not a window calculation.
 
+### App Store compliance: account deletion and Sign in with Apple
+
+**Migration**: `20260801000018_account_deletion.sql`. **Function**: `delete-account`. **Guidelines**: 5.1.1(v) and 4.8.
+
+**Account deletion (5.1.1(v))** — an app that creates accounts must let somebody delete theirs from inside it. Pointing them at an email address does not satisfy the rule. Settings → Delete my account, behind a confirmation that says plainly what goes and what stays.
+
+**The obstacle was the cascade, not the deletion.** `profiles.id` references `auth.users` ON DELETE CASCADE and every table hangs off `profiles` the same way — so deleting one auth user silently destroyed their course purchases, workshop registrations and subscription records. Those are financial records Indian tax law expects to be retainable for years, and Apple's own rule explicitly permits keeping data required for legitimate legal purposes. The three money tables now use ON DELETE SET NULL with a nullable `user_id`: the row survives, pointing at nobody, with the billing name and amount already on it keeping the record meaningful. Everything genuinely personal still cascades.
+
+Two details that follow: the partial unique indexes are unaffected because Postgres treats NULLs as distinct, and every RLS policy compares `user_id` to `auth.uid()`, which a null never equals — so an orphaned row is invisible to members and visible to staff, which is right for a record kept only for the books.
+
+`account_deletions` logs that a deletion happened and whether the person had ever paid. It deliberately holds no id, name or email: a deletion log that identifies the deleted defeats its own purpose.
+
+The function refuses staff accounts — an admin deleting themselves through the app would lock the dashboard out with no way back — and identifies the caller from their own JWT, never from an id in the body.
+
+**Sign in with Apple (4.8)** — required because the app offers Google Sign-In. iOS only; on Android it would be a button with nothing behind it. The nonce is the part that goes wrong: Apple signs a SHA-256 hash of it into the identity token and Supabase re-hashes the raw value to compare, so sending the hash to Supabase or the raw value to Apple fails with a message that does not say which way round is wrong.
+
+**Apple sends the user's name exactly once**, on the first authorisation, and never again — not on a later sign-in, not after a reinstall. It is captured at that moment into a blank `display_name`, or the app greets that person by email address forever.
+
+Three things outside the code, all of which fail at runtime rather than at build: the Xcode target must reference `Runner.entitlements` (add the capability in Xcode, not by hand-editing `project.pbxproj`), the App ID needs the capability enabled in the developer portal, and Supabase's Apple provider needs its Services ID, Team ID, Key ID and .p8 key.
+
 ### Bug-fix chronology — Phases 3b through 5
 
 Every one of these was found by testing on a real device, not by review.
