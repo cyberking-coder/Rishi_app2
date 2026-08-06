@@ -7,6 +7,8 @@ export interface CouponRow {
   discount_type: "percent" | "flat";
   discount_value: number;
   course_id: string | null;
+  plan_id: string | null;
+  applies_to: "course" | "subscription" | "any";
   max_redemptions: number | null;
   times_redeemed: number;
   starts_at: string | null;
@@ -22,9 +24,20 @@ export interface PricedCoupon {
   finalAmount: number;
 }
 
+/** What a coupon is being applied to. Both ids are the thing's own id;
+ *  `kind` is what decides which of the coupon's scopes has to match. */
+export type CouponTarget =
+  | { kind: "course"; id: string }
+  | { kind: "subscription"; id: string };
+
 /**
- * Validates a coupon against a course and price, returning what it's
- * worth — or a reason it doesn't apply.
+ * Validates a coupon against what is being bought and its price,
+ * returning what the code is worth — or a reason it doesn't apply.
+ *
+ * `priceAmount` is always PAISE, whatever the thing is. Courses and
+ * sessions store paise already; subscription_plans stores rupees, so its
+ * caller converts before getting here. Mixing the two units in this
+ * function is how a ₹100-off code takes ₹1 off a membership.
  *
  * This only *checks* eligibility; it never marks the code as used. The
  * redemption counter is bumped atomically by the redeem_coupon()
@@ -33,7 +46,7 @@ export interface PricedCoupon {
  */
 export function priceWithCoupon(
   coupon: CouponRow | null,
-  courseId: string,
+  target: CouponTarget,
   priceAmount: number,
 ): { ok: true; result: PricedCoupon } | { ok: false; error: string } {
   if (!coupon) return { ok: false, error: "That code isn't valid." };
@@ -52,8 +65,24 @@ export function priceWithCoupon(
   ) {
     return { ok: false, error: "That code has been fully redeemed." };
   }
-  if (coupon.course_id !== null && coupon.course_id !== courseId) {
-    return { ok: false, error: "That code doesn't apply to this course." };
+  // Scope first, then the specific item. Checked in that order so the
+  // message names the real problem: a course code entered against the
+  // membership should say so, not "doesn't apply to this course".
+  if (coupon.applies_to !== "any" && coupon.applies_to !== target.kind) {
+    return {
+      ok: false,
+      error: target.kind === "subscription"
+        ? "That code is for courses, not the membership."
+        : "That code is for the membership, not for courses.",
+    };
+  }
+
+  if (target.kind === "course") {
+    if (coupon.course_id !== null && coupon.course_id !== target.id) {
+      return { ok: false, error: "That code doesn't apply to this course." };
+    }
+  } else if (coupon.plan_id !== null && coupon.plan_id !== target.id) {
+    return { ok: false, error: "That code doesn't apply to this plan." };
   }
 
   const raw =

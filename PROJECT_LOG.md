@@ -493,6 +493,20 @@ The sender looks the price up per reminder rather than carrying it on the claim,
 
 The Sheets tab (`Workshops`) is the attendee list — filter `Event = Registered`. Two Wati templates: `workshop_registration_success` (name, session, amount) and `workshop_payment_failed` (name, session, reason). The failure message must say plainly that no seat was held, or somebody turns up on the day.
 
+### Membership plans and subscription coupons
+
+**Migration**: `20260801000017_subscription_coupons.sql`. **Admin**: Membership (new), Coupons (extended).
+
+A **Membership** page lists the plans, creates new ones, and edits price, billing interval and whether a plan is on sale. Retiring a plan deactivates it and never deletes: `subscriptions.plan_id` is a plain foreign key with no cascade, and a price somebody paid has to stay readable on their record after it stops being sold. The page warns when no plan is active (the app cannot open checkout at all) and when more than one is (the app takes the first it finds).
+
+**`subscription_plans.price` is RUPEES**, `numeric(10,2)` — the only price in this system that is not integer paise. That is old and the checkout already reads it correctly, so it stays; the migration does not convert live pricing data underneath a running checkout. Every boundary converts instead: the admin form takes rupees, and the coupon path multiplies to paise before any discount arithmetic and divides back at the gateway call. **Mixing the two units is how a ₹100-off code takes ₹1 off a membership**, which is why `priceWithCoupon` documents its parameter as paise and why the subscription branch is the only caller that multiplies.
+
+The currency default *was* changed: `subscription_plans.currency` defaulted to `'USD'` on a table whose every row is priced in rupees. A plan created from the new admin page would have inherited it and the checkout would have asked Razorpay for dollars.
+
+**Coupons gained a scope** — `applies_to` is `course`, `subscription` or `any`, with `plan_id` alongside `course_id`. Existing rows default to `course`, which is exactly what they already meant, so nothing that works today changes. Two CHECK constraints keep the row coherent: only one target id may be set, and it has to match the declared scope. Without them the pricing code would pick one and silently ignore the other, which is the kind of rule nobody discovers until somebody is charged the wrong amount.
+
+**A 100%-off code is refused on the membership.** Access windows are opened by `razorpay-webhook` when a payment lands; a free order produces no payment, so there would be nothing to open one from. Implementing it would put "how long does access last" in two places. Courses keep their free path — that grant is a row insert, not a window calculation.
+
 ### Bug-fix chronology — Phases 3b through 5
 
 Every one of these was found by testing on a real device, not by review.

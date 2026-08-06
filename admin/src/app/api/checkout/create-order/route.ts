@@ -3,7 +3,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { verifyCheckoutToken } from "@/lib/checkout-token";
 import { createRazorpayOrder } from "@/lib/razorpay";
 import { env } from "@/lib/env";
-import { priceWithCoupon } from "@/lib/coupons";
+import { priceWithCoupon, type CouponRow } from "@/lib/coupons";
 import { notifyN8n } from "@/lib/n8n";
 
 // Public route - protected by the checkout token, not Supabase auth (the
@@ -102,11 +102,69 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Plan not found" }, { status: 404 });
   }
 
+  // subscription_plans.price is RUPEES, unlike every other price in this
+  // system. Converted to paise here so the coupon maths — which is all
+  // in paise — cannot be applied to the wrong unit, and converted back
+  // at the gateway call.
+  let planPaise = Math.round(Number(plan.price) * 100);
+  const couponCode = (body.coupon ?? "").trim().toUpperCase() || null;
+
+  if (couponCode) {
+    const { data: couponRow } = await db
+      .from("coupons")
+      .select(
+        "id, code, discount_type, discount_value, course_id, plan_id, " +
+          "applies_to, max_redemptions, times_redeemed, starts_at, " +
+          "expires_at, is_active",
+      )
+      .eq("code", couponCode)
+      .maybeSingle<CouponRow>();
+
+    const priced = priceWithCoupon(
+      couponRow ?? null,
+      { kind: "subscription", id: plan.id },
+      planPaise,
+    );
+    if (!priced.ok) {
+      return NextResponse.json({ error: priced.error }, { status: 400 });
+    }
+
+    // A membership is granted by razorpay-webhook when a payment lands.
+    // A 100%-off code produces no payment, so there would be nothing to
+    // grant it from — and duplicating the window-extension logic here to
+    // cover one case would put "how long does access last" in two places.
+    // Refused rather than half-implemented.
+    if (priced.result.finalAmount === 0) {
+      return NextResponse.json(
+        {
+          error:
+            "A 100% code cannot be used on the membership. Grant the " +
+            "access window from the admin instead.",
+        },
+        { status: 400 },
+      );
+    }
+
+    // Claim the redemption before charging, exactly as the course path
+    // does: if two buyers race for the last one, only the winner gets it.
+    const { data: claimed } = await db.rpc("redeem_coupon", {
+      p_coupon_id: priced.result.coupon.id,
+    });
+    if (claimed !== true) {
+      return NextResponse.json(
+        { error: "That code has just been fully redeemed." },
+        { status: 409 },
+      );
+    }
+
+    planPaise = priced.result.finalAmount;
+  }
+
   try {
     // These notes are what razorpay-webhook reads back (by fetching the
     // order) to know who paid and how to reach them.
     const order = await createRazorpayOrder({
-      amountRupees: plan.price,
+      amountRupees: planPaise / 100,
       currency: plan.currency,
       notes: {
         user_id: payload.uid,
@@ -358,12 +416,18 @@ async function createCourseOrder(
     const { data: couponRow } = await db
       .from("coupons")
       .select(
-        "id, code, discount_type, discount_value, course_id, max_redemptions, times_redeemed, starts_at, expires_at, is_active",
+        "id, code, discount_type, discount_value, course_id, plan_id, " +
+          "applies_to, max_redemptions, times_redeemed, starts_at, " +
+          "expires_at, is_active",
       )
       .eq("code", couponCode)
       .maybeSingle();
 
-    const priced = priceWithCoupon(couponRow ?? null, course.id, course.price_amount);
+    const priced = priceWithCoupon(
+      couponRow ?? null,
+      { kind: "course", id: course.id },
+      course.price_amount,
+    );
     if (!priced.ok) {
       return NextResponse.json({ error: priced.error }, { status: 400 });
     }

@@ -36,7 +36,8 @@ function inactiveReason(c: Coupon): string | null {
 export default async function CouponsPage() {
   const supabase = createClient();
 
-  const [{ data: coupons }, { data: courses }] = await Promise.all([
+  const [{ data: coupons }, { data: courses }, { data: plans }] =
+    await Promise.all([
     supabase
       .from("coupons")
       .select("*")
@@ -47,18 +48,39 @@ export default async function CouponsPage() {
       .select("id, title")
       .order("title", { ascending: true })
       .returns<Pick<Course, "id" | "title">[]>(),
+    supabase
+      .from("subscription_plans")
+      .select("id, name")
+      .order("name", { ascending: true })
+      .returns<{ id: string; name: string }[]>(),
   ]);
 
   const courseTitleById = new Map(
     (courses ?? []).map((c) => [c.id, c.title]),
   );
+  const planNameById = new Map((plans ?? []).map((p) => [p.id, p.name]));
+
+  /// What a code can be spent on, in one phrase.
+  function scopeLabel(c: Coupon): string {
+    if (c.applies_to === "any") return "Everything";
+    if (c.applies_to === "subscription") {
+      return c.plan_id
+        ? (planNameById.get(c.plan_id) ?? "One plan")
+        : "Membership";
+    }
+    return c.course_id
+      ? (courseTitleById.get(c.course_id) ?? "One course")
+      : "All courses";
+  }
 
   return (
     <div>
       <PageHeader
         title="Coupons"
-        description="Discount codes buyers can enter at course checkout."
-        action={<CreateCouponDialog courses={courses ?? []} />}
+        description="Discount codes buyers can enter at checkout, for courses or for the membership."
+        action={
+          <CreateCouponDialog courses={courses ?? []} plans={plans ?? []} />
+        }
       />
 
       <Card>
@@ -95,9 +117,7 @@ export default async function CouponsPage() {
                       </TableCell>
                       <TableCell>{discountLabel(c)}</TableCell>
                       <TableCell className="text-muted-foreground">
-                        {c.course_id
-                          ? (courseTitleById.get(c.course_id) ?? "Deleted course")
-                          : "All courses"}
+                        {scopeLabel(c)}
                       </TableCell>
                       <TableCell>
                         {c.times_redeemed}

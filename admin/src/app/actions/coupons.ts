@@ -11,8 +11,13 @@ export interface CreateCouponInput {
   discountType: "percent" | "flat";
   /** Percent: 1-100. Flat: rupees (converted to paise here). */
   discountValue: number;
-  /** Omit to make the coupon valid on every course. */
+  /** What the code is for. 'course' with no courseId means every course;
+   *  'subscription' with no planId means every plan; 'any' means both. */
+  appliesTo?: "course" | "subscription" | "any";
+  /** Only with appliesTo 'course'. Omit for every course. */
   courseId?: string;
+  /** Only with appliesTo 'subscription'. Omit for every plan. */
+  planId?: string;
   maxRedemptions?: number | null;
   expiresAt?: string | null;
 }
@@ -51,7 +56,13 @@ export async function createCoupon(
       input.discountType === "percent"
         ? input.discountValue
         : Math.round(input.discountValue * 100),
-    course_id: input.courseId || null,
+    applies_to: input.appliesTo ?? "course",
+    // The database refuses a target that contradicts the scope, so these
+    // are cleared rather than trusted: a form that once had a course
+    // selected and was then switched to the membership must not carry
+    // the stale id through.
+    course_id: input.appliesTo === "course" ? input.courseId || null : null,
+    plan_id: input.appliesTo === "subscription" ? input.planId || null : null,
     max_redemptions: input.maxRedemptions ?? null,
     expires_at: input.expiresAt || null,
     created_by: admin.id,

@@ -265,7 +265,7 @@ export default async function CheckoutPage({
             defaultEmail={defaultEmail}
             priceAmount={priceAmount}
             priceLabel={priceLabel}
-            allowCoupon={payload.kind === "course"}
+            allowCoupon={payload.kind === "course" || payload.kind === "subscription"}
             returnUrl={returnUrl}
           />
         </CardContent>

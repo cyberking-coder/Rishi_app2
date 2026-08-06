@@ -192,7 +192,11 @@ export interface Coupon {
   discount_type: "percent" | "flat";
   /** Percent: 1-100. Flat: minor units (paise). */
   discount_value: number;
+  /** What the code may be spent on. 'course' with a null course_id means
+   *  every course; 'subscription' with a null plan_id means every plan. */
+  applies_to: "course" | "subscription" | "any";
   course_id: string | null;
+  plan_id: string | null;
   max_redemptions: number | null;
   times_redeemed: number;
   starts_at: string | null;

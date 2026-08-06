@@ -17,11 +17,14 @@ import { Label } from "@/components/ui/label";
 import { NativeOption, NativeSelect } from "@/components/ui/native-select";
 import { createCoupon } from "@/app/actions/coupons";
 import type { Course } from "@/lib/types";
+import type { SubscriptionPlan } from "@/app/actions/plans";
 
 export function CreateCouponDialog({
   courses,
+  plans,
 }: {
   courses: Pick<Course, "id" | "title">[];
+  plans: Pick<SubscriptionPlan, "id" | "name">[];
 }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
@@ -30,7 +33,11 @@ export function CreateCouponDialog({
   const [code, setCode] = useState("");
   const [discountType, setDiscountType] = useState<"percent" | "flat">("percent");
   const [discountValue, setDiscountValue] = useState("10");
+  const [appliesTo, setAppliesTo] = useState<"course" | "subscription" | "any">(
+    "course",
+  );
   const [courseId, setCourseId] = useState("");
+  const [planId, setPlanId] = useState("");
   const [maxRedemptions, setMaxRedemptions] = useState("");
   const [expiresAt, setExpiresAt] = useState("");
 
@@ -38,7 +45,9 @@ export function CreateCouponDialog({
     setCode("");
     setDiscountType("percent");
     setDiscountValue("10");
+    setAppliesTo("course");
     setCourseId("");
+    setPlanId("");
     setMaxRedemptions("");
     setExpiresAt("");
   }
@@ -51,7 +60,9 @@ export function CreateCouponDialog({
         code,
         discountType,
         discountValue: Number(discountValue),
+        appliesTo,
         courseId: courseId || undefined,
+        planId: planId || undefined,
         maxRedemptions: maxRedemptions.trim() ? Number(maxRedemptions) : null,
         // A date input gives a local calendar day; treat it as end-of-day
         // so a coupon "expiring on the 5th" is usable all of the 5th.
@@ -134,22 +145,73 @@ export function CreateCouponDialog({
             </div>
           </div>
 
-          <div>
-            <Label htmlFor="cp-course">Applies to</Label>
-            <NativeSelect
-              id="cp-course"
-              value={courseId}
-              onChange={(e) => setCourseId(e.target.value)}
-              disabled={busy}
-            >
-              <NativeOption value="">All courses</NativeOption>
-              {courses.map((c) => (
-                <NativeOption key={c.id} value={c.id}>
-                  {c.title}
-                </NativeOption>
-              ))}
-            </NativeSelect>
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <Label htmlFor="cp-scope">Applies to</Label>
+              <NativeSelect
+                id="cp-scope"
+                value={appliesTo}
+                onChange={(e) => {
+                  const next = e.target.value as typeof appliesTo;
+                  setAppliesTo(next);
+                  // Clear the other side's target. A code switched from a
+                  // course to the membership must not keep pointing at a
+                  // course — the database rejects that pairing outright.
+                  if (next !== "course") setCourseId("");
+                  if (next !== "subscription") setPlanId("");
+                }}
+                disabled={busy}
+              >
+                <NativeOption value="course">Courses</NativeOption>
+                <NativeOption value="subscription">Membership</NativeOption>
+                <NativeOption value="any">Both</NativeOption>
+              </NativeSelect>
+            </div>
+
+            <div>
+              <Label htmlFor="cp-target">Limit to</Label>
+              {appliesTo === "course" ? (
+                <NativeSelect
+                  id="cp-target"
+                  value={courseId}
+                  onChange={(e) => setCourseId(e.target.value)}
+                  disabled={busy}
+                >
+                  <NativeOption value="">All courses</NativeOption>
+                  {courses.map((c) => (
+                    <NativeOption key={c.id} value={c.id}>
+                      {c.title}
+                    </NativeOption>
+                  ))}
+                </NativeSelect>
+              ) : appliesTo === "subscription" ? (
+                <NativeSelect
+                  id="cp-target"
+                  value={planId}
+                  onChange={(e) => setPlanId(e.target.value)}
+                  disabled={busy}
+                >
+                  <NativeOption value="">All plans</NativeOption>
+                  {plans.map((p) => (
+                    <NativeOption key={p.id} value={p.id}>
+                      {p.name}
+                    </NativeOption>
+                  ))}
+                </NativeSelect>
+              ) : (
+                <NativeSelect id="cp-target" value="" disabled>
+                  <NativeOption value="">Everything</NativeOption>
+                </NativeSelect>
+              )}
+            </div>
           </div>
+
+          <p className="text-xs text-muted-foreground">
+            A 100% code works on a course, which is granted on the spot.
+            It is refused on the membership — access windows are opened by
+            the payment webhook, and there is no payment to open one
+            from. Grant those from the Users page instead.
+          </p>
 
           <div className="grid grid-cols-2 gap-4">
             <div>
