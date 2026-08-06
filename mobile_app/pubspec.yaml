@@ -14,7 +14,12 @@ publish_to: "none"
 # internal testing. +11 was never successfully built (see the pubspec
 # restore in the bug chronology), so nothing was uploaded under it —
 # but a skipped number costs nothing and a reused one is rejected.
-version: 2.1.0+12
+#
+# +13 is +12 rebuilt against an iOS deployment target of 15.0. App Store
+# Connect refused +12 outright at 13.0 — the build number has to move
+# even though not a line of Dart changed, because Apple has already seen
+# that number.
+version: 2.1.0+13
 
 environment:
   sdk: ">=3.3.0 <4.0.0"
