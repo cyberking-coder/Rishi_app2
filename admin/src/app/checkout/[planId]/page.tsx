@@ -214,7 +214,7 @@ export default async function CheckoutPage({
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-background p-4 py-8">
+    <div className="flex min-h-screen flex-col items-center justify-center bg-background p-4 py-8">
       <Card className="w-full max-w-md overflow-hidden">
         {coverUrl && (
           // eslint-disable-next-line @next/next/no-img-element
@@ -281,7 +281,7 @@ function formatPrice(price: number, currency: string): string {
 
 function ErrorCard({ message }: { message: string }) {
   return (
-    <div className="flex min-h-screen items-center justify-center bg-background p-4 py-8">
+    <div className="flex min-h-screen flex-col items-center justify-center bg-background p-4 py-8">
       <Card className="w-full max-w-md">
         <CardHeader>
           <CardTitle>Checkout unavailable</CardTitle>
@@ -290,6 +290,24 @@ function ErrorCard({ message }: { message: string }) {
           <p className="text-sm text-muted-foreground">{message}</p>
         </CardContent>
       </Card>
+      <LegalLinks />
     </div>
+  );
+}
+
+/// Policy links, under the payment card.
+///
+/// Here rather than only in a site footer for two reasons: Razorpay's
+/// website review looks for them on the page that takes the money, and a
+/// buyer deciding whether to pay should be able to read the refund terms
+/// without hunting for them.
+function LegalLinks() {
+  return (
+    <nav className="mt-4 flex flex-wrap justify-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
+      <a href="/terms" className="hover:text-foreground">Terms</a>
+      <a href="/privacy" className="hover:text-foreground">Privacy</a>
+      <a href="/refunds" className="hover:text-foreground">Refunds</a>
+      <a href="/contact" className="hover:text-foreground">Contact</a>
+    </nav>
   );
 }
