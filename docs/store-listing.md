@@ -138,6 +138,26 @@ meditation,mindfulness,calm,sleep,relax,spiritual,anxiety,breathe,guided,peace,h
 • Fixes to playback, downloads and notifications.
 ```
 
+### What's New — 2.1.1 (build 14), the downloads fix
+```
+This update fixes a bug that deleted downloaded audio.
+
+• Downloads no longer disappear. Saving an audio and then returning to the
+  home screen could remove everything you had downloaded. Your downloads now
+  stay on your device until you delete them yourself.
+• The short freeze on the home screen was the same fault, and is gone with it.
+• The download button on the player is now clearly visible. It was being drawn
+  in a dark colour against the dark player background and was easy to miss.
+• The membership page opens reliably, and now says what went wrong on the rare
+  occasion it cannot.
+
+If your downloads vanished before this update, they will need downloading
+again — the files were removed from the device and cannot be recovered.
+```
+> The last line is not padding. Anyone who lost downloads will reopen the app
+> expecting them back; saying so here is cheaper than the support mail that
+> follows if we do not.
+
 ### App Review Information → Notes
 ```
 DEMO ACCOUNT
@@ -195,6 +215,19 @@ Know Thyself
 ```
 Guided meditation, courses and a companion to ask. Find peace within.
 ```
+
+### Release notes — 2.1.1 (build 14) (500 max — this is 424)
+```
+Fixes in this update:
+
+• Downloads no longer disappear. Saving an audio and returning to the home screen could wipe everything you had downloaded. Your downloads now stay until you remove them.
+• The brief freeze on the home screen, caused by the same fault, is gone.
+• The download button on the player is now clearly visible — it was being drawn in a dark colour on a dark background.
+• The membership page opens reliably.
+```
+> Play caps release notes at 500 characters per language, and silently
+> truncates rather than warning. This is the shortened wording; the App
+> Store version above has room to say more.
 
 ### Full description (4000 max)
 Use the App Store description above verbatim; it is within Play's limit and
