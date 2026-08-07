@@ -22,9 +22,13 @@ class CheckoutRemoteDataSource {
         // can now create several, and without an order Postgres is free to
         // return a different one on each call — the app would silently
         // charge whichever row the planner happened to reach first.
-        // Oldest active plan wins, which is stable across calls.
+        //
+        // Cheapest active plan wins. That is not an arbitrary tie-break:
+        // the admin's New plan dialog tells whoever is creating one that
+        // "the cheapest active one is what the app shows", so any other
+        // rule here would quietly make the admin UI lie.
         .eq('is_active', true)
-        .order('created_at', ascending: true)
+        .order('price', ascending: true)
         .limit(1)
         .maybeSingle();
 
