@@ -50,8 +50,23 @@ class AccessState {
   /// True while the user may still see and play content.
   bool get hasAccess => tier != UserTier.free;
 
-  /// True once access has lapsed — home hides audio, downloads are purged.
+  /// True for anyone outside a retreat window — including someone who
+  /// never had one. Use this to gate premium content, never to destroy
+  /// anything: it is true for every ordinary self-signup account.
   bool get isExpired => !hasAccess;
+
+  /// True only for an account that *had* a window and has now run past
+  /// the end of it.
+  ///
+  /// [isExpired] cannot be used for this. It is also true for a user who
+  /// was never granted a window at all, which is nearly everybody, and
+  /// wiring the download purge to it deleted the downloads of every free
+  /// user the moment they returned to the home screen.
+  ///
+  /// A null [expiresAt] is never lapsed: it means either no window was
+  /// ever granted, or one was granted with no end date.
+  bool get hasLapsed =>
+      expiresAt != null && !expiresAt!.isAfter(DateTime.now());
 
   /// Whole days left in the access window (0 once expired). Null == no limit.
   int? get daysLeft {

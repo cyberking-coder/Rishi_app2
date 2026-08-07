@@ -66,7 +66,12 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
   }
 
   void _onAccess(AccessState access) {
-    if (access.isExpired && !_purged) {
+    // Only for an account whose retreat window has actually run out —
+    // NOT for anyone merely outside one. `isExpired` is true for every
+    // ordinary free account, so purging on it deleted the downloads of
+    // every free user as soon as they came back to this screen, which is
+    // the whole of the "my downloads vanish" report.
+    if (access.hasLapsed && !_purged) {
       _purged = true;
       ref.read(downloadRepositoryProvider).purgeAll();
       return;

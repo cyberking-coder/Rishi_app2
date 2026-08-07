@@ -214,9 +214,28 @@ class DownloadRepositoryImpl implements DownloadRepository {
 
   @override
   Future<void> purgeAll() async {
+    // Not a loop over delete(). That rewrites the entire manifest and
+    // pushes a new list to every listener once per download, so clearing
+    // n items cost n full JSON serialisations and n widget rebuilds —
+    // enough to visibly stall the frame on the screen that triggers it.
+    // The state is dropped in memory first, then written once.
     final ids = _tasks.values.map((t) => t.id).toList();
+    if (ids.isEmpty) return;
+
     for (final id in ids) {
-      await delete(id);
+      _controls[id]?.cancelRequested = true;
+      _proxy.unregister(id);
+      _tasks.remove(id);
+      _ivs.remove(id);
+    }
+    await _persist();
+    _emit();
+
+    // Files last, and off the path the UI is waiting on. The manifest is
+    // already empty, so an app killed midway through this cannot come
+    // back showing downloads whose bytes are gone.
+    for (final id in ids) {
+      await _storage.purge(id);
     }
   }
 
