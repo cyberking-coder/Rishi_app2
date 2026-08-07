@@ -1,4 +1,4 @@
-# Store listing copy — Know Thyself 2.1.0
+# Store listing copy — Know Thyself 2.1.1
 
 Everything the two stores ask for, in the order they ask for it. Replaces
 the 1.x `play-store-listing.md`, which still described a dark-violet
@@ -10,7 +10,7 @@ marked, so an edit does not silently overflow and get truncated mid-word.
 
 - **iOS bundle ID:** `com.anuragrishi.knowthyself`
 - **Android package:** `com.knowthyself.app`
-- **Version:** 2.1.0 (build 13)
+- **Version:** 2.1.1 (build 14)
 
 ---
 
@@ -128,35 +128,38 @@ meditation,mindfulness,calm,sleep,relax,spiritual,anxiety,breathe,guided,peace,h
 > and "stillness" are absent.
 
 ### What's New in This Version (4000 max)
+
+Features **and** fixes together, deliberately. Build 13 was pulled from
+review before it rolled out, so nobody ever received 2.1.0 — for everyone
+installing 2.1.1 this is the release that brings the guide, the redesign and
+Sign in with Apple. Fix-only notes would describe a version they never had.
+
 ```
-• Ask the guide — a companion that knows the library and your progress. Type or
-  tap the microphone and speak, in English, Hindi or Marathi.
+• Ask the guide — a companion that knows the whole library and where you are
+  in it. Ask how to sit with a restless mind or what to play tonight, in
+  English, Hindi or Marathi. Type it, or tap the microphone and just talk.
 • A completely new look: softer, quieter, easier to read.
 • Live sessions you can register for and join from inside the app.
 • Sign in with Apple.
-• Delete your account and all your data from Profile → Settings, at any time.
-• Fixes to playback, downloads and notifications.
-```
+• Delete your account and everything in it from Profile → Settings, at any
+  time, in two taps.
 
-### What's New — 2.1.1 (build 14), the downloads fix
-```
-This update fixes a bug that deleted downloaded audio.
+Also in this update:
 
-• Downloads no longer disappear. Saving an audio and then returning to the
-  home screen could remove everything you had downloaded. Your downloads now
-  stay on your device until you delete them yourself.
+• Fixed downloaded audio disappearing. Saving something and then returning to
+  the home screen could remove everything you had downloaded. Your downloads
+  now stay on your device until you delete them yourself. If any vanished
+  before this update they will need downloading again — the files were removed
+  and cannot be recovered.
 • The short freeze on the home screen was the same fault, and is gone with it.
 • The download button on the player is now clearly visible. It was being drawn
   in a dark colour against the dark player background and was easy to miss.
 • The membership page opens reliably, and now says what went wrong on the rare
   occasion it cannot.
-
-If your downloads vanished before this update, they will need downloading
-again — the files were removed from the device and cannot be recovered.
 ```
-> The last line is not padding. Anyone who lost downloads will reopen the app
-> expecting them back; saying so here is cheaper than the support mail that
-> follows if we do not.
+> The line about downloads being unrecoverable is not padding. Anyone who lost
+> them will reopen the app expecting them back; saying so here is cheaper than
+> the support mail that follows if we do not.
 
 ### App Review Information → Notes
 ```
@@ -216,18 +219,19 @@ Know Thyself
 Guided meditation, courses and a companion to ask. Find peace within.
 ```
 
-### Release notes — 2.1.1 (build 14) (500 max — this is 424)
+### Release notes — 2.1.1 (build 14) (500 max — this is 479)
 ```
-Fixes in this update:
-
-• Downloads no longer disappear. Saving an audio and returning to the home screen could wipe everything you had downloaded. Your downloads now stay until you remove them.
-• The brief freeze on the home screen, caused by the same fault, is gone.
-• The download button on the player is now clearly visible — it was being drawn in a dark colour on a dark background.
-• The membership page opens reliably.
+• Ask the guide — a companion that knows the whole library and your progress. Type, or tap the microphone and speak, in English, Hindi or Marathi.
+• A softer, calmer new look throughout.
+• Live sessions you can register for and join from inside the app.
+• Delete your account and all your data from Profile → Settings.
+• Fixed downloads disappearing after a return to the home screen, and the brief freeze that came with it.
+• The player's download button is now clearly visible.
 ```
-> Play caps release notes at 500 characters per language, and silently
-> truncates rather than warning. This is the shortened wording; the App
-> Store version above has room to say more.
+> Play caps release notes at 500 characters per language and truncates
+> silently rather than warning, so this is a compressed version of the App
+> Store text — same order, features before fixes. Sign in with Apple is the
+> line that had to go: it is the least relevant of them on Android.
 
 ### Full description (4000 max)
 Use the App Store description above verbatim; it is within Play's limit and

@@ -19,7 +19,13 @@ publish_to: "none"
 # Connect refused +12 outright at 13.0 — the build number has to move
 # even though not a line of Dart changed, because Apple has already seen
 # that number.
-version: 2.1.0+13
+#
+# 2.1.1+14 pulls +13 out of review at both stores rather than waiting it
+# out. +13 shipped a home screen that deleted every free user's
+# downloads the moment they navigated back to it — data loss on the
+# majority of accounts, which is worth forfeiting the review time
+# already spent rather than letting it reach anyone else.
+version: 2.1.1+14
 
 environment:
   sdk: ">=3.3.0 <4.0.0"
