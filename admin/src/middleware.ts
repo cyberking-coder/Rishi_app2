@@ -49,8 +49,23 @@ export async function middleware(request: NextRequest) {
   // is that someone who was shown a certificate, and who has no account
   // here at all, can confirm it.
   const isPublicVerifyRoute = request.nextUrl.pathname.startsWith("/verify");
+  // The policy pages. Public by obligation, not by preference: Google
+  // Play, the App Store and Razorpay all fetch these anonymously to
+  // check them, and so does anybody deciding whether to pay.
+  //
+  // Leaving them behind the session redirect is exactly how the Play
+  // submission was rejected for an "invalid privacy policy" — the
+  // reviewer opened /privacy and was shown the admin login screen.
+  const isPublicPolicyRoute = ["/terms", "/privacy", "/refunds", "/contact"]
+    .some((route) => request.nextUrl.pathname.startsWith(route));
 
-  if (!user && !isLoginRoute && !isPublicCheckoutRoute && !isPublicVerifyRoute) {
+  if (
+    !user &&
+    !isLoginRoute &&
+    !isPublicCheckoutRoute &&
+    !isPublicVerifyRoute &&
+    !isPublicPolicyRoute
+  ) {
     const url = request.nextUrl.clone();
     url.pathname = "/login";
     return NextResponse.redirect(url);
