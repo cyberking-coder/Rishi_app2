@@ -17,7 +17,14 @@ class CheckoutRemoteDataSource {
     final plan = await _client
         .from('subscription_plans')
         .select('id')
+        // Ordered, not just limited. There used to be exactly one plan, so
+        // an unordered limit(1) was harmless; the admin Subscriptions page
+        // can now create several, and without an order Postgres is free to
+        // return a different one on each call — the app would silently
+        // charge whichever row the planner happened to reach first.
+        // Oldest active plan wins, which is stable across calls.
         .eq('is_active', true)
+        .order('created_at', ascending: true)
         .limit(1)
         .maybeSingle();
 
@@ -30,7 +37,10 @@ class CheckoutRemoteDataSource {
     );
 
     if (response.status != 200) {
-      throw Exception('Could not start checkout. Please try again.');
+      final detail = response.data is Map
+          ? (response.data as Map)['error'] ?? response.data
+          : response.data;
+      throw Exception('Checkout failed (${response.status}): $detail');
     }
 
     final token = (response.data as Map)['token'] as String;

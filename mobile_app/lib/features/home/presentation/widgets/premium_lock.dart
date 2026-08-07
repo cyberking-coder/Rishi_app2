@@ -4,6 +4,7 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../../../../core/config/checkout_config.dart';
 import '../../../access/application/access_providers.dart';
+import '../../../access/data/checkout_remote_datasource.dart';
 
 /// Small lock badge overlaid on a premium item's thumbnail for a free-tier
 /// user, so locked content is discoverable without having to tap it first.
@@ -70,10 +71,23 @@ class _PremiumLockedDialogState extends ConsumerState<_PremiumLockedDialog> {
       final opened = await launchUrl(url, mode: LaunchMode.externalApplication);
       if (!opened) throw Exception('Could not open checkout');
       if (mounted) Navigator.pop(context);
-    } catch (_) {
+    } on NoActivePlanException {
+      // Distinct from a network or function failure, and fixable in a
+      // completely different place: it means nothing in the admin's
+      // Subscriptions page is marked active, so there is no price to
+      // charge. Saying "something went wrong" sends whoever reports it
+      // hunting through the app instead.
       if (mounted) {
         setState(() => _error =
-            'Something went wrong starting checkout.\n\n$_fallbackMessage');
+            'No subscription plan is available right now.\n\n$_fallbackMessage');
+      }
+    } catch (e) {
+      // Show what actually failed. The same blanket "something went
+      // wrong" in the course purchase sheet hid an edge function that
+      // had not been redeployed, behind a message that suggested
+      // emailing support — that lesson was applied there and not here.
+      if (mounted) {
+        setState(() => _error = '$e\n\n$_fallbackMessage');
       }
     } finally {
       if (mounted) setState(() => _loading = false);
