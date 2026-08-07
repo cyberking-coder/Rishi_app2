@@ -9,11 +9,26 @@ import '../../domain/entities/download_status.dart';
 /// Drop-in control for any content detail screen: starts a download, shows
 /// live progress as a ring, and toggles pause/resume. Tapping a completed
 /// download offers removal.
+///
+/// [size] and [color] exist because this button has to sit next to other
+/// icons and look like one of them. It used to be an IconButton with no
+/// colour, which inherited the app's IconTheme — near-black text meant for
+/// a cream background. On the now-playing screen, which is a deep sage
+/// #1B2723, that came out at a contrast ratio of 1.17:1 and was for
+/// practical purposes invisible. Callers on a dark surface must pass a
+/// colour; there is no sensible default that works on both.
 class DownloadButton extends ConsumerWidget {
   final String contentId;
   final DownloadContentType contentType;
   final String title;
   final String? thumbnailUrl;
+
+  /// Glyph size in logical pixels. Match whatever the icons beside it use.
+  final double size;
+
+  /// Colour for the idle and in-progress states. Null inherits the
+  /// ambient IconTheme, which is only right on a light surface.
+  final Color? color;
 
   const DownloadButton({
     super.key,
@@ -21,18 +36,23 @@ class DownloadButton extends ConsumerWidget {
     required this.contentType,
     required this.title,
     this.thumbnailUrl,
+    this.size = 24,
+    this.color,
   });
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final task = ref.watch(downloadForContentProvider(contentId));
     final repo = ref.read(downloadRepositoryProvider);
+    final base = color ?? IconTheme.of(context).color;
 
     if (task == null) {
-      return IconButton(
+      return _IconTap(
         tooltip: 'Download',
-        icon: const Icon(Icons.download_outlined),
-        onPressed: () async {
+        icon: Icons.download_outlined,
+        size: size,
+        color: base,
+        onTap: () async {
           final messenger = ScaffoldMessenger.of(context);
           try {
             await repo.enqueue(
@@ -55,10 +75,15 @@ class DownloadButton extends ConsumerWidget {
 
     switch (task.status) {
       case DownloadStatus.completed:
-        return IconButton(
+        // sageLight, not sage. The darker sage is legible on cream and
+        // sinks into the now-playing background; this one clears 6.7:1
+        // on that surface and still reads as "done" on a light one.
+        return _IconTap(
           tooltip: 'Downloaded — tap to remove',
-          icon: const Icon(Icons.download_done, color: AppTheme.sage),
-          onPressed: () => _confirmDelete(context, () => repo.delete(task.id)),
+          icon: Icons.download_done,
+          size: size,
+          color: AppTheme.sageLight,
+          onTap: () => _confirmDelete(context, () => repo.delete(task.id)),
         );
 
       case DownloadStatus.downloading:
@@ -66,6 +91,8 @@ class DownloadButton extends ConsumerWidget {
         return _ProgressRing(
           progress: task.progress,
           icon: Icons.pause,
+          size: size,
+          color: base,
           onTap: () => repo.pause(task.id),
         );
 
@@ -73,20 +100,27 @@ class DownloadButton extends ConsumerWidget {
         return _ProgressRing(
           progress: task.progress,
           icon: Icons.download,
+          size: size,
+          color: base,
           onTap: () => repo.resume(task.id),
         );
 
       case DownloadStatus.failed:
-        return IconButton(
+        return _IconTap(
           tooltip: task.errorMessage ?? 'Download failed — retry',
-          icon: const Icon(Icons.error_outline, color: Colors.redAccent),
-          onPressed: () => repo.resume(task.id),
+          icon: Icons.error_outline,
+          size: size,
+          color: Colors.redAccent,
+          onTap: () => repo.resume(task.id),
         );
 
       case DownloadStatus.revoked:
-        return const IconButton(
-          icon: Icon(Icons.block, color: AppTheme.textSecondary),
-          onPressed: null,
+        return _IconTap(
+          tooltip: 'No longer available offline',
+          icon: Icons.block,
+          size: size,
+          color: AppTheme.textSecondary,
+          onTap: null,
         );
     }
   }
@@ -116,14 +150,51 @@ class DownloadButton extends ConsumerWidget {
   }
 }
 
+/// An icon drawn at exactly [size], with a tap area padded out around it.
+///
+/// Not an IconButton. IconButton pads a 24px glyph out to a ~40px box, so
+/// dropping one beside plain `Icon(size: 26)` siblings and constraining it
+/// to match shrank the glyph to about 15px — the button looked both faint
+/// and smaller than everything next to it. Here the glyph is the size it
+/// is asked for and the padding is hit-test-only, so the row still aligns.
+class _IconTap extends StatelessWidget {
+  final IconData icon;
+  final double size;
+  final Color? color;
+  final String? tooltip;
+  final VoidCallback? onTap;
+
+  const _IconTap({
+    required this.icon,
+    required this.size,
+    required this.color,
+    this.tooltip,
+    this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final child = GestureDetector(
+      onTap: onTap,
+      behavior: HitTestBehavior.opaque,
+      child: Icon(icon, size: size, color: color),
+    );
+    return tooltip == null ? child : Tooltip(message: tooltip!, child: child);
+  }
+}
+
 class _ProgressRing extends StatelessWidget {
   final double progress;
   final IconData icon;
+  final double size;
+  final Color? color;
   final VoidCallback onTap;
 
   const _ProgressRing({
     required this.progress,
     required this.icon,
+    required this.size,
+    required this.color,
     required this.onTap,
   });
 
@@ -131,23 +202,25 @@ class _ProgressRing extends StatelessWidget {
   Widget build(BuildContext context) {
     return GestureDetector(
       onTap: onTap,
+      behavior: HitTestBehavior.opaque,
       child: SizedBox(
-        width: 40,
-        height: 40,
+        width: size,
+        height: size,
         child: Stack(
           alignment: Alignment.center,
           children: [
-            SizedBox(
-              width: 32,
-              height: 32,
+            SizedBox.expand(
               child: CircularProgressIndicator(
                 value: progress == 0 ? null : progress,
                 strokeWidth: 2.5,
-                backgroundColor: Colors.black12,
-                valueColor: const AlwaysStoppedAnimation(AppTheme.sage),
+                // Black at 12% is invisible on a dark surface — it was
+                // chosen when every screen was cream. The unfilled track
+                // now derives from the icon colour instead.
+                backgroundColor: (color ?? AppTheme.sage).withValues(alpha: 0.24),
+                valueColor: AlwaysStoppedAnimation(color ?? AppTheme.sage),
               ),
             ),
-            Icon(icon, size: 16),
+            Icon(icon, size: size * 0.55, color: color),
           ],
         ),
       ),

@@ -452,20 +452,23 @@ class _DownloadTool extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    // Wrap the existing DownloadButton in a column to match the tool-row style.
+    // Sized and coloured to match _ToolButton exactly, rather than scaled
+    // to fit. The old FittedBox squeezed a padded IconButton into 26px,
+    // which shrank the glyph itself to roughly 15px next to 26px
+    // neighbours — and with no colour passed it inherited the app's
+    // near-black icon theme onto this deep sage background.
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
         SizedBox(
-          width: 26,
           height: 26,
-          child: FittedBox(
-            child: DownloadButton(
-              contentId: contentId,
-              contentType: DownloadContentType.audio,
-              title: title,
-              thumbnailUrl: thumbnailUrl,
-            ),
+          child: DownloadButton(
+            contentId: contentId,
+            contentType: DownloadContentType.audio,
+            title: title,
+            thumbnailUrl: thumbnailUrl,
+            size: 26,
+            color: _kTextSecondary,
           ),
         ),
         const SizedBox(height: 4),
