@@ -526,11 +526,11 @@ class _ListeningBar extends StatelessWidget {
         color: AppTheme.sageSoft,
         borderRadius: BorderRadius.circular(AppTheme.radiusRow),
       ),
-      child: Row(
+      child: const Row(
         children: [
-          const _PulsingDot(),
-          const SizedBox(width: 10),
-          const Expanded(
+          _PulsingDot(),
+          SizedBox(width: 10),
+          Expanded(
             child: Text(
               'Listening… speak your question, then tap the mic to stop.',
               style: TextStyle(

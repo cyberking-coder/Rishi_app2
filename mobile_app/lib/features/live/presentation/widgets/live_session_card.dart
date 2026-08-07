@@ -114,7 +114,7 @@ class LiveSessionCard extends ConsumerWidget {
     // "Register • ₹499" to somebody who has already paid, for the half
     // second before the answer arrives, is the one wrong state here.
     final paid = ref.watch(paidSessionsProvider).valueOrNull;
-    final registered = paid == null ? null : paid.contains(session.id);
+    final registered = paid?.contains(session.id);
     final needsPayment = session.isPaid && registered == false;
 
     return Opacity(
