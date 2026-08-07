@@ -12,6 +12,7 @@ const LINKS = [
   { href: "/privacy", label: "Privacy" },
   { href: "/refunds", label: "Refunds" },
   { href: "/contact", label: "Contact" },
+  { href: "/delete-account", label: "Delete account" },
 ];
 
 export default function LegalLayout({

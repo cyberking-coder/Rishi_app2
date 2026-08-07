@@ -56,7 +56,16 @@ export async function middleware(request: NextRequest) {
   // Leaving them behind the session redirect is exactly how the Play
   // submission was rejected for an "invalid privacy policy" — the
   // reviewer opened /privacy and was shown the admin login screen.
-  const isPublicPolicyRoute = ["/terms", "/privacy", "/refunds", "/contact"]
+  const isPublicPolicyRoute = [
+    "/terms",
+    "/privacy",
+    "/refunds",
+    "/contact",
+    // Play's User Data policy requires the deletion URL to be reachable
+    // anonymously, exactly like the privacy policy. Adding a page under
+    // (legal) without adding it here is what caused the rejection.
+    "/delete-account",
+  ]
     .some((route) => request.nextUrl.pathname.startsWith(route));
 
   if (
