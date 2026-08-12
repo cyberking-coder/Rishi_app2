@@ -62,11 +62,15 @@ export default async function StorePage() {
       .eq("is_active", true)
       .order("price", { ascending: true })
       .returns<PlanRow[]>(),
+    // Every published course, not only the priced ones. Filtering on
+    // `price_amount > 0` made a course with no price indistinguishable
+    // from a broken query — both render as nothing at all — and the
+    // admin has no way to tell which. A free course shows without a
+    // buy button instead, which says what is actually true about it.
     db
       .from("courses")
       .select("id, title, description, price_amount, currency, cover_image_url")
       .eq("status", "published")
-      .gt("price_amount", 0)
       .order("created_at", { ascending: false })
       .returns<CourseRow[]>(),
     db
@@ -82,6 +86,18 @@ export default async function StorePage() {
   const planRows = plans.data ?? [];
   const courseRows = courses.data ?? [];
   const sessionRows = sessions.data ?? [];
+
+  // `?? []` on its own is how a failing query becomes an empty page with
+  // nothing to explain it — the trap this codebase has already been
+  // caught by three times (see the bug chronology: a failing embed
+  // returning null data, and n8n failing silently for three deploys).
+  // A query that errored says so, and says it where somebody will see it.
+  const failures = [
+    plans.error && `plans: ${plans.error.message}`,
+    courses.error && `courses: ${courses.error.message}`,
+    sessions.error && `live sessions: ${sessions.error.message}`,
+  ].filter(Boolean) as string[];
+
   const empty =
     planRows.length === 0 &&
     courseRows.length === 0 &&
@@ -99,10 +115,31 @@ export default async function StorePage() {
         </p>
       </section>
 
-      {empty && (
-        <p className="text-muted-foreground">
-          Nothing is on sale at the moment. Please check back shortly.
-        </p>
+      {failures.length > 0 && (
+        <div className="rounded-lg border border-destructive/40 bg-destructive/5 p-4 text-sm">
+          <p className="font-medium text-destructive">
+            Some of this page could not be loaded.
+          </p>
+          <ul className="mt-2 list-disc space-y-1 pl-5 text-muted-foreground">
+            {failures.map((f) => (
+              <li key={f}>{f}</li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      {empty && failures.length === 0 && (
+        <div className="rounded-lg border p-5 text-sm text-muted-foreground">
+          <p className="font-medium text-foreground">
+            Nothing is on sale at the moment.
+          </p>
+          <p className="mt-2">
+            If that is unexpected, the usual causes are: no membership plan is
+            marked active (Admin → Membership), no course has status
+            &ldquo;published&rdquo; (Admin → Courses), and no upcoming live
+            session has a price on it.
+          </p>
+        </div>
       )}
 
       {planRows.length > 0 && (
@@ -166,10 +203,31 @@ export default async function StorePage() {
                       {course.description}
                     </p>
                   )}
-                  <p className="mt-auto pt-2 text-2xl font-semibold">
-                    {formatPrice(course.price_amount / 100, course.currency)}
-                  </p>
-                  <BuyButton target={{ kind: "course", id: course.id }} />
+                  {course.price_amount > 0 ? (
+                    <>
+                      <p className="mt-auto pt-2 text-2xl font-semibold">
+                        {formatPrice(
+                          course.price_amount / 100,
+                          course.currency,
+                        )}
+                      </p>
+                      <BuyButton target={{ kind: "course", id: course.id }} />
+                    </>
+                  ) : (
+                    <>
+                      <p className="mt-auto pt-2 text-2xl font-semibold">
+                        Free
+                      </p>
+                      {/* No buy button, because there is nothing to buy.
+                          mint-checkout-token would answer for it, and
+                          the webhook grants a free course by row insert
+                          rather than by payment — sending someone to
+                          Razorpay for ₹0 has no path back. */}
+                      <p className="text-sm text-muted-foreground">
+                        Open the app and sign in — this one is already yours.
+                      </p>
+                    </>
+                  )}
                 </CardContent>
               </Card>
             ))}

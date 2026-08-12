@@ -191,10 +191,11 @@ See Section 7 for the bug-fix chronology of the LMS/payments work (Phases 0-5).
 
 ## 6. Store Submission Status
 
-- **Google Play**: Account in setup (DUNS number required for Organisation account — use Individual account to avoid DUNS)
-- **Apple App Store**: Requires Mac for Xcode build + $99/year Apple Developer account
+- **Google Play**: live. Unaffected by any of the App Store work — the Android build keeps its in-app checkout and full Razorpay margin.
+- **Apple App Store**: live at 2.1.0. **2.1.1 was rejected under Guideline 3.1.1** and is being resubmitted as a reader app under 3.1.3(a) — see Section 7.
+- **The Apple Developer account is registered to an individual, not the business.** That decides where App Store payouts land, whose name appears as the seller, and who legally owns the app. It does not block anything, and it gets harder to unwind the longer it runs. Section 10 has the options; note that Apple's Organisation enrolment needs a legal entity (a sole proprietorship is not eligible), which is what a D-U-N-S number is for — it has nothing to do with which storefronts you sell in.
 - APK release build: signed with keystore in `key.properties` (gitignored, keep backed up separately)
-- App version: check `pubspec.yaml` → `version:` field before each store submission
+- App version: `pubspec.yaml` sets the version **name**; the build **number** comes from Codemagic's `$BUILD_NUMBER` and overrides the `+N` in the file. This is why Apple reviewed build 22 while the file said `+14` — not a mismatch to fix.
 
 ---
 
@@ -527,6 +528,47 @@ The function refuses staff accounts — an admin deleting themselves through the
 
 Three things outside the code, all of which fail at runtime rather than at build: the Xcode target must reference `Runner.entitlements` (add the capability in Xcode, not by hand-editing `project.pbxproj`), the App ID needs the capability enabled in the developer portal, and Supabase's Apple provider needs its Services ID, Team ID, Key ID and .p8 key.
 
+### App Store rejection 3.1.1 — iOS as a reader app, and the storefront it forced
+
+**Rejected**: 2.1.1 (build 22), iPad Air 11-inch (M3), iPadOS 26.2. **Guideline**: 3.1.1 In-App Purchase.
+
+Apple's finding was that the app sells digital content — courses, membership, seats at live sessions — through `pay.anuragrishi.com` in an external browser, and that content bought outside must also be purchasable through In-App Purchase. **This is the compliance question deliberately parked in July** ("keep everything as it is, let's see how Apple responds"); it is now answered.
+
+**Their message quotes the US-storefront link-out allowance, which does not apply here.** That came from the 2025 US court ruling and covers the United States storefront only. These buyers are in India paying rupees through Razorpay, and the Indian storefront has no equivalent. No disclosure sheet or change of wording reaches it.
+
+**Three routes existed; the middle one was taken.** In-App Purchase via StoreKit (unambiguous, ~15% under the Small Business Program, works on the courses); reader app under **3.1.3(a)** (no commission, but bets on a reviewer accepting the content as "audio and video"); or leave the App Store. Reader was chosen because it is a day of work against several, and a rejection costs one review cycle and loses nothing — StoreKit remains available afterwards.
+
+**3.1.3(b) is the wrong clause to cite and must not be used in an appeal.** Multiplatform Services permits access to content bought elsewhere *"provided those items are also available as in-app purchases within the app"* — citing it concedes the rejection. The clause that permits no IAP at all is 3.1.3(a), and it enumerates magazines, newspapers, books, audio, music and video. **The courses are the exposure**: sequenced lessons with a certificate at the end are not obviously any of those six, and Apple's rejection named courses specifically.
+
+**`kPurchaseUiEnabled` (`core/config/purchase_config.dart`) is false on iOS and true everywhere else.** Android and the web checkout are untouched and keep Razorpay at full margin. It is a runtime `defaultTargetPlatform` check rather than a `dart-define`, deliberately: a build flag can be misconfigured into shipping the purchase UI to iOS, and that mistake costs another review cycle, whereas a platform check cannot be got wrong.
+
+**The exception is all-or-nothing, so it covers every price string, not just the buttons.** A locked course still reading "₹499" is a purchase mechanism as far as review is concerned. Six surfaces: the membership dialog's "Get Access Now", the course purchase sheet's price and button, the course-detail badge and primary button, the price badges on **both** the courses list and the home screen (that second one is easy to miss — it is a separate widget in `home_screen.dart`, not shared with `courses_screen.dart`), and "Register • ₹499" on paid live sessions.
+
+**Kept on purpose**: login and signup (there is free content behind an account, and Netflix keeps its Sign In button too), the full catalogue with locks and no prices, and every existing Razorpay entitlement — anyone who already bought signs in and it works, which 3.1.3(b) explicitly allows. A locked item still opens a sheet explaining it needs access rather than doing nothing, because a tap that is silently ignored reads as a broken app.
+
+**A one-time unlock code was considered and refused.** 3.1.1 names the mechanism directly: *"Apps may not use their own mechanisms to unlock content or functionality, such as license keys, augmented reality markers, QR codes, cryptocurrencies…"*. A scratch code is a licence key. It is also strictly worse than what already exists — account-based entitlement is the most defensible form of buying outside the app, and it was rejected anyway.
+
+**Restoring the external links after an approval would be Guideline 2.3.1**, hidden or undocumented features — including hiding them behind a remote flag and flipping it once approved. That risks the developer account, not just the release. If review rejects the reader framing, StoreKit goes behind the same flag.
+
+**The storefront exists because removing the purchase UI left nowhere to buy.** This was not anticipated when the work started, and it is the more consequential half. `mint-checkout-token` answers 401 without a session and the token carries a user id, so **every `/checkout/[id]?token=` link was minted inside the app, for one signed-in user and one item**. The web checkout was never a shop — it is a payment page the app opens. With the iOS purchase UI gone, an iPhone buyer had no route at all: not a harder one, none. There was no URL that could be put in an Instagram bio.
+
+`/store` is that URL, with `/store/signin` for buyers, both allowlisted in `middleware.ts` alongside the checkout and policy routes. It hands off to the same signed checkout page, the same edge function, the same Razorpay flow and the same webhook — a second door into the existing flow, not a parallel one, so coupons, seat limits, sold-out checks and the already-registered guard all still apply because none of that code changed.
+
+**Buyers get their own sign-in, not `/login`.** The two share a Supabase project but not an audience: `/login` leads to the dashboard and `requireAdmin()` bounces anyone else back out with `not_authorized`, which reads to a customer as a broken purchase.
+
+**The catalogue reads through the service-role client**, because `live_sessions` is `to authenticated` and a signed-out visitor is the entire audience. Columns are listed explicitly for that reason and `join_url` is never among them — it is the field that policy exists to protect.
+
+**The confirmation screen had to fork.** It fired `meditationapp://` after 800ms and offered "Return to the app"; a storefront buyer may never have installed it, so that is a browser error immediately after paying. `src=store` selects download buttons and the email they paid with instead. It decides copy only — the token is still the only thing that authorises anything — so a forged `src` changes nothing but the wording on a page the forger has already paid on.
+
+**Two bugs found on first use, both mine, both instances of traps already in this log**:
+
+| Symptom | Root cause and fix |
+|---|---|
+| `/store` opened but showed no courses and no buy button | `plans.data ?? []` swallowed a PostgREST error into an empty list — **the same silent-failure trap as the failing embed and the three-deploy n8n silence**. Errors are now surfaced on the page. Compounding it, `.gt("price_amount", 0)` filtered unpriced courses out entirely, making "this course is free" indistinguishable from "the query broke". Every published course now renders; a free one shows without a buy button, since a ₹0 Razorpay order has no path back and the webhook grants free courses by row insert. |
+| "Invalid login credentials" when trying to create an account | That string is a *sign-in* error. The page defaulted to sign-in with "Create an account" as a text link below the form, so it was easy to type into the wrong mode and be told the site was broken. Both modes are now an equally weighted selector above the form, Supabase's developer-facing auth errors are translated, an email that already exists is detected via the empty `identities` array (Supabase does not error on it, to avoid confirming which addresses are registered — the mobile app already checks the same thing), and email-confirmation gets its own screen rather than a line of text under a form that still looks submittable. |
+
+**Still outstanding**: `appLinks.appStore` in `lib/legal.ts` is blank until Apple assigns the numeric app id at first approval, and the iOS download button stays hidden until it is filled in — a dead App Store link on a payment confirmation is worse than none. The bare domain still serves the admin login, so buyers must be linked to `/store` directly. And the developer account is registered to an individual rather than the business, which decides where App Store payouts land; see Section 10.
+
 ### Bug-fix chronology — Phases 3b through 5
 
 Every one of these was found by testing on a real device, not by review.
@@ -720,7 +762,16 @@ The admin app doesn't use this layering — it's a much thinner app, and Next.js
 
 ## 10. Known Issues / Next Steps
 
-As of the end of the push-notification session, in priority order:
+As of the end of the App Store compliance session, in priority order:
+
+0. **The App Store rejection is the live item.** The iOS reader-app build and the storefront are written and pushed but neither has been deployed or submitted. Before submitting:
+   - Fill the demo account in `docs/store-listing.md` → App Review Notes with an account that **has active access**. A reviewer who only ever sees locked screens rejects on that alone, and it is the most common failure for apps of this shape.
+   - Walk the iOS build signed out and on a free account and confirm no price, no "Get Access", no "Register • ₹…" and no link to `pay.anuragrishi.com` survives anywhere.
+   - Check the scheduled pop-up's CTA label in Admin → Settings. It is free text in the database, so "Register ₹499" would put a price on an iOS screen that no code change can catch.
+   - Decide the sequencing: submitting before the storefront is deployed ships the 2.1.1 fixes but means iOS sells nothing in the meantime. Existing customers are unaffected either way — they sign in and everything works.
+   - The Flutter side has **not been compiled** — there is no Flutter toolchain in the environment it was written in. Codemagic is the first build.
+
+0b. **Apple Developer account ownership.** Registered to an individual rather than the business, so payouts land in a personal bank account and the app is legally that person's. Three routes: convert to an Organisation (needs a legal entity and a D-U-N-S number — not available to a sole proprietorship), transfer the app to the business owner's own individual account (needs their own ~₹9,000/yr membership; no D-U-N-S), or leave it and document the arrangement with a CA. **If transferring, do it before IAP subscribers exist** — Sign in with Apple identifiers are scoped to the developer team, so every existing Apple user needs migrating via Apple's transfer-identifier endpoint or they come back as strangers and lose their purchases. That migration is small today and grows with every Apple sign-in.
 
 1. **This branch (`claude/repo-structure-overview-vt36iu`) still has not been merged to `main`.** Nothing in Section 7 is live for real users until that happens. `checkout_config.dart` now points at the stable production alias (`https://rishi-app2.vercel.app`) rather than a per-deployment preview URL, so that particular breakage is resolved either way.
 
@@ -792,4 +843,4 @@ The push fan-out originally broke at about **1,000 devices, silently** — an un
 
 ---
 
-*Last updated: 2 August 2026, after live sessions, push notifications, and the fan-out scaling work. Phases 3b, 4 and 5 landed in one extended session before that; see the bug-fix chronology at the end of Section 7 for what broke along the way and why.*
+*Last updated: 12 August 2026, after the App Store 3.1.1 rejection — the iOS reader-app build and the public storefront it forced. Before that: live sessions, push notifications and the fan-out scaling work (2 August); Phases 3b, 4 and 5 landed in one extended session earlier still. See the bug-fix chronology at the end of Section 7 for what broke along the way and why.*
