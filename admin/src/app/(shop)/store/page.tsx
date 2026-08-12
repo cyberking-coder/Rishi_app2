@@ -271,8 +271,8 @@ export default async function StorePage({
           </div>
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {planRows.map((plan) => (
-              <Card key={plan.id}>
-                <CardContent className="flex h-full flex-col gap-3 p-5">
+              <Card key={plan.id} className="flex h-full flex-col">
+                <CardContent className="flex flex-1 flex-col gap-3 p-5">
                   <h3 className="font-semibold">{plan.name}</h3>
                   {plan.description && (
                     <p className="text-sm text-muted-foreground">
@@ -306,7 +306,15 @@ export default async function StorePage({
           </div>
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {courseRows.map((course) => (
-              <Card key={course.id} className="overflow-hidden">
+              // flex-col on the Card, flex-1 on the content — NOT
+              // h-full on the content. h-full resolved to the full
+              // stretched height of the grid cell, so the content box
+              // started below the cover image and ran that same height
+              // again, putting the price and the buy button outside the
+              // card's own overflow-hidden boundary. They rendered into
+              // the DOM and were clipped, which looked exactly like a
+              // branch that had not run at all.
+              <Card key={course.id} className="flex h-full flex-col overflow-hidden">
                 {course.cover_image_url && (
                   // eslint-disable-next-line @next/next/no-img-element
                   <img
@@ -315,7 +323,7 @@ export default async function StorePage({
                     className="aspect-video w-full object-cover"
                   />
                 )}
-                <CardContent className="flex h-full flex-col gap-3 p-5">
+                <CardContent className="flex flex-1 flex-col gap-3 p-5">
                   <h3 className="font-semibold">{course.title}</h3>
                   {course.description && (
                     <p className="line-clamp-3 text-sm text-muted-foreground">
@@ -364,8 +372,8 @@ export default async function StorePage({
           </div>
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {sessionRows.map((session) => (
-              <Card key={session.id}>
-                <CardContent className="flex h-full flex-col gap-3 p-5">
+              <Card key={session.id} className="flex h-full flex-col">
+                <CardContent className="flex flex-1 flex-col gap-3 p-5">
                   <h3 className="font-semibold">{session.title}</h3>
                   <p className="text-sm text-muted-foreground">
                     {new Date(session.starts_at).toLocaleString("en-IN", {
