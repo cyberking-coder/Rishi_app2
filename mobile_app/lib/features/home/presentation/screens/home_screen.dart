@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../../../app/theme/app_theme.dart';
 import '../../../../app/widgets/botanical.dart';
+import '../../../../core/config/purchase_config.dart';
 import '../../../access/application/access_providers.dart';
 import '../../../access/data/popup_seen_store.dart';
 import '../../../access/domain/access_state.dart';
@@ -904,7 +905,11 @@ class _CourseMiniCard extends StatelessWidget {
                       const SizedBox(width: 5),
                     ],
                     Text(
-                      course.owned ? 'Enrolled' : course.priceLabel,
+                      course.owned
+                          ? 'Enrolled'
+                          : kPurchaseUiEnabled || course.isFree
+                              ? course.priceLabel
+                              : 'Locked',
                       style: TextStyle(
                         fontFamily: AppTheme.text,
                         fontSize: 13,

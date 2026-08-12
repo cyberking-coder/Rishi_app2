@@ -9,6 +9,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../../../app/theme/app_theme.dart';
+import '../../../../core/config/purchase_config.dart';
 import '../../../audio/application/audio_providers.dart';
 import '../../../audio/domain/entities/audio_track.dart';
 import '../../application/lms_providers.dart';
@@ -470,7 +471,9 @@ class _MetaCard extends StatelessWidget {
                 const Icon(Icons.lock_rounded, size: 11, color: AppTheme.clay),
                 const SizedBox(width: 4),
                 Text(
-                  priceLabel,
+                  // The lock stays on iOS, the price does not: locked
+                  // content may be shown, priced content may not.
+                  kPurchaseUiEnabled ? priceLabel : 'Locked',
                   style: const TextStyle(
                     fontSize: 10.5,
                     fontWeight: FontWeight.w700,
@@ -516,7 +519,9 @@ class _MetaCard extends StatelessWidget {
               onPressed: onPrimary,
               child: Text(
                 locked
-                    ? 'Get access · $priceLabel'
+                    ? kPurchaseUiEnabled
+                        ? 'Get access · $priceLabel'
+                        : 'Why is this locked?'
                     : started
                         ? 'Continue learning'
                         : 'Start course',

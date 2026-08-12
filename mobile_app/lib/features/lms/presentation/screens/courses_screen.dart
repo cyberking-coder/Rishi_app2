@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../../../app/theme/app_theme.dart';
 import '../../../../app/widgets/botanical.dart';
+import '../../../../core/config/purchase_config.dart';
 import '../../application/lms_providers.dart';
 import '../../domain/entities/course_summary.dart';
 
@@ -335,7 +336,11 @@ class CourseCard extends StatelessWidget {
                         ),
                         const SizedBox(width: 4),
                         Text(
-                          course.owned ? 'Enrolled' : course.priceLabel,
+                          course.owned
+                              ? 'Enrolled'
+                              : kPurchaseUiEnabled || course.isFree
+                                  ? course.priceLabel
+                                  : 'Locked',
                           style: TextStyle(
                             fontSize: 10.5,
                             fontWeight: FontWeight.w800,

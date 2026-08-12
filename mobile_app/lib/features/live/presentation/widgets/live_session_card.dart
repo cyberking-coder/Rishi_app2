@@ -4,6 +4,7 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../../../../app/theme/app_theme.dart';
 import '../../../../core/config/checkout_config.dart';
+import '../../../../core/config/purchase_config.dart';
 import '../../../access/application/access_providers.dart';
 import '../../application/live_providers.dart';
 import '../../domain/entities/live_session.dart';
@@ -62,11 +63,18 @@ Future<void> joinSession(
 }
 
 /// Sends somebody to the external checkout for a seat.
+///
+/// A no-op on iOS, where a paid seat cannot be sold in-app at all — see
+/// [kPurchaseUiEnabled]. The card hides the button there, so this guard
+/// is only belt-and-braces against a future caller reaching it another
+/// way; the cost of that being wrong is a rejected build.
 Future<void> registerForSession(
   BuildContext context,
   WidgetRef ref,
   LiveSession session,
 ) async {
+  if (!kPurchaseUiEnabled) return;
+
   if (!isCheckoutConfigured) {
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(content: Text('Registration is not set up yet.')),
@@ -117,14 +125,24 @@ class LiveSessionCard extends ConsumerWidget {
     final registered = paid?.contains(session.id);
     final needsPayment = session.isPaid && registered == false;
 
+    // On iOS a seat cannot be bought in the app, so the card stops at
+    // saying the seat is held rather than offering one. The session
+    // itself stays listed — a reader app may show what exists, it just
+    // may not sell it.
+    final showLockedNotice = needsPayment && !kPurchaseUiEnabled;
+
     return Opacity(
       opacity: dimmed ? 0.55 : 1,
       child: GestureDetector(
         onTap: dimmed
             ? null
-            : needsPayment
-                ? () => registerForSession(context, ref, session)
-                : () => joinSession(context, ref, session),
+            : showLockedNotice
+                ? () => ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text(kLockedContentMessage)),
+                    )
+                : needsPayment
+                    ? () => registerForSession(context, ref, session)
+                    : () => joinSession(context, ref, session),
         child: Container(
           decoration: AppTheme.claySurface(),
           child: Column(
@@ -252,6 +270,24 @@ class LiveSessionCard extends ConsumerWidget {
                             ),
                           ),
                         )
+                      else if (showLockedNotice)
+                        Row(children: [
+                          const Icon(Icons.lock_rounded,
+                              size: 16, color: AppTheme.clay),
+                          const SizedBox(width: 6),
+                          Expanded(
+                            child: Text(
+                              'Open to registered participants',
+                              style: Theme.of(context)
+                                  .textTheme
+                                  .bodySmall
+                                  ?.copyWith(
+                                    color: AppTheme.clay,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                            ),
+                          ),
+                        ])
                       else if (needsPayment)
                         SizedBox(
                           width: double.infinity,
