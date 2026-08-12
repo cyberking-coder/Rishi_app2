@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { NativeOption, NativeSelect } from "@/components/ui/native-select";
+import { appLinks } from "@/lib/legal";
 
 // This component collects billing details, then hands off to Razorpay's
 // own hosted checkout and shows a friendly "we've got it" message
@@ -74,6 +75,7 @@ export function CheckoutClient({
   priceLabel,
   allowCoupon = false,
   returnUrl,
+  fromStore = false,
 }: {
   token: string;
   planName: string;
@@ -87,6 +89,11 @@ export function CheckoutClient({
   /** meditationapp:// link opened once payment is confirmed, so the
    *  buyer returns to the app instead of being stranded on this page. */
   returnUrl?: string;
+  /** True when the buyer came from the public storefront rather than
+   *  the app. They may not have installed it yet — which is the whole
+   *  reason the storefront exists — so the confirmation tells them how
+   *  to get it and which email to use, instead of "return to the app". */
+  fromStore?: boolean;
 }) {
   const [status, setStatus] = useState<Status>("idle");
   const [error, setError] = useState<string | null>(null);
@@ -234,19 +241,53 @@ export function CheckoutClient({
           🎉
         </div>
         <p className="mb-1 font-semibold">Payment received</p>
-        <p className="text-sm text-muted-foreground">
-          Your access is being activated — this usually takes just a few
-          seconds.
-          {returnUrl
-            ? " You'll be taken back to the app automatically."
-            : " Return to the app and it should unlock automatically."}
-        </p>
-        {appUrl && (
-          <Button asChild className="mt-4 w-full" size="lg">
-            {/* A real user tap here also satisfies browsers that block a
-                programmatic redirect to a custom scheme without one. */}
-            <a href={appUrl}>Return to the app</a>
-          </Button>
+
+        {fromStore ? (
+          <>
+            <p className="text-sm text-muted-foreground">
+              Your access is being activated — this usually takes just a few
+              seconds. Open the Know Thyself app and sign in with{" "}
+              <span className="font-medium text-foreground">
+                {email.trim()}
+              </span>{" "}
+              and it will be waiting for you.
+            </p>
+            <div className="mt-4 space-y-2">
+              {appLinks.appStore && (
+                <Button asChild className="w-full" size="lg">
+                  <a href={appLinks.appStore}>Download for iPhone</a>
+                </Button>
+              )}
+              <Button
+                asChild
+                className="w-full"
+                size="lg"
+                variant={appLinks.appStore ? "outline" : "default"}
+              >
+                <a href={appLinks.play}>Download for Android</a>
+              </Button>
+            </div>
+            <p className="mt-4 text-xs text-muted-foreground">
+              Already have the app? Just sign in — there is nothing else to do.
+            </p>
+          </>
+        ) : (
+          <>
+            <p className="text-sm text-muted-foreground">
+              Your access is being activated — this usually takes just a few
+              seconds.
+              {returnUrl
+                ? " You'll be taken back to the app automatically."
+                : " Return to the app and it should unlock automatically."}
+            </p>
+            {appUrl && (
+              <Button asChild className="mt-4 w-full" size="lg">
+                {/* A real user tap here also satisfies browsers that block a
+                    programmatic redirect to a custom scheme without one. */}
+                <a href={appUrl}>Return to the app</a>
+              </Button>
+            )}
+          </>
         )}
       </div>
     );

@@ -51,7 +51,11 @@ export async function mintCheckoutPath(
   const token = (data as { token?: string } | null)?.token;
   if (!token) throw new Error("Checkout failed: no token returned");
 
-  return `/checkout/${target.id}?token=${encodeURIComponent(token)}`;
+  // src=store tells the checkout page this buyer may not have the app
+  // yet, so the confirmation offers the download rather than a deep link
+  // into an app that might not be installed. It decides copy only —
+  // the token stays the only thing that authorises anything.
+  return `/checkout/${target.id}?token=${encodeURIComponent(token)}&src=store`;
 }
 
 /** Serialises a target into a URL param, so intent survives a sign-in. */

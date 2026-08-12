@@ -54,3 +54,25 @@ export const legal = {
 
 /** Where support requests are told to go, in one phrase. */
 export const contactLine = `${legal.email} or ${legal.phone}`;
+
+/**
+ * Where a storefront buyer is sent to collect what they just bought.
+ *
+ * Only the web checkout needs these. Somebody who bought inside the app
+ * already has the app; somebody who bought on the website may never have
+ * opened it, and telling them to "return to the app" is the fastest way
+ * to turn a completed payment into a support email.
+ */
+export const appLinks = {
+  /** Derived from the Flutter applicationId, so this one cannot drift. */
+  play:
+    "https://play.google.com/store/apps/details?id=com.anuragrishi.knowthyself",
+
+  /** CONFIRM: Apple assigns the numeric id at first approval, and there
+   *  is no way to derive it from the bundle id. Until it is filled in,
+   *  the checkout page hides the iOS button rather than linking
+   *  somewhere wrong — a dead App Store link on a payment confirmation
+   *  is worse than no link. Find it in App Store Connect under
+   *  General → App Information → Apple ID. */
+  appStore: "" as string,
+} as const;
