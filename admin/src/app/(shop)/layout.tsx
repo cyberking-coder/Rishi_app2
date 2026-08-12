@@ -1,5 +1,7 @@
 import Link from "next/link";
 import { legal } from "@/lib/legal";
+import { createClient } from "@/lib/supabase/server";
+import { AccountNav } from "./account-nav";
 
 /// Frame for the public storefront.
 ///
@@ -9,11 +11,15 @@ import { legal } from "@/lib/legal";
 /// reached with a token minted for a signed-in user, so until now the
 /// only way to buy anything was from inside the app. That is fine on
 /// Android and impossible on iOS, where the app may not sell.
-export default function ShopLayout({
+export default async function ShopLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
+  const {
+    data: { user },
+  } = await createClient().auth.getUser();
+
   return (
     <div className="flex min-h-screen flex-col bg-background">
       <header className="border-b">
@@ -21,13 +27,11 @@ export default function ShopLayout({
           <Link href="/store" className="font-semibold">
             {legal.tradingName}
           </Link>
-          <nav className="flex gap-x-5 text-sm text-muted-foreground">
+          <nav className="flex items-center gap-x-5 text-sm text-muted-foreground">
             <Link href="/store" className="hover:text-foreground">
               Browse
             </Link>
-            <Link href="/store/signin" className="hover:text-foreground">
-              Sign in
-            </Link>
+            <AccountNav email={user?.email ?? null} />
           </nav>
         </div>
       </header>

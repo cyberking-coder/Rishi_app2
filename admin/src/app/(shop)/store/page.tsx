@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { createClient as createUserClient } from "@/lib/supabase/server";
 import { getCurrentProfile } from "@/lib/auth";
 import { Card, CardContent } from "@/components/ui/card";
 import { BuyButton } from "./buy-button";
@@ -109,6 +110,11 @@ export default async function StorePage() {
   // unpublished course, or a course whose price is genuinely zero?
   // Those three look identical from the outside, which is exactly how
   // the first version of this page wasted a round of testing.
+  const {
+    data: { user: buyer },
+  } = await createUserClient().auth.getUser();
+  const buyerEmail = buyer?.email ?? null;
+
   const profile = await getCurrentProfile();
   const isStaff =
     profile !== null &&
@@ -343,14 +349,26 @@ export default async function StorePage() {
       )}
 
       <section className="rounded-lg border p-5 text-sm text-muted-foreground">
-        <p>
-          Already bought something? You do not need to buy it again — open the
-          app and sign in with the same email.{" "}
-          <Link href="/store/signin" className="underline hover:text-foreground">
-            Sign in here
-          </Link>{" "}
-          to see what your account already has.
-        </p>
+        {profile || buyerEmail ? (
+          <p>
+            You are signed in as{" "}
+            <span className="font-medium text-foreground">{buyerEmail}</span>.
+            Anything you buy is added to this account, so sign in to the app
+            with the same email.
+          </p>
+        ) : (
+          <p>
+            Already bought something? You do not need to buy it again — open the
+            app and sign in with the same email.{" "}
+            <Link
+              href="/store/signin"
+              className="underline hover:text-foreground"
+            >
+              Sign in here
+            </Link>{" "}
+            to see what your account already has.
+          </p>
+        )}
       </section>
     </div>
   );
