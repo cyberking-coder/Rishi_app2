@@ -49,6 +49,13 @@ export async function middleware(request: NextRequest) {
   // is that someone who was shown a certificate, and who has no account
   // here at all, can confirm it.
   const isPublicVerifyRoute = request.nextUrl.pathname.startsWith("/verify");
+  // The storefront. Public by necessity: it exists to be linked from
+  // Instagram and WhatsApp to people who have no account yet, and it is
+  // the only way an iOS user can buy anything at all now that the app
+  // may not sell. Bouncing it to /login would show a customer the staff
+  // login — which is what the bare domain already does, and the reason
+  // this needed its own path rather than the root.
+  const isPublicStoreRoute = request.nextUrl.pathname.startsWith("/store");
   // The policy pages. Public by obligation, not by preference: Google
   // Play, the App Store and Razorpay all fetch these anonymously to
   // check them, and so does anybody deciding whether to pay.
@@ -73,6 +80,7 @@ export async function middleware(request: NextRequest) {
     !isLoginRoute &&
     !isPublicCheckoutRoute &&
     !isPublicVerifyRoute &&
+    !isPublicStoreRoute &&
     !isPublicPolicyRoute
   ) {
     const url = request.nextUrl.clone();
