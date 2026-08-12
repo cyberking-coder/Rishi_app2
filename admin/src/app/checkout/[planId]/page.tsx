@@ -43,10 +43,16 @@ export default async function CheckoutPage({
   searchParams,
 }: {
   params: Promise<{ planId: string }>;
-  searchParams: Promise<{ token?: string }>;
+  searchParams: Promise<{ token?: string; src?: string }>;
 }) {
   const { planId } = await params;
-  const { token } = await searchParams;
+  const { token, src } = await searchParams;
+
+  // Set by the storefront's buy button. It only decides what the
+  // confirmation screen says, never what is charged or granted — the
+  // token remains the only thing trusted here — so it is safe for it to
+  // be a plain, forgeable query param.
+  const fromStore = src === "store";
 
   if (!token) {
     return <ErrorCard message="Missing checkout link. Please try again from the app." />;
@@ -266,7 +272,11 @@ export default async function CheckoutPage({
             priceAmount={priceAmount}
             priceLabel={priceLabel}
             allowCoupon={payload.kind === "course" || payload.kind === "subscription"}
-            returnUrl={returnUrl}
+            // A storefront buyer may not have the app at all, so the
+            // deep link back into it is withheld: firing it would take
+            // them to a browser error, or nowhere, straight after paying.
+            returnUrl={fromStore ? undefined : returnUrl}
+            fromStore={fromStore}
           />
         </CardContent>
       </Card>
