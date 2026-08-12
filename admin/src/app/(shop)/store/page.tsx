@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { getCurrentProfile } from "@/lib/auth";
 import { Card, CardContent } from "@/components/ui/card";
 import { BuyButton } from "./buy-button";
 
@@ -103,6 +104,24 @@ export default async function StorePage() {
     courseRows.length === 0 &&
     sessionRows.length === 0;
 
+  // Shown only to staff, and only to answer one question that nothing
+  // else on the page can: is a missing buy button a broken query, an
+  // unpublished course, or a course whose price is genuinely zero?
+  // Those three look identical from the outside, which is exactly how
+  // the first version of this page wasted a round of testing.
+  const profile = await getCurrentProfile();
+  const isStaff =
+    profile !== null &&
+    ["admin", "content_manager", "support"].includes(profile.role);
+
+  const pricedCourses = courseRows.filter((c) => c.price_amount > 0).length;
+  const allCourses = isStaff
+    ? await db
+        .from("courses")
+        .select("id, status, price_amount")
+        .returns<{ id: string; status: string; price_amount: number }[]>()
+    : null;
+
   return (
     <div className="space-y-14">
       <section>
@@ -114,6 +133,54 @@ export default async function StorePage() {
           same email. Everything you have bought is already waiting.
         </p>
       </section>
+
+      {isStaff && (
+        <div className="rounded-lg border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900">
+          <p className="font-semibold">
+            Staff diagnostic — only you can see this
+          </p>
+          <ul className="mt-2 list-disc space-y-1 pl-5">
+            <li>
+              Membership plans marked active: <strong>{planRows.length}</strong>
+              {planRows.length === 0 &&
+                " — nothing to sell. Admin → Membership, mark a plan active."}
+            </li>
+            <li>
+              Published courses: <strong>{courseRows.length}</strong>, of which{" "}
+              <strong>{pricedCourses}</strong> have a price above zero.
+              {courseRows.length > 0 && pricedCourses === 0 && (
+                <>
+                  {" "}
+                  A course priced at ₹0 is free, so it shows without a buy
+                  button — that is the page working, not failing. Set a price
+                  in Admin → Courses → Edit.
+                </>
+              )}
+            </li>
+            {allCourses?.data && (
+              <li>
+                All courses in the database:{" "}
+                <strong>{allCourses.data.length}</strong> (
+                {allCourses.data.filter((c) => c.status === "published").length}{" "}
+                published,{" "}
+                {allCourses.data.filter((c) => c.status === "draft").length}{" "}
+                draft,{" "}
+                {allCourses.data.filter((c) => c.status === "archived").length}{" "}
+                archived). Only published ones can appear here.
+              </li>
+            )}
+            <li>
+              Upcoming priced live sessions:{" "}
+              <strong>{sessionRows.length}</strong>
+            </li>
+          </ul>
+          <p className="mt-2 text-xs">
+            Prices are stored in paise for courses and sessions, and in rupees
+            for membership plans. A course showing ₹4.99 instead of ₹499 would
+            mean that conversion is wrong somewhere.
+          </p>
+        </div>
+      )}
 
       {failures.length > 0 && (
         <div className="rounded-lg border border-destructive/40 bg-destructive/5 p-4 text-sm">
