@@ -187,11 +187,19 @@ HOW TO REACH EACH FEATURE
     the account immediately and cannot be undone, so please use a throwaway
     signup rather than the demo account above if you want to test it.
 
-PAYMENTS
-Courses and seats at live sessions are sold through an external web page at
-pay.anuragrishi.com, opened in the device browser. Payment is handled by
-Razorpay, an Indian payment gateway, in Indian rupees. There is no purchase
-flow inside the app itself.
+READER APP — GUIDELINE 3.1.3(a)
+This build contains no purchase mechanism of any kind. There are no prices,
+no purchase buttons, no checkout, and no links to any page where a purchase
+can be made. Guided meditations, talks, courses and live sessions are
+acquired outside the app entirely; the app signs the user in and plays the
+content their account already has.
+
+Content that the signed-in account does not have access to is shown with a
+lock and no price, and tapping it explains that access is required. Nothing
+in the app offers a way to obtain that access.
+
+The demo account above has active access, so the reviewer can see the full
+signed-in experience rather than only the locked state.
 
 MICROPHONE
 Requested only when the user taps the microphone in the guide, for dictation.
@@ -329,3 +337,13 @@ declarations apply.
 - [ ] Fill the remaining CONFIRM values in `admin/src/lib/legal.ts` — the
       phone number and postal address are still placeholders, and they appear
       on the contact page a reviewer will open.
+- [ ] **iOS only:** walk the build signed out and on a free account and
+      confirm no price, no "Get Access", no "Register • ₹…" and no link to
+      pay.anuragrishi.com appears anywhere. One survivor loses the reader-app
+      exception and the rejection comes back. `kPurchaseUiEnabled` in
+      `mobile_app/lib/core/config/purchase_config.dart` is the switch; the
+      places it reaches are listed there.
+- [ ] **iOS only:** check the scheduled pop-up's CTA label in the admin
+      Settings page. It is free text stored in the database, so a label like
+      "Register ₹499" would put a price on an iOS screen that no code change
+      can catch.

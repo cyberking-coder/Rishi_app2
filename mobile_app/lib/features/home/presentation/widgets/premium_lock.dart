@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../../../core/config/checkout_config.dart';
+import '../../../../core/config/purchase_config.dart';
 import '../../../access/application/access_providers.dart';
 import '../../../access/data/checkout_remote_datasource.dart';
 
@@ -28,11 +29,17 @@ class PremiumLockBadge extends StatelessWidget {
   }
 }
 
-/// Shown when a free-tier user taps premium content. "Get Access Now" opens
-/// an external browser to the web checkout (never in-app — deliberately,
-/// to stay outside Apple/Google's in-app purchase requirements for
-/// digital content). Never says "buy"/"premium"/"subscribe" next to the
-/// button, only "Get Access Now".
+/// Shown when a free-tier user taps premium content.
+///
+/// On Android, "Get Access Now" opens an external browser to the web
+/// checkout (never in-app — deliberately, to stay outside Google's
+/// in-app purchase requirements for digital content). Never says
+/// "buy"/"premium"/"subscribe" next to the button, only "Get Access
+/// Now".
+///
+/// On iOS there is no button and no route to payment at all — see
+/// [kPurchaseUiEnabled]. The dialog only explains that the content
+/// needs access, which is what a reader app is allowed to say.
 void showPremiumLockedMessage(BuildContext context, WidgetRef ref) {
   showDialog<void>(
     context: context,
@@ -96,6 +103,19 @@ class _PremiumLockedDialogState extends ConsumerState<_PremiumLockedDialog> {
 
   @override
   Widget build(BuildContext context) {
+    if (!kPurchaseUiEnabled) {
+      return AlertDialog(
+        title: const Text('Members only'),
+        content: const Text(kLockedContentMessage),
+        actions: [
+          FilledButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('OK'),
+          ),
+        ],
+      );
+    }
+
     return AlertDialog(
       title: const Text('Premium content'),
       content: Column(

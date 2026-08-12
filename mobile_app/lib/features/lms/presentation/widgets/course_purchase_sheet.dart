@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../../../app/theme/app_theme.dart';
+import '../../../../core/config/purchase_config.dart';
 import '../../../access/application/access_providers.dart';
 
 /// Prompts to buy a single course.
@@ -11,7 +12,12 @@ import '../../../access/application/access_providers.dart';
 /// subscription lock dialog: the price shown is the course's own, and
 /// checkout targets the course rather than the plan. Payment happens in
 /// an external browser, never in-app — deliberately, to stay outside
-/// Apple/Google's in-app purchase rules for digital content.
+/// Google's in-app purchase rules for digital content.
+///
+/// On iOS the price and the button are both gone and this is only an
+/// explanation that the course is locked — see [kPurchaseUiEnabled].
+/// The sheet still opens rather than the tap doing nothing, because a
+/// locked lesson that silently ignores you reads as a broken app.
 Future<void> showCoursePurchaseSheet(
   BuildContext context,
   WidgetRef ref, {
@@ -129,30 +135,34 @@ class _CoursePurchaseSheetState extends ConsumerState<_CoursePurchaseSheet> {
           ),
         ),
         const SizedBox(height: 6),
-        const Text(
-          'Get lifetime access to every lesson in this course.',
+        Text(
+          kPurchaseUiEnabled
+              ? 'Get lifetime access to every lesson in this course.'
+              : kLockedContentMessage,
           textAlign: TextAlign.center,
-          style: TextStyle(
+          style: const TextStyle(
             fontSize: 13,
             color: AppTheme.textSecondary,
             height: 1.5,
           ),
         ),
-        const SizedBox(height: 18),
 
-        Text(
-          widget.priceLabel,
-          style: const TextStyle(
-            fontSize: 30,
-            fontWeight: FontWeight.w800,
-            color: AppTheme.textPrimary,
+        if (kPurchaseUiEnabled) ...[
+          const SizedBox(height: 18),
+          Text(
+            widget.priceLabel,
+            style: const TextStyle(
+              fontSize: 30,
+              fontWeight: FontWeight.w800,
+              color: AppTheme.textPrimary,
+            ),
           ),
-        ),
-        const SizedBox(height: 4),
-        const Text(
-          'One-time payment',
-          style: TextStyle(fontSize: 12, color: AppTheme.textSecondary),
-        ),
+          const SizedBox(height: 4),
+          const Text(
+            'One-time payment',
+            style: TextStyle(fontSize: 12, color: AppTheme.textSecondary),
+          ),
+        ],
 
         if (_error != null) ...[
           const SizedBox(height: 14),
@@ -168,30 +178,39 @@ class _CoursePurchaseSheetState extends ConsumerState<_CoursePurchaseSheet> {
         ],
 
         const SizedBox(height: 20),
-        SizedBox(
-          width: double.infinity,
-          child: FilledButton(
-            onPressed: _loading ? null : _buy,
-            child: _loading
-                ? const SizedBox(
-                    height: 18,
-                    width: 18,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2,
-                      color: Colors.white,
-                    ),
-                  )
-                : const Text('Get Access Now'),
+        if (kPurchaseUiEnabled) ...[
+          SizedBox(
+            width: double.infinity,
+            child: FilledButton(
+              onPressed: _loading ? null : _buy,
+              child: _loading
+                  ? const SizedBox(
+                      height: 18,
+                      width: 18,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: Colors.white,
+                      ),
+                    )
+                  : const Text('Get Access Now'),
+            ),
           ),
-        ),
-        const SizedBox(height: 8),
-        TextButton(
-          onPressed: _loading ? null : () => Navigator.pop(context),
-          child: const Text(
-            'Not now',
-            style: TextStyle(color: AppTheme.textSecondary),
+          const SizedBox(height: 8),
+          TextButton(
+            onPressed: _loading ? null : () => Navigator.pop(context),
+            child: const Text(
+              'Not now',
+              style: TextStyle(color: AppTheme.textSecondary),
+            ),
           ),
-        ),
+        ] else
+          SizedBox(
+            width: double.infinity,
+            child: FilledButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('OK'),
+            ),
+          ),
       ]),
     );
   }
