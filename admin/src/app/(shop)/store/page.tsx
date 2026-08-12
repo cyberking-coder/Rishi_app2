@@ -54,7 +54,12 @@ function formatPrice(rupees: number, currency: string): string {
   return `${symbol}${rupees % 1 === 0 ? rupees : rupees.toFixed(2)}`;
 }
 
-export default async function StorePage() {
+export default async function StorePage({
+  searchParams,
+}: {
+  searchParams: Promise<{ debug?: string }>;
+}) {
+  const { debug } = await searchParams;
   const db = createAdminClient();
 
   const [plans, courses, sessions] = await Promise.all([
@@ -139,6 +144,47 @@ export default async function StorePage() {
           same email. Everything you have bought is already waiting.
         </p>
       </section>
+
+      {/* /store?debug=1 — what the server actually fetched, and the
+          exact type of every price, because a string "0" and a number 0
+          behave differently in the comparison that decides whether a
+          buy button appears. Deliberately not gated on a login: it
+          shows only fields this page already renders publicly, and the
+          people who need it are the ones who cannot get the staff panel
+          to appear. */}
+      {debug === "1" && (
+        <pre className="overflow-x-auto rounded-lg border bg-muted p-4 text-xs">
+          {JSON.stringify(
+            {
+              errors: {
+                plans: plans.error?.message ?? null,
+                courses: courses.error?.message ?? null,
+                sessions: sessions.error?.message ?? null,
+              },
+              counts: {
+                plans: planRows.length,
+                courses: courseRows.length,
+                sessions: sessionRows.length,
+              },
+              courses: courseRows.map((c) => ({
+                title: c.title,
+                price_amount: c.price_amount,
+                price_type: typeof c.price_amount,
+                gt_zero: c.price_amount > 0,
+                currency: c.currency,
+              })),
+              plans: planRows.map((p) => ({
+                name: p.name,
+                price: p.price,
+                price_type: typeof p.price,
+                currency: p.currency,
+              })),
+            },
+            null,
+            2,
+          )}
+        </pre>
+      )}
 
       {isStaff && (
         <div className="rounded-lg border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900">
