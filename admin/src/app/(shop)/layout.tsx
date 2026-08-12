@@ -62,6 +62,16 @@ export default async function ShopLayout({
           <p className="mt-1">
             {legal.email} · {legal.phone}
           </p>
+          {/* Which commit is actually serving this page.
+              Two rounds were spent arguing about whether a fix was live,
+              from a screenshot that could not answer it — a preview URL
+              and the production domain look identical once rendered.
+              Vercel sets this at build time; locally there is no commit
+              to report, hence the fallback. */}
+          <p className="mt-3 text-xs opacity-60">
+            build{" "}
+            {process.env.VERCEL_GIT_COMMIT_SHA?.slice(0, 7) ?? "local"}
+          </p>
         </div>
       </footer>
     </div>
