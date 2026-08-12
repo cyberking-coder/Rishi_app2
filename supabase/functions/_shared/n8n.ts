@@ -118,6 +118,18 @@ export interface LifecycleNotification {
   days_before: number;
   /** ISO timestamp the access window ends (or ended). */
   expires_at: string;
+  /** Where to go to renew. Filled in by `notifyN8nLifecycle` from
+   *  STOREFRONT_URL, so no caller has to know it.
+   *
+   *  This is the whole renewal path for an iOS member. Membership is a
+   *  manually renewed grant — a payment buys N days and the person pays
+   *  again when it lapses — and the iOS build carries no purchase UI at
+   *  all under App Store Guideline 3.1.3(a), so there is no "Get Access
+   *  Now" for them to tap and the app is not permitted to link them to
+   *  one. The WhatsApp and email templates are the only place that link
+   *  can appear, which makes this field the difference between a lapsed
+   *  iPhone member renewing and having no way to. */
+  renew_url?: string;
 }
 
 /** Sent to its own workflow rather than the payment one. A payment
@@ -143,10 +155,30 @@ export async function notifyN8nLifecycle(
     return;
   }
 
+  // Said out loud rather than left as an empty field, because the
+  // consequence is invisible from here: without it the message reaches
+  // an iOS member with nowhere to renew, and the app cannot offer them
+  // one. A missing renewal link looks like a working notification.
+  const storefront = Deno.env.get("STOREFRONT_URL");
+  if (!storefront) {
+    console.warn(
+      `STOREFRONT_URL is not set, so this expiry message carries no ` +
+        `renewal link. iOS members have no in-app way to renew — this ` +
+        `link is their only path.`,
+    );
+  }
+
+  const body: LifecycleNotification = {
+    ...notification,
+    renew_url: storefront
+      ? `${storefront.replace(/\/+$/, "")}/store`
+      : undefined,
+  };
+
   const res = await fetch(webhookUrl, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(notification),
+    body: JSON.stringify(body),
   });
 
   if (!res.ok) {
