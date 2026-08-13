@@ -2,6 +2,7 @@ import Link from "next/link";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient as createUserClient } from "@/lib/supabase/server";
 import { getCurrentProfile } from "@/lib/auth";
+import { legal } from "@/lib/legal";
 import { Card, CardContent } from "@/components/ui/card";
 import { BuyButton } from "./buy-button";
 
@@ -134,24 +135,40 @@ export default async function StorePage({
     : null;
 
   return (
-    <div className="space-y-14">
+    <div className="space-y-12">
+      {/* ── Hero ─────────────────────────────────────────────── */}
       <section>
-        <h1 className="text-3xl font-semibold tracking-tight">
+        <p className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+          Know Thyself
+        </p>
+        <h1 className="mt-2 text-3xl font-semibold tracking-tight sm:text-4xl">
           Choose your access
         </h1>
-        <p className="mt-3 max-w-2xl text-muted-foreground">
-          Pay once here, then open the Know Thyself app and sign in with the
-          same email. Everything you have bought is already waiting.
+        <p className="mt-3 max-w-xl text-muted-foreground">
+          Pay here, then open the app and sign in with the same email.
+          Everything you have bought is already waiting.
         </p>
+
+        {/* The account is stated up here rather than in a panel at the
+            foot of the page. Access is granted to the account that pays,
+            so which one you are signed into is a thing to check before
+            buying, not after. */}
+        {buyerEmail ? (
+          <p className="mt-5 inline-flex flex-wrap items-center gap-x-2 rounded-full bg-secondary px-4 py-2 text-sm">
+            <span className="text-muted-foreground">Buying as</span>
+            <span className="font-medium">{buyerEmail}</span>
+          </p>
+        ) : (
+          <p className="mt-5 text-sm text-muted-foreground">
+            Already bought something?{" "}
+            <Link href="/store/signin" className="font-medium text-foreground underline underline-offset-4">
+              Sign in
+            </Link>{" "}
+            — you never need to buy the same thing twice.
+          </p>
+        )}
       </section>
 
-      {/* /store?debug=1 — what the server actually fetched, and the
-          exact type of every price, because a string "0" and a number 0
-          behave differently in the comparison that decides whether a
-          buy button appears. Deliberately not gated on a login: it
-          shows only fields this page already renders publicly, and the
-          people who need it are the ones who cannot get the staff panel
-          to appear. */}
       {debug === "1" && (
         <pre className="overflow-x-auto rounded-lg border bg-muted p-4 text-xs">
           {JSON.stringify(
@@ -188,9 +205,7 @@ export default async function StorePage({
 
       {isStaff && (
         <div className="rounded-lg border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900">
-          <p className="font-semibold">
-            Staff diagnostic — only you can see this
-          </p>
+          <p className="font-semibold">Staff diagnostic — only you can see this</p>
           <ul className="mt-2 list-disc space-y-1 pl-5">
             <li>
               Membership plans marked active: <strong>{planRows.length}</strong>
@@ -200,14 +215,6 @@ export default async function StorePage({
             <li>
               Published courses: <strong>{courseRows.length}</strong>, of which{" "}
               <strong>{pricedCourses}</strong> have a price above zero.
-              {courseRows.length > 0 && pricedCourses === 0 && (
-                <>
-                  {" "}
-                  A course priced at ₹0 is free, so it shows without a buy
-                  button — that is the page working, not failing. Set a price
-                  in Admin → Courses → Edit.
-                </>
-              )}
             </li>
             {allCourses?.data && (
               <li>
@@ -215,22 +222,15 @@ export default async function StorePage({
                 <strong>{allCourses.data.length}</strong> (
                 {allCourses.data.filter((c) => c.status === "published").length}{" "}
                 published,{" "}
-                {allCourses.data.filter((c) => c.status === "draft").length}{" "}
-                draft,{" "}
+                {allCourses.data.filter((c) => c.status === "draft").length} draft,{" "}
                 {allCourses.data.filter((c) => c.status === "archived").length}{" "}
                 archived). Only published ones can appear here.
               </li>
             )}
             <li>
-              Upcoming priced live sessions:{" "}
-              <strong>{sessionRows.length}</strong>
+              Upcoming priced live sessions: <strong>{sessionRows.length}</strong>
             </li>
           </ul>
-          <p className="mt-2 text-xs">
-            Prices are stored in paise for courses and sessions, and in rupees
-            for membership plans. A course showing ₹4.99 instead of ₹499 would
-            mean that conversion is wrong somewhere.
-          </p>
         </div>
       )}
 
@@ -261,33 +261,30 @@ export default async function StorePage({
         </div>
       )}
 
+      {/* ── Membership ───────────────────────────────────────── */}
       {planRows.length > 0 && (
-        <section className="space-y-5">
-          <div>
-            <h2 className="text-xl font-semibold">Membership</h2>
-            <p className="mt-1 text-sm text-muted-foreground">
-              Unlocks every guided meditation and talk in the library.
-            </p>
-          </div>
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <section>
+          <SectionHeading
+            title="Membership"
+            subtitle="Unlocks every guided meditation and talk in the library."
+          />
+          <div className="grid gap-5 sm:grid-cols-2 xl:grid-cols-3">
             {planRows.map((plan) => (
-              <Card key={plan.id} className="flex h-full flex-col">
-                <CardContent className="flex flex-1 flex-col gap-3 p-5">
-                  <h3 className="font-semibold">{plan.name}</h3>
+              <Card key={plan.id} className="flex flex-col">
+                <CardContent className="flex flex-1 flex-col p-6">
+                  <h3 className="text-lg font-semibold">{plan.name}</h3>
                   {plan.description && (
-                    <p className="text-sm text-muted-foreground">
+                    <p className="mt-2 line-clamp-3 text-sm text-muted-foreground">
                       {plan.description}
                     </p>
                   )}
-                  <p className="mt-auto pt-2 text-2xl font-semibold">
-                    {/* Plans store rupees; courses and sessions store
-                        paise. Getting this backwards prices a ₹499 plan
-                        at ₹4.99, which Razorpay would happily charge. */}
-                    {formatPrice(plan.price, plan.currency)}
-                    <span className="ml-1 text-sm font-normal text-muted-foreground">
-                      / {plan.billing_interval.replace("ly", "")}
-                    </span>
-                  </p>
+                  <PriceBlock
+                    /* Plans store rupees; courses and sessions store paise.
+                       Getting this backwards prices a ₹499 plan at ₹4.99,
+                       which Razorpay would charge without complaint. */
+                    price={formatPrice(plan.price, plan.currency)}
+                    note={`per ${plan.billing_interval.replace("ly", "")}`}
+                  />
                   <BuyButton target={{ kind: "plan", id: plan.id }} />
                 </CardContent>
               </Card>
@@ -296,60 +293,54 @@ export default async function StorePage({
         </section>
       )}
 
+      {/* ── Courses ──────────────────────────────────────────── */}
       {courseRows.length > 0 && (
-        <section className="space-y-5">
-          <div>
-            <h2 className="text-xl font-semibold">Courses</h2>
-            <p className="mt-1 text-sm text-muted-foreground">
-              Bought once, yours for good.
-            </p>
-          </div>
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <section>
+          <SectionHeading title="Courses" subtitle="Bought once, yours for good." />
+          <div className="grid gap-5 sm:grid-cols-2 xl:grid-cols-3">
             {courseRows.map((course) => (
-              // flex-col on the Card, flex-1 on the content — NOT
-              // h-full on the content. h-full resolved to the full
-              // stretched height of the grid cell, so the content box
-              // started below the cover image and ran that same height
-              // again, putting the price and the buy button outside the
-              // card's own overflow-hidden boundary. They rendered into
-              // the DOM and were clipped, which looked exactly like a
-              // branch that had not run at all.
-              <Card key={course.id} className="flex h-full flex-col overflow-hidden">
-                {course.cover_image_url && (
+              // flex-col on the Card, flex-1 on the content — NOT h-full
+              // on the content. h-full resolved to the full stretched
+              // height of the grid cell, so the content box started below
+              // the cover image and ran that same height again, putting
+              // the price and the button outside the card's own
+              // overflow-hidden boundary. They rendered and were clipped,
+              // which looked exactly like a branch that never ran.
+              <Card key={course.id} className="flex flex-col overflow-hidden">
+                {course.cover_image_url ? (
                   // eslint-disable-next-line @next/next/no-img-element
                   <img
                     src={course.cover_image_url}
                     alt=""
                     className="aspect-video w-full object-cover"
                   />
+                ) : (
+                  // A tinted panel rather than nothing, so a course with
+                  // no artwork still lines up with the ones that have it.
+                  <div className="aspect-video w-full bg-secondary" />
                 )}
-                <CardContent className="flex flex-1 flex-col gap-3 p-5">
-                  <h3 className="font-semibold">{course.title}</h3>
+                <CardContent className="flex flex-1 flex-col p-6">
+                  <h3 className="text-lg font-semibold">{course.title}</h3>
                   {course.description && (
-                    <p className="line-clamp-3 text-sm text-muted-foreground">
+                    <p className="mt-2 line-clamp-2 text-sm text-muted-foreground">
                       {course.description}
                     </p>
                   )}
                   {course.price_amount > 0 ? (
                     <>
-                      <p className="mt-auto pt-2 text-2xl font-semibold">
-                        {formatPrice(
-                          course.price_amount / 100,
-                          course.currency,
-                        )}
-                      </p>
+                      <PriceBlock
+                        price={formatPrice(course.price_amount / 100, course.currency)}
+                        note="one-time"
+                      />
                       <BuyButton target={{ kind: "course", id: course.id }} />
                     </>
                   ) : (
                     <>
-                      <p className="mt-auto pt-2 text-2xl font-semibold">
-                        Free
-                      </p>
+                      <PriceBlock price="Free" />
                       {/* No buy button, because there is nothing to buy.
-                          mint-checkout-token would answer for it, and
-                          the webhook grants a free course by row insert
-                          rather than by payment — sending someone to
-                          Razorpay for ₹0 has no path back. */}
+                          The webhook grants a free course by row insert
+                          rather than by payment, so a ₹0 Razorpay order
+                          has no path back. */}
                       <p className="text-sm text-muted-foreground">
                         Open the app and sign in — this one is already yours.
                       </p>
@@ -362,20 +353,18 @@ export default async function StorePage({
         </section>
       )}
 
+      {/* ── Live sessions ────────────────────────────────────── */}
       {sessionRows.length > 0 && (
-        <section className="space-y-5">
-          <div>
-            <h2 className="text-xl font-semibold">Live sessions</h2>
-            <p className="mt-1 text-sm text-muted-foreground">
-              A seat at an upcoming session. Seats are limited.
-            </p>
-          </div>
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <section>
+          <SectionHeading
+            title="Live sessions"
+            subtitle="A seat at an upcoming session. Seats are limited."
+          />
+          <div className="grid gap-5 sm:grid-cols-2 xl:grid-cols-3">
             {sessionRows.map((session) => (
-              <Card key={session.id} className="flex h-full flex-col">
-                <CardContent className="flex flex-1 flex-col gap-3 p-5">
-                  <h3 className="font-semibold">{session.title}</h3>
-                  <p className="text-sm text-muted-foreground">
+              <Card key={session.id} className="flex flex-col">
+                <CardContent className="flex flex-1 flex-col p-6">
+                  <p className="inline-flex w-fit rounded-full bg-secondary px-3 py-1 text-xs font-medium">
                     {new Date(session.starts_at).toLocaleString("en-IN", {
                       dateStyle: "medium",
                       timeStyle: "short",
@@ -383,17 +372,19 @@ export default async function StorePage({
                     })}{" "}
                     IST
                   </p>
+                  <h3 className="mt-3 text-lg font-semibold">{session.title}</h3>
                   {session.description && (
-                    <p className="line-clamp-3 text-sm text-muted-foreground">
+                    <p className="mt-2 line-clamp-2 text-sm text-muted-foreground">
                       {session.description}
                     </p>
                   )}
-                  <p className="mt-auto pt-2 text-2xl font-semibold">
-                    {formatPrice(
+                  <PriceBlock
+                    price={formatPrice(
                       (session.price_amount ?? 0) / 100,
                       session.currency,
                     )}
-                  </p>
+                    note="per seat"
+                  />
                   <BuyButton target={{ kind: "session", id: session.id }} />
                 </CardContent>
               </Card>
@@ -402,28 +393,70 @@ export default async function StorePage({
         </section>
       )}
 
-      <section className="rounded-lg border p-5 text-sm text-muted-foreground">
-        {profile || buyerEmail ? (
-          <p>
-            You are signed in as{" "}
-            <span className="font-medium text-foreground">{buyerEmail}</span>.
-            Anything you buy is added to this account, so sign in to the app
-            with the same email.
-          </p>
-        ) : (
-          <p>
-            Already bought something? You do not need to buy it again — open the
-            app and sign in with the same email.{" "}
-            <Link
-              href="/store/signin"
-              className="underline hover:text-foreground"
+      {/* ── What happens next ────────────────────────────────── */}
+      {!empty && (
+        <section className="rounded-2xl border bg-card p-6 sm:p-8">
+          <h2 className="text-lg font-semibold">After you pay</h2>
+          <ol className="mt-5 grid gap-6 sm:grid-cols-3">
+            {[
+              ["1", "Pay on this page", "Card, UPI or net banking, through Razorpay."],
+              ["2", "Get the app", "Search the App Store or Play Store for Know Thyself."],
+              ["3", "Sign in", "Use the same email you paid with, and it is already unlocked."],
+            ].map(([n, title, body]) => (
+              <li key={n} className="flex gap-3">
+                <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-secondary text-sm font-semibold">
+                  {n}
+                </span>
+                <span>
+                  <span className="block font-medium">{title}</span>
+                  <span className="mt-1 block text-sm text-muted-foreground">
+                    {body}
+                  </span>
+                </span>
+              </li>
+            ))}
+          </ol>
+          <p className="mt-6 text-sm text-muted-foreground">
+            Something not right? Write to{" "}
+            <a
+              href={`mailto:${legal.email}`}
+              className="font-medium text-foreground underline underline-offset-4"
             >
-              Sign in here
-            </Link>{" "}
-            to see what your account already has.
+              {legal.email}
+            </a>
+            .
           </p>
-        )}
-      </section>
+        </section>
+      )}
+    </div>
+  );
+}
+
+/// One heading treatment for all three sections, so they read as a set
+/// rather than three variations on a theme.
+function SectionHeading({
+  title,
+  subtitle,
+}: {
+  title: string;
+  subtitle: string;
+}) {
+  return (
+    <div className="mb-5">
+      <h2 className="text-xl font-semibold tracking-tight">{title}</h2>
+      <p className="mt-1 text-sm text-muted-foreground">{subtitle}</p>
+    </div>
+  );
+}
+
+/// Pinned to the bottom of whatever card it is in, so prices line up
+/// across a row no matter how long the titles and descriptions above
+/// them run.
+function PriceBlock({ price, note }: { price: string; note?: string }) {
+  return (
+    <div className="mt-auto flex items-baseline gap-2 pb-4 pt-6">
+      <span className="text-2xl font-semibold">{price}</span>
+      {note && <span className="text-sm text-muted-foreground">{note}</span>}
     </div>
   );
 }
