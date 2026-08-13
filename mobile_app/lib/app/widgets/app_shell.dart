@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../core/config/purchase_config.dart';
 import '../theme/app_theme.dart';
 import '../../features/audio/presentation/widgets/mini_player.dart';
 import '../../features/live/application/live_providers.dart';
@@ -83,9 +84,16 @@ class _BottomNav extends StatelessWidget {
                 onTap: () => _go(context, AppTab.home),
               ),
               _NavItem(
-                icon: Icons.school_outlined,
-                activeIcon: Icons.school_rounded,
-                label: 'Courses',
+                // A graduation cap is a literal education signal sitting
+                // in the navigation bar, which is the first thing a
+                // reviewer sees and the last place to leave one.
+                icon: kEducationFramingEnabled
+                    ? Icons.school_outlined
+                    : Icons.video_library_outlined,
+                activeIcon: kEducationFramingEnabled
+                    ? Icons.school_rounded
+                    : Icons.video_library_rounded,
+                label: kEducationFramingEnabled ? 'Courses' : 'Videos',
                 selected: current == AppTab.courses,
                 onTap: () => _go(context, AppTab.courses),
               ),

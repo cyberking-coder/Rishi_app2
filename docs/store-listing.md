@@ -43,10 +43,19 @@ Meditation & Inner Stillness
 
 ### Promotional text (170 max — editable without a new build)
 ```
-New: ask the guide anything, in English, Hindi or Marathi — by voice or by typing. Plus guided courses, live sessions with Anurag Rishi, and offline listening.
+New: ask the guide anything, in English, Hindi or Marathi — by voice or by typing. Plus guided video series, live sessions with Anurag Rishi, and offline listening.
 ```
 
 ### Description (4000 max)
+
+> **Apple copy only.** Play keeps the course wording further down — Android is
+> not claiming the reader-app exception and has nothing to gain from the
+> reframing. The words here are chosen against Guideline 3.1.3(a), which
+> enumerates magazines, newspapers, books, audio, music and video and says
+> nothing about education: "course", "lesson" and "certificate" are the three
+> that invite the reviewer to file this under the one category the exception
+> does not cover.
+
 ```
 Know Thyself — Find Peace Within
 
@@ -69,12 +78,11 @@ Spoken sessions to relax, refocus and reconnect, alongside talks and teachings
 that bring clarity rather than noise. Browse by category or search for what you
 need in the moment.
 
-COURSES, ONE LESSON AT A TIME
+VIDEO SERIES
 
-Structured programmes that build. Each lesson unlocks as you go, your place is
-remembered, and finished courses issue a certificate you can keep and share.
-Course materials — worksheets, readings, audio — come attached to the lessons
-they belong to.
+Guided series that build episode by episode. The next one opens as you go, your
+place is remembered, and the readings and audio that belong with an episode sit
+alongside it.
 
 LIVE SESSIONS
 
@@ -93,7 +101,7 @@ stay awake to stop it.
 IT REMEMBERS WHERE YOU WERE
 
 Close the app mid-session and open it a week later; it picks up at the same
-second. Your progress, your downloads and your place in every course follow
+second. Your progress, your downloads and your place in every series follow
 your account.
 
 MADE TO BE CALM
@@ -165,7 +173,7 @@ Also in this update:
 ```
 DEMO ACCOUNT
 The account below is signed in and has an active membership, so every
-screen — including paid courses and live sessions — is reachable without
+screen — including paid series and live sessions — is reachable without
 making a purchase.
 
   Email:    <FILL IN>
@@ -181,7 +189,7 @@ HOW TO REACH EACH FEATURE
   • Ask the guide — Home tab, the "Ask the guide" row under the search bar.
     The microphone is at the right of the message box. It needs the
     microphone permission and a network connection.
-  • Courses — Courses tab. The demo account has access to all of them.
+  • Video series — Videos tab. The demo account has access to all of them.
   • Live sessions — Home tab, "Live sessions".
   • Account deletion — Profile tab → Settings → Delete account. This deletes
     the account immediately and cannot be undone, so please use a throwaway
@@ -190,7 +198,7 @@ HOW TO REACH EACH FEATURE
 READER APP — GUIDELINE 3.1.3(a)
 This build contains no purchase mechanism of any kind. There are no prices,
 no purchase buttons, no checkout, and no links to any page where a purchase
-can be made. Guided meditations, talks, courses and live sessions are
+can be made. Guided meditations, talks, video series and live sessions are
 acquired outside the app entirely; the app signs the user in and plays the
 content their account already has.
 

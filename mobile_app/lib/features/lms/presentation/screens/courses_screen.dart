@@ -43,8 +43,8 @@ class _CoursesScreenState extends ConsumerState<CoursesScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Padding(
-            padding: EdgeInsets.fromLTRB(20, 14, 20, 16),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(20, 14, 20, 16),
             child: Row(
               children: [
                 Expanded(
@@ -52,18 +52,20 @@ class _CoursesScreenState extends ConsumerState<CoursesScreen> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        'Courses',
-                        style: TextStyle(
+                        kEducationFramingEnabled ? 'Courses' : 'Videos',
+                        style: const TextStyle(
                           fontFamily: AppTheme.display,
                           fontSize: 30,
                           fontWeight: FontWeight.w600,
                           color: AppTheme.textPrimary,
                         ),
                       ),
-                      SizedBox(height: 5),
+                      const SizedBox(height: 5),
                       Text(
-                        'Guided programmes, one lesson at a time.',
-                        style: TextStyle(
+                        kEducationFramingEnabled
+                            ? 'Guided programmes, one lesson at a time.'
+                            : 'Guided video series, one episode at a time.',
+                        style: const TextStyle(
                           fontFamily: AppTheme.text,
                           fontSize: 14.5,
                           color: AppTheme.textSecondary,
@@ -81,7 +83,7 @@ class _CoursesScreenState extends ConsumerState<CoursesScreen> {
                   child: Stack(
                     clipBehavior: Clip.none,
                     children: [
-                      Positioned(
+                      const Positioned(
                         right: -34,
                         top: 2,
                         child: LeafSprig(size: 122, angle: -0.42, opacity: 0.6),
@@ -109,18 +111,22 @@ class _CoursesScreenState extends ConsumerState<CoursesScreen> {
               ),
               error: (e, _) => _EmptyState(
                 icon: Icons.cloud_off_rounded,
-                title: 'Could not load courses',
+                title: 'Could not load this',
                 subtitle: '$e',
               ),
               data: (courses) {
                 final visible = _apply(courses);
 
                 if (courses.isEmpty) {
-                  return const _EmptyState(
-                    icon: Icons.school_outlined,
-                    title: 'No courses yet',
+                  return _EmptyState(
+                    icon: kEducationFramingEnabled
+                        ? Icons.school_outlined
+                        : Icons.video_library_outlined,
+                    title: kEducationFramingEnabled
+                        ? 'No courses yet'
+                        : 'Nothing here yet',
                     subtitle:
-                        'New programmes will appear here as they are published.',
+                        'New releases will appear here as they are published.',
                   );
                 }
                 if (visible.isEmpty) {
@@ -337,7 +343,7 @@ class CourseCard extends StatelessWidget {
                         const SizedBox(width: 4),
                         Text(
                           course.owned
-                              ? 'Enrolled'
+                              ? (kEducationFramingEnabled ? 'Enrolled' : 'Yours')
                               : kPurchaseUiEnabled || course.isFree
                                   ? course.priceLabel
                                   : 'Locked',
@@ -410,7 +416,7 @@ class CourseCard extends StatelessWidget {
                           const SizedBox(width: 6),
                           Text(
                             '${course.lessonCount} '
-                            '${course.lessonCount == 1 ? "lesson" : "lessons"}',
+                            '${course.lessonCount == 1 ? kPartWord : "${kPartWord}s"}',
                             style: const TextStyle(
                               fontFamily: AppTheme.text,
                               fontSize: 13,

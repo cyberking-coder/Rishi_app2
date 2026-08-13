@@ -216,7 +216,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
             const SizedBox(height: 24),
 
             _SectionTitle(
-              title: 'Courses',
+              title: kEducationFramingEnabled ? 'Courses' : 'Videos',
               action: 'See all',
               onAction: () => context.go('/courses'),
             ),
@@ -809,11 +809,15 @@ class _CoursesRow extends ConsumerWidget {
       orElse: () => const SizedBox(height: 190),
       data: (courses) {
         if (courses.isEmpty) {
-          return const Padding(
-            padding: EdgeInsets.symmetric(horizontal: 20),
+          return Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 20),
             child: _EmptyHint(
-              icon: Icons.school_outlined,
-              text: 'Courses will appear here once they are published.',
+              icon: kEducationFramingEnabled
+                  ? Icons.school_outlined
+                  : Icons.video_library_outlined,
+              text: kEducationFramingEnabled
+                  ? 'Courses will appear here once they are published.'
+                  : 'New releases will appear here once they are published.',
             ),
           );
         }
@@ -984,7 +988,11 @@ class _CourseMiniCard extends StatelessWidget {
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         Text(
-                          course.isStarted ? 'Continue' : 'Start Course',
+                          course.isStarted
+                              ? 'Continue'
+                              : (kEducationFramingEnabled
+                                  ? 'Start Course'
+                                  : 'Watch'),
                           style: const TextStyle(
                             fontFamily: AppTheme.text,
                             fontSize: 14,
