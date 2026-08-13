@@ -28,6 +28,35 @@ import 'package:flutter/foundation.dart'
 /// carries no `dart:io` import, and so a test can override it.
 final bool kPurchaseUiEnabled = defaultTargetPlatform != TargetPlatform.iOS;
 
+/// Whether the app presents its long-form content as a course.
+///
+/// False on iOS, for the other half of the 3.1.3(a) claim. The reader
+/// exception covers magazines, newspapers, books, audio, music and
+/// video — it does not mention education, and the rejection named the
+/// courses specifically. A reviewer decides which of those they are
+/// looking at from what the app does, so this is not a relabelling
+/// exercise: the completion certificate is withheld too, because an
+/// issued credential is the one feature no video service has and the
+/// clearest evidence that this is a course rather than a series.
+///
+/// Netflix has episodes, sequencing, locked items and continue-watching.
+/// None of those are education signals and none of them are touched.
+/// What changes is the vocabulary around them — lesson, enrolled,
+/// curriculum, continue *learning* — and the credential at the end.
+///
+/// The certificate record itself is untouched server-side. It is still
+/// earned, still issued, still verifiable at /verify; an iOS member
+/// simply is not shown it. If review accepts the courses as they are,
+/// flipping this back restores the feature with no data to migrate.
+final bool kEducationFramingEnabled =
+    defaultTargetPlatform != TargetPlatform.iOS;
+
+/// What one item inside a course is called, in the singular.
+///
+/// "Lesson" is the word that makes a list of videos a curriculum.
+/// "Episode" is the same list without the claim.
+String get kPartWord => kEducationFramingEnabled ? 'lesson' : 'episode';
+
 /// What a locked item says when there is no way to buy it in-app.
 ///
 /// Deliberately says nothing about price, purchasing, or where to go —

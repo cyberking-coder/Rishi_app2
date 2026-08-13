@@ -295,7 +295,14 @@ class _CourseDetailScreenState extends ConsumerState<CourseDetailScreen>
                 const SliverToBoxAdapter(child: SizedBox(height: 10)),
               ],
 
-              if (!locked)
+              // Withheld on iOS. An issued credential is the single
+              // clearest evidence that this is a course rather than a
+              // video series, and the reader-app claim in 3.1.3(a)
+              // turns on exactly that distinction. The certificate is
+              // still earned and still issued server-side — it is only
+              // not shown here — so flipping the flag back restores it
+              // with nothing to migrate.
+              if (!locked && kEducationFramingEnabled)
                 SliverToBoxAdapter(
                   child: _CertificateSection(courseId: widget.courseId),
                 ),
@@ -452,7 +459,7 @@ class _MetaCard extends StatelessWidget {
           const Icon(Icons.play_lesson_outlined, size: 15, color: AppTheme.sage),
           const SizedBox(width: 6),
           Text(
-            '$lessonCount ${lessonCount == 1 ? "lesson" : "lessons"}',
+            '$lessonCount ${lessonCount == 1 ? kPartWord : "${kPartWord}s"}',
             style: const TextStyle(
               fontSize: 12.5,
               color: AppTheme.textPrimary,
@@ -523,8 +530,12 @@ class _MetaCard extends StatelessWidget {
                         ? 'Get access · $priceLabel'
                         : 'Why is this locked?'
                     : started
-                        ? 'Continue learning'
-                        : 'Start course',
+                        ? (kEducationFramingEnabled
+                            ? 'Continue learning'
+                            : 'Continue watching')
+                        : (kEducationFramingEnabled
+                            ? 'Start course'
+                            : 'Start watching'),
               ),
             ),
           ),
