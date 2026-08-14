@@ -223,6 +223,61 @@ opaque authorisation error.
 
 ---
 
+### TestFlight → Test Information (Beta App Review)
+
+Separate from App Review Notes above, and asked for once before the first
+external test. The Beta App Description is shown to **testers** inside
+TestFlight, so it is written for them rather than for a reviewer — but the
+beta reviewer reads it too, which is why it uses the same vocabulary as the
+App Store description and does not mention buying anything. See Section 7 on
+Guideline 3.1.3(a): a purchase call to action in this field would be one in
+the submission.
+
+**Beta App Description** (4000 max)
+```
+Know Thyself is a guided meditation app — spoken sessions, talks and video
+series from Anurag Rishi, with a companion you can ask for something to play.
+
+This build is for testing before release. Please try:
+
+  • Sign in with email, Google or Apple, and check you land on the home screen.
+  • Play a guided meditation. Lock the phone and confirm playback continues,
+    with controls on the lock screen.
+  • Download something, turn on Airplane Mode, and play it back.
+  • Open the Videos tab and watch an episode of a series.
+  • Ask the guide a question — type it, then tap the microphone and speak it.
+    Dictation needs the microphone permission; speech recognition runs on
+    your own device.
+  • Set a sleep timer and confirm the audio fades out on its own.
+  • Home tab → Live sessions, if one is scheduled.
+  • Profile → Settings → Delete account. Please use a throwaway signup for
+    this rather than the test account below, since it cannot be undone.
+
+Notes:
+
+  • One account works on one device at a time. Signing in on a second device
+    releases the first — if you see a device error, sign in again and it will
+    clear.
+  • The test account below already has full access, so nothing in the app
+    will ask you for payment.
+  • Report anything odd to the feedback email, or shake the device to send a
+    screenshot through TestFlight.
+```
+
+**Feedback Email**: `ar.happinessmovement@gmail.com`
+
+**Contact Information**: the Account Holder's own name, phone and email —
+Apple uses these to reach a person about the beta, and they are not shown to
+testers. CONFIRM against `admin/src/lib/legal.ts`, whose phone number is still
+a placeholder.
+
+**Sign-In Information**: tick *Sign-in required* and give the same demo
+account as App Review Notes above. It **must have active access** — a tester
+or reviewer who can only reach locked screens reports the app as broken, which
+is the most common way this step fails.
+
+---
+
 ## 3. Google Play Console
 
 ### App name (30 max)
