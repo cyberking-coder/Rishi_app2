@@ -3,6 +3,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient as createUserClient } from "@/lib/supabase/server";
 import { getCurrentProfile } from "@/lib/auth";
 import { legal } from "@/lib/legal";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { BuyButton } from "./buy-button";
 
@@ -133,6 +134,94 @@ export default async function StorePage({
         .select("id, status, price_amount")
         .returns<{ id: string; status: string; price_amount: number }[]>()
     : null;
+
+  // Signed out, this is an account page and nothing else — no prices, no
+  // catalogue, no buy buttons. Two reasons, and the second is the one
+  // that matters.
+  //
+  // It is the page the iOS app would link to under the External Link
+  // Account Entitlement, which permits a link out for creating and
+  // managing an account and nothing more. Netflix's netflix.com/more is
+  // this exact screen: Create Account, Manage Account, no plan and no
+  // price. A shopfront behind that link is a purchase mechanism reached
+  // from the app, which is what 3.1.1 rejected in the first place.
+  //
+  // It also means whoever pays has an account before they pay, which the
+  // checkout requires anyway — mint-checkout-token answers 401 without a
+  // session, and the entitlement is granted to a user id.
+  //
+  // The cost is real: somebody arriving from Instagram meets a sign-up
+  // before they see a price, and some of them leave. Deleting this block
+  // puts the catalogue back in front of everyone.
+  // ?debug=1 still bypasses this. Diagnosing an empty catalogue is
+  // something you do signed out as often as signed in, and a landing
+  // page that hides the diagnostics is a landing page that hides the
+  // fault.
+  if (!buyerEmail && debug !== "1") {
+    return (
+      <div className="mx-auto max-w-xl py-6 text-center sm:py-12">
+        <p className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+          Know Thyself
+        </p>
+        <h1 className="mt-3 text-3xl font-semibold tracking-tight sm:text-4xl">
+          Create your account
+        </h1>
+        <p className="mx-auto mt-4 max-w-md text-muted-foreground">
+          One account for everything — guided meditations, talks and series,
+          on this site and in the app.
+        </p>
+
+        <div className="mx-auto mt-8 flex max-w-xs flex-col gap-3">
+          <Button asChild size="lg">
+            <Link href="/store/signin?mode=signup">Create a free account</Link>
+          </Button>
+          <Button asChild size="lg" variant="outline">
+            <Link href="/store/signin">Sign in</Link>
+          </Button>
+        </div>
+
+        <p className="mt-8 text-sm text-muted-foreground">
+          Already using the app? Sign in with the same email and everything you
+          have is already here.
+        </p>
+
+        <div className="mt-12 border-t pt-8 text-left">
+          <h2 className="text-center text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+            How it works
+          </h2>
+          <ol className="mt-6 grid gap-6 sm:grid-cols-3">
+            {[
+              ["1", "Create your account", "An email address and a password. Nothing else."],
+              ["2", "Choose your access", "Membership, or a single series."],
+              ["3", "Open the app", "Sign in with the same email — it is already unlocked."],
+            ].map(([n, title, body]) => (
+              <li key={n} className="flex gap-3">
+                <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-secondary text-sm font-semibold">
+                  {n}
+                </span>
+                <span>
+                  <span className="block text-sm font-medium">{title}</span>
+                  <span className="mt-1 block text-sm text-muted-foreground">
+                    {body}
+                  </span>
+                </span>
+              </li>
+            ))}
+          </ol>
+        </div>
+
+        <p className="mt-10 text-sm text-muted-foreground">
+          Questions?{" "}
+          <a
+            href={`mailto:${legal.email}`}
+            className="font-medium text-foreground underline underline-offset-4"
+          >
+            {legal.email}
+          </a>
+        </p>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-12">

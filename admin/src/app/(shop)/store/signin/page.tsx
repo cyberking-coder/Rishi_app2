@@ -29,7 +29,13 @@ function SignInForm() {
   const params = useSearchParams();
   const target = decodeTarget(params.get("buy"));
 
-  const [mode, setMode] = useState<"signin" | "signup">("signin");
+  // Landing sends people here with ?mode=signup, so the button they
+  // pressed and the form they arrive at agree. Defaulting to sign-in
+  // regardless is how somebody who meant to register ends up being told
+  // their credentials are invalid.
+  const [mode, setMode] = useState<"signin" | "signup">(
+    params.get("mode") === "signup" ? "signup" : "signin",
+  );
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
