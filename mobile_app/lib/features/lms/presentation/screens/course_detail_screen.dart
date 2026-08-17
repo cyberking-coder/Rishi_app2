@@ -229,12 +229,15 @@ class _CourseDetailScreenState extends ConsumerState<CourseDetailScreen>
                   ),
               ),
 
-              const SliverToBoxAdapter(
+              SliverToBoxAdapter(
                 child: Padding(
-                    padding: EdgeInsets.fromLTRB(20, 24, 20, 10),
+                    padding: const EdgeInsets.fromLTRB(20, 24, 20, 10),
                     child: Text(
-                      'Lessons',
-                      style: TextStyle(
+                      // Missed in the first pass: the tab, the counts and
+                      // the buttons all said episode while the list they
+                      // sit above still announced itself as Lessons.
+                      kEducationFramingEnabled ? 'Lessons' : 'Episodes',
+                      style: const TextStyle(
                         fontSize: 17,
                         fontWeight: FontWeight.w800,
                         color: AppTheme.textPrimary,
