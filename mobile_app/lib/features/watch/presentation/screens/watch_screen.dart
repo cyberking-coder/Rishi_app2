@@ -143,22 +143,3 @@ class WatchScreen extends ConsumerWidget {
     );
   }
 }
-
-class _SectionLabel extends StatelessWidget {
-  final String text;
-
-  const _SectionLabel(this.text);
-
-  @override
-  Widget build(BuildContext context) {
-    return Text(
-      text.toUpperCase(),
-      style: const TextStyle(
-        fontSize: 11,
-        fontWeight: FontWeight.w700,
-        letterSpacing: 1.1,
-        color: AppTheme.textSecondary,
-      ),
-    );
-  }
-}
