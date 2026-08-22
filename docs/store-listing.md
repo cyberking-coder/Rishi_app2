@@ -10,7 +10,7 @@ marked, so an edit does not silently overflow and get truncated mid-word.
 
 - **iOS bundle ID:** `com.anuragrishi.knowthyself`
 - **Android package:** `com.knowthyself.app`
-- **Version:** 2.1.1 (build 14)
+- **Version:** 2.1.1 (build 15 locally; CI assigns its own)
 
 ---
 
@@ -43,7 +43,7 @@ Meditation & Inner Stillness
 
 ### Promotional text (170 max — editable without a new build)
 ```
-New: ask the guide anything, in English, Hindi or Marathi — by voice or by typing. Plus guided video series, live sessions with Anurag Rishi, and offline listening.
+New: ask the guide anything, in English, Hindi or Marathi — by voice or by typing. Plus guided video series from Anurag Rishi, and offline listening wherever you are.
 ```
 
 ### Description (4000 max)
@@ -55,6 +55,12 @@ New: ask the guide anything, in English, Hindi or Marathi — by voice or by typ
 > nothing about education: "course", "lesson" and "certificate" are the three
 > that invite the reviewer to file this under the one category the exception
 > does not cover.
+>
+> **Nothing here may describe a feature the build does not have.** Live
+> sessions and certificates were removed from the app, so every mention of
+> them was removed from this copy too — a description promising something a
+> reviewer cannot find is Guideline 2.3, and it would be a fresh rejection on
+> top of the one being answered.
 
 ```
 Know Thyself — Find Peace Within
@@ -83,12 +89,6 @@ VIDEO SERIES
 Guided series that build episode by episode. The next one opens as you go, your
 place is remembered, and the readings and audio that belong with an episode sit
 alongside it.
-
-LIVE SESSIONS
-
-Join Anurag Rishi live. Sessions appear in the app with the time in your
-calendar, you are reminded before they begin, and the joining link arrives when
-it is time.
 
 LISTEN ANYWHERE
 
@@ -147,7 +147,6 @@ Sign in with Apple. Fix-only notes would describe a version they never had.
   in it. Ask how to sit with a restless mind or what to play tonight, in
   English, Hindi or Marathi. Type it, or tap the microphone and just talk.
 • A completely new look: softer, quieter, easier to read.
-• Live sessions you can register for and join from inside the app.
 • Sign in with Apple.
 • Delete your account and everything in it from Profile → Settings, at any
   time, in two taps.
@@ -171,48 +170,56 @@ Also in this update:
 
 ### App Review Information → Notes
 ```
-DEMO ACCOUNT
-The account below is signed in and has an active membership, so every
-screen — including paid series and live sessions — is reachable without
-making a purchase.
+READER APP — GUIDELINE 3.1.3(a)
+Know Thyself is a reader app. It provides guided meditation audio,
+recorded talks, and video series from Anurag Rishi. People acquire
+access outside the app; the app signs them in and plays what their
+account already holds.
 
-  Email:    <FILL IN>
-  Password: <FILL IN>
+This build contains no purchase mechanism of any kind. There are no
+prices anywhere in the app, no purchase or subscribe buttons, no
+checkout, and no buttons, links or calls to action of any kind that
+direct a customer to a purchasing mechanism outside the app.
+
+Content the signed-in account does not hold is shown with a lock and no
+price. Selecting it explains that access is required and offers no way
+to obtain it. The in-app assistant does not describe how to obtain
+access, name any price, or reference any website.
+
+WHAT CHANGED SINCE THE PREVIOUS SUBMISSION
+The previous submission was made without review information, so it was
+assessed without the context above. That was our omission.
+
+We have also removed everything that was not the playing of previously
+acquired content. Live sessions have been removed entirely, so the app
+facilitates no real-time or person-to-person services. Completion
+certificates have been removed, so the app issues no credentials. What
+remains is a library of audio and video, and a player for it.
+
+DEMO ACCOUNT
+The account in Sign-In Information has active access, so every screen is
+reachable without any purchase. Please use it — a new free account sees
+only locked content, which is not the full experience.
 
 ONE-DEVICE SIGN-IN
-The app allows one device per account at a time, as a licence-sharing
-control. If the demo account was signed in elsewhere it will sign that
-session out rather than refuse yours; if you hit any device error, sign in
-again and it will clear.
+The app permits one device per account at a time, as a licence-sharing
+control. If the account is signed in elsewhere, signing in releases the
+previous session; if a device error appears, signing in again clears it.
 
 HOW TO REACH EACH FEATURE
-  • Ask the guide — Home tab, the "Ask the guide" row under the search bar.
-    The microphone is at the right of the message box. It needs the
+  • Ask the guide — Home tab, the "Ask the guide" row under the search
+    bar. The microphone is at the right of the message box. It needs the
     microphone permission and a network connection.
   • Video series — Videos tab. The demo account has access to all of them.
-  • Live sessions — Home tab, "Live sessions".
-  • Account deletion — Profile tab → Settings → Delete account. This deletes
-    the account immediately and cannot be undone, so please use a throwaway
-    signup rather than the demo account above if you want to test it.
-
-READER APP — GUIDELINE 3.1.3(a)
-This build contains no purchase mechanism of any kind. There are no prices,
-no purchase buttons, no checkout, and no links to any page where a purchase
-can be made. Guided meditations, talks, video series and live sessions are
-acquired outside the app entirely; the app signs the user in and plays the
-content their account already has.
-
-Content that the signed-in account does not have access to is shown with a
-lock and no price, and tapping it explains that access is required. Nothing
-in the app offers a way to obtain that access.
-
-The demo account above has active access, so the reviewer can see the full
-signed-in experience rather than only the locked state.
+  • Offline playback — the download control on any item, then Downloads.
+  • Account deletion — Profile tab → Settings → Delete account. This
+    deletes the account immediately and cannot be undone, so please use a
+    throwaway signup rather than the demo account if you want to test it.
 
 MICROPHONE
-Requested only when the user taps the microphone in the guide, for dictation.
-Speech recognition runs on the device through the system recogniser; no audio
-is recorded to a file or transmitted by the app.
+Requested only when the user taps the microphone in the guide, for
+dictation. Speech recognition runs on the device through the system
+recogniser; no audio is recorded to a file or transmitted by the app.
 ```
 
 ### Sign in with Apple
@@ -249,7 +256,6 @@ This build is for testing before release. Please try:
     Dictation needs the microphone permission; speech recognition runs on
     your own device.
   • Set a sleep timer and confirm the audio fades out on its own.
-  • Home tab → Live sessions, if one is scheduled.
   • Profile → Settings → Delete account. Please use a throwaway signup for
     this rather than the test account below, since it cannot be undone.
 
@@ -290,14 +296,17 @@ Know Thyself
 Guided meditation, courses and a companion to ask. Find peace within.
 ```
 
-### Release notes — 2.1.1 (build 14) (500 max — this is 479)
+### Release notes — 2.1.1 (build 15) (500 max — this is 331)
+
+> Android gains nothing in this release and loses two features. Everything
+> else in the work was gated to iOS. Consider not shipping it to Play at all
+> until there is something in it for these users — the compliance problem it
+> solves does not exist on Android.
+
 ```
-• Ask the guide — a companion that knows the whole library and your progress. Type, or tap the microphone and speak, in English, Hindi or Marathi.
-• A softer, calmer new look throughout.
-• Live sessions you can register for and join from inside the app.
-• Delete your account and all your data from Profile → Settings.
-• Fixed downloads disappearing after a return to the home screen, and the brief freeze that came with it.
-• The player's download button is now clearly visible.
+• Live sessions have been retired. If you were holding a seat for an upcoming session, please contact us at ar.happinessmovement@gmail.com.
+• Course certificates are no longer shown in the app. Certificates already issued stay valid and can still be verified online.
+• Smaller fixes and refinements throughout.
 ```
 > Play caps release notes at 500 characters per language and truncates
 > silently rather than warning, so this is a compressed version of the App
@@ -343,8 +352,8 @@ All functionality requires signing in.
   Email:    <FILL IN>
   Password: <FILL IN>
 
-This account has an active membership, so paid courses and live sessions are
-reachable without paying. The app permits one signed-in device per account; if
+This account has an active membership, so all paid content is reachable
+without paying. The app permits one signed-in device per account; if
 a sign-in is refused, sign in again and the previous session is cleared.
 
 Account deletion is at Profile → Settings → Delete account, and is immediate
