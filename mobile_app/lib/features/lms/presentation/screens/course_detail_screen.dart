@@ -88,8 +88,8 @@ class _CourseDetailScreenState extends ConsumerState<CourseDetailScreen>
 
     if (!lesson.isPlayable) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text("This lesson's content isn't available right now."),
+        SnackBar(
+          content: Text("This $kPartWord's content isn't available right now."),
         ),
       );
       return;
@@ -172,7 +172,7 @@ class _CourseDetailScreenState extends ConsumerState<CourseDetailScreen>
                 child: Padding(
                   padding: const EdgeInsets.all(32),
                   child: Text(
-                    'Could not load this course.\n$e',
+                    'Could not load this.\n$e',
                     textAlign: TextAlign.center,
                     style: const TextStyle(
                         color: AppTheme.textSecondary, height: 1.5),
