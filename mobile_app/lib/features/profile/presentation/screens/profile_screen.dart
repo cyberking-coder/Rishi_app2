@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../../../app/theme/app_theme.dart';
 import '../../../../app/widgets/botanical.dart';
+import '../../../../core/config/purchase_config.dart';
 import '../../../../core/device/device_info_service.dart';
 import '../../../../core/errors/auth_failure.dart';
 import '../../../access/application/access_providers.dart';
@@ -88,11 +89,19 @@ class ProfileScreen extends ConsumerWidget {
             // a course buyer as free was showing them "Free plan" right
             // next to the course they'd just paid for.
             final isFree = !hasMembership && enrolled.isEmpty;
-            final memberLabel = hasMembership
-                ? '$subPlan Member'
-                : enrolled.isEmpty
-                    ? 'Free plan'
-                    : 'Premium Member';
+            // On iOS the chip states what the account can reach, not
+            // what tier it is on. "Free plan" and "Premium Member" name a
+            // paid tier that the app has no way to sell, which invites a
+            // reviewer to look for the purchase path that 3.1.3(a) says
+            // must not be there — and it was a subscription the last
+            // rejection singled out.
+            final memberLabel = !kEducationFramingEnabled
+                ? (isFree ? 'Free access' : 'Full access')
+                : hasMembership
+                    ? '$subPlan Member'
+                    : enrolled.isEmpty
+                        ? 'Free plan'
+                        : 'Premium Member';
 
             return ListView(
               padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
@@ -229,7 +238,7 @@ class ProfileScreen extends ConsumerWidget {
                     _Badge(
                       emoji: '💎',
                       color: AppTheme.clay,
-                      label: 'Premium',
+                      label: kEducationFramingEnabled ? 'Premium' : 'Devoted',
                       // Dimmed rather than hidden: the badge is something
                       // to earn back, and a gap in the row would read as
                       // a layout bug.
@@ -237,10 +246,18 @@ class ProfileScreen extends ConsumerWidget {
                       onTap: () => _showAchievement(
                         context,
                         '💎',
-                        'Premium',
+                        kEducationFramingEnabled ? 'Premium' : 'Devoted',
+                        // The locked copy used to read "Unlock this by
+                        // joining Rishi Mode for full access" — an
+                        // instruction to go and buy something, inside a
+                        // build whose whole claim is that it contains no
+                        // such prompt. It describes the badge on iOS
+                        // instead of telling anyone how to get it.
                         isFree
-                            ? 'Unlock this by joining Rishi Mode for full access to all content.'
-                            : 'You are a premium member with full access to all content.',
+                            ? (kEducationFramingEnabled
+                                ? 'Unlock this by joining Rishi Mode for full access to all content.'
+                                : 'Awarded to accounts with full access to the library.')
+                            : 'You have full access to the library.',
                       ),
                     ),
                     _Badge(
@@ -286,11 +303,22 @@ class ProfileScreen extends ConsumerWidget {
                 _ListRow(
                   icon: Icons.workspace_premium_rounded,
                   iconColor: _kPink,
-                  title: 'Subscription',
-                  subtitle: hasMembership ? subPlan : 'No active subscription',
+                  title: kEducationFramingEnabled ? 'Subscription' : 'Membership',
+                  // "Subscription" is Apple's own heading for Guideline
+                  // 3.1.1, and a row carrying it with a chevron reads as
+                  // the way in to buying one.
+                  subtitle: hasMembership
+                      ? subPlan
+                      : (kEducationFramingEnabled
+                          ? 'No active subscription'
+                          : 'Not active'),
                   onTap: () => _showSubscriptionDetails(
                     context,
-                    hasMembership ? subPlan : 'No active subscription',
+                    hasMembership
+                        ? subPlan
+                        : (kEducationFramingEnabled
+                            ? 'No active subscription'
+                            : 'Not active'),
                     // Never pass the raw subscription row for an account
                     // without live access — it records what was once
                     // bought and is never cleared on revoke, so a
@@ -401,8 +429,8 @@ class ProfileScreen extends ConsumerWidget {
               ),
             ),
             const SizedBox(height: 20),
-            const Text('Subscription',
-                style: TextStyle(
+            Text(kEducationFramingEnabled ? 'Subscription' : 'Membership',
+                style: const TextStyle(
                     color: _kText,
                     fontSize: 20,
                     fontWeight: FontWeight.w700)),
@@ -422,7 +450,10 @@ class ProfileScreen extends ConsumerWidget {
                 ),
             ] else
               _DetailRow(
-                  label: 'Status', value: isFree ? 'No active plan' : 'Active'),
+                  label: 'Status',
+                  value: isFree
+                      ? (kEducationFramingEnabled ? 'No active plan' : 'Not active')
+                      : 'Active'),
           ],
         ),
       ),
