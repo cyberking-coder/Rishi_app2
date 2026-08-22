@@ -661,3 +661,89 @@ export async function removeCertificateTemplate(
   revalidatePath(`/courses/${courseId}`);
   return { ok: true };
 }
+
+/**
+ * Enrols somebody in a course without a payment.
+ *
+ * The roster could only ever revoke and restore, which needs a purchase
+ * row to already exist — so there was no way to let anybody into a
+ * course who had not bought it. That covers the cases a payment cannot:
+ * a review or demo account, an offline cohort, a refunded student being
+ * made whole, a comp. The Award button on this same roster exists for
+ * exactly the same reason on the certificate side.
+ *
+ * Written as a purchase at `amount: 0` rather than as a separate kind of
+ * grant. has_course_access() only looks for a paid, unexpired row, so
+ * anything else would need a second branch in the one function that
+ * decides who can watch what — and revenue totals stay honest because
+ * the row records what was actually charged, which was nothing.
+ *
+ * A revoked row is promoted rather than joined by a second one: the
+ * unique index only covers 'paid', so an insert would succeed and leave
+ * two rows for one student, which is how the roster's dedupe starts
+ * disagreeing with itself.
+ */
+export async function grantCourseAccess(
+  email: string,
+  courseId: string,
+): Promise<ActionResult> {
+  await requireAdmin();
+  const db = createAdminClient();
+
+  const address = email.trim().toLowerCase();
+  if (!address) return { ok: false, error: "Enter an email address." };
+
+  // listUsers rather than a filtered query: auth.users is not reachable
+  // through PostgREST, and there is no admin lookup-by-email endpoint.
+  const { data: list, error: listError } = await db.auth.admin.listUsers({
+    page: 1,
+    perPage: 1000,
+  });
+  if (listError) return { ok: false, error: listError.message };
+
+  const user = (list?.users ?? []).find(
+    (u) => u.email?.toLowerCase() === address,
+  );
+  if (!user) {
+    return {
+      ok: false,
+      error:
+        `No account exists for ${address}. They need to sign up first — ` +
+        `access is granted to an account, not to an address.`,
+    };
+  }
+
+  const { data: existing } = await db
+    .from("course_purchases")
+    .select("id, status")
+    .eq("user_id", user.id)
+    .eq("course_id", courseId)
+    .in("status", ["paid", "revoked"])
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle<{ id: string; status: string }>();
+
+  if (existing?.status === "paid") {
+    return { ok: false, error: "That account already has access to this course." };
+  }
+
+  if (existing) {
+    const { error } = await db
+      .from("course_purchases")
+      .update({ status: "paid", updated_at: new Date().toISOString() })
+      .eq("id", existing.id);
+    if (error) return { ok: false, error: error.message };
+  } else {
+    const { error } = await db.from("course_purchases").insert({
+      user_id: user.id,
+      course_id: courseId,
+      amount: 0,
+      currency: "INR",
+      status: "paid",
+    });
+    if (error) return { ok: false, error: error.message };
+  }
+
+  revalidatePath(`/courses/${courseId}`);
+  return { ok: true };
+}

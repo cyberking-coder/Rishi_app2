@@ -13,6 +13,7 @@ import {
 import { formatDate } from "@/lib/utils";
 import { AwardCertificateButton } from "./award-certificate-button";
 import { EnrolmentAccessButton } from "./enrolment-access-button";
+import { GrantAccessDialog } from "./grant-access-dialog";
 
 interface PurchaseRow {
   user_id: string;
@@ -153,6 +154,7 @@ export async function EnrolledStudents({ courseId }: { courseId: string }) {
               {duplicateCount} duplicate{duplicateCount === 1 ? "" : "s"} to refund
             </Badge>
           )}
+          <GrantAccessDialog courseId={courseId} />
         </div>
       </CardHeader>
       <CardContent className="p-0">
