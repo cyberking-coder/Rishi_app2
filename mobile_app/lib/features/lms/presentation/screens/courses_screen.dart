@@ -77,13 +77,13 @@ class _CoursesScreenState extends ConsumerState<CoursesScreen> {
                 // Clipped to its own box so the sprig can overhang the
                 // right edge without widening the row and pushing the
                 // title into a wrap.
-                SizedBox(
+                const SizedBox(
                   width: 76,
                   height: 76,
                   child: Stack(
                     clipBehavior: Clip.none,
                     children: [
-                      const Positioned(
+                      Positioned(
                         right: -34,
                         top: 2,
                         child: LeafSprig(size: 122, angle: -0.42, opacity: 0.6),
