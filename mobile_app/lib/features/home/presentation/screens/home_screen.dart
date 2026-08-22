@@ -910,7 +910,7 @@ class _CourseMiniCard extends StatelessWidget {
                     ],
                     Text(
                       course.owned
-                          ? 'Enrolled'
+                          ? (kEducationFramingEnabled ? 'Enrolled' : 'Yours')
                           : kPurchaseUiEnabled || course.isFree
                               ? course.priceLabel
                               : 'Locked',
