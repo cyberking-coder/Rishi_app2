@@ -25,7 +25,15 @@ publish_to: "none"
 # downloads the moment they navigated back to it — data loss on the
 # majority of accounts, which is worth forfeiting the review time
 # already spent rather than letting it reach anyone else.
-version: 2.1.1+14
+#
+# +15 because Play refused +14 as already used. Nothing about the code
+# required the bump. Note this number only reaches a store from a local
+# build: codemagic.yaml passes --build-number=$BUILD_NUMBER and ignores
+# what is written here, so CI builds carry their own, higher numbers.
+# That means a local Android upload has to clear the highest versionCode
+# CI has ever pushed, not merely the last one written down here — check
+# Play Console -> App bundle explorer before trusting +15.
+version: 2.1.1+15
 
 environment:
   sdk: ">=3.3.0 <4.0.0"
