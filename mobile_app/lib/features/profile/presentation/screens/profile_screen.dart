@@ -531,13 +531,13 @@ class _EnrolledCourseCard extends StatelessWidget {
                     ),
                     const SizedBox(height: 5),
                     Text(
-                      '$done of $total lessons complete',
+                      '$done of $total ${kPartWord}s complete',
                       style: const TextStyle(color: _kSub, fontSize: 12),
                     ),
                   ] else
-                    const Text(
-                      'Enrolled',
-                      style: TextStyle(color: _kSub, fontSize: 12),
+                    Text(
+                      kEducationFramingEnabled ? 'Enrolled' : 'Yours',
+                      style: const TextStyle(color: _kSub, fontSize: 12),
                     ),
                 ],
               ),
