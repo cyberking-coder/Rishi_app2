@@ -388,8 +388,34 @@ declarations apply.
 
 ## 5. Before pressing submit
 
+> **The 22 August rejection happened here, not in the code.** App Review
+> Information was submitted **blank**. The reviewer therefore had no demo
+> account, signed up for a free one, found the meditations locked behind a
+> membership bought elsewhere, and applied Guideline 3.1.3(b) — the default
+> rule — because nothing asked them to consider 3.1.3(a). Every line of the
+> reader-app work was invisible to that review.
+>
+> **The copy below existing in this file is not the same as it reaching App
+> Store Connect.** Paste it in, and check it is there on the submission
+> screen before pressing send.
+
+
 - [ ] Fill both `<FILL IN>` review accounts, and check they sign in on a
       device you are not already signed in on.
+- [ ] **Paste the App Review Information → Notes block from Section 2 into App
+      Store Connect**, with the demo account filled in. Blank notes is what
+      caused the 22 August rejection.
+- [ ] The demo account must be a **member with active access**, not an admin.
+      An admin login hands a reviewer the dashboard; a member with no access
+      shows them nothing but locked screens, which is what they reject on.
+- [ ] Confirm the build you are attaching reports the version you expect.
+      Apple reviewed "2.1.0 (24)" while `pubspec.yaml` had said 2.1.1 since
+      before any of the reader-app work landed — a binary reporting the older
+      version cannot contain it. Check the version and build number on the
+      submission screen against the commit you meant to ship.
+- [ ] Open the build and confirm the bottom tab reads **Videos**, not
+      **Courses**. That single word is the fastest check that the binary
+      carries the reframing rather than only the purchase removal.
 - [ ] Give the review account an active membership, or the reviewer meets a
       paywall on the first paid screen and files it as a broken feature.
 - [ ] Confirm all five policy URLs load **in a private window**. A normal tab
