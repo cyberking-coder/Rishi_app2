@@ -171,48 +171,56 @@ Also in this update:
 
 ### App Review Information → Notes
 ```
-DEMO ACCOUNT
-The account below is signed in and has an active membership, so every
-screen — including paid series and live sessions — is reachable without
-making a purchase.
+READER APP — GUIDELINE 3.1.3(a)
+Know Thyself is a reader app. It provides guided meditation audio,
+recorded talks, and video series from Anurag Rishi. People acquire
+access outside the app; the app signs them in and plays what their
+account already holds.
 
-  Email:    <FILL IN>
-  Password: <FILL IN>
+This build contains no purchase mechanism of any kind. There are no
+prices anywhere in the app, no purchase or subscribe buttons, no
+checkout, and no buttons, links or calls to action of any kind that
+direct a customer to a purchasing mechanism outside the app.
+
+Content the signed-in account does not hold is shown with a lock and no
+price. Selecting it explains that access is required and offers no way
+to obtain it. The in-app assistant does not describe how to obtain
+access, name any price, or reference any website.
+
+WHAT CHANGED SINCE THE PREVIOUS SUBMISSION
+The previous submission was made without review information, so it was
+assessed without the context above. That was our omission.
+
+We have also removed everything that was not the playing of previously
+acquired content. Live sessions have been removed entirely, so the app
+facilitates no real-time or person-to-person services. Completion
+certificates have been removed, so the app issues no credentials. What
+remains is a library of audio and video, and a player for it.
+
+DEMO ACCOUNT
+The account in Sign-In Information has active access, so every screen is
+reachable without any purchase. Please use it — a new free account sees
+only locked content, which is not the full experience.
 
 ONE-DEVICE SIGN-IN
-The app allows one device per account at a time, as a licence-sharing
-control. If the demo account was signed in elsewhere it will sign that
-session out rather than refuse yours; if you hit any device error, sign in
-again and it will clear.
+The app permits one device per account at a time, as a licence-sharing
+control. If the account is signed in elsewhere, signing in releases the
+previous session; if a device error appears, signing in again clears it.
 
 HOW TO REACH EACH FEATURE
-  • Ask the guide — Home tab, the "Ask the guide" row under the search bar.
-    The microphone is at the right of the message box. It needs the
+  • Ask the guide — Home tab, the "Ask the guide" row under the search
+    bar. The microphone is at the right of the message box. It needs the
     microphone permission and a network connection.
   • Video series — Videos tab. The demo account has access to all of them.
-  • Live sessions — Home tab, "Live sessions".
-  • Account deletion — Profile tab → Settings → Delete account. This deletes
-    the account immediately and cannot be undone, so please use a throwaway
-    signup rather than the demo account above if you want to test it.
-
-READER APP — GUIDELINE 3.1.3(a)
-This build contains no purchase mechanism of any kind. There are no prices,
-no purchase buttons, no checkout, and no links to any page where a purchase
-can be made. Guided meditations, talks, video series and live sessions are
-acquired outside the app entirely; the app signs the user in and plays the
-content their account already has.
-
-Content that the signed-in account does not have access to is shown with a
-lock and no price, and tapping it explains that access is required. Nothing
-in the app offers a way to obtain that access.
-
-The demo account above has active access, so the reviewer can see the full
-signed-in experience rather than only the locked state.
+  • Offline playback — the download control on any item, then Downloads.
+  • Account deletion — Profile tab → Settings → Delete account. This
+    deletes the account immediately and cannot be undone, so please use a
+    throwaway signup rather than the demo account if you want to test it.
 
 MICROPHONE
-Requested only when the user taps the microphone in the guide, for dictation.
-Speech recognition runs on the device through the system recogniser; no audio
-is recorded to a file or transmitted by the app.
+Requested only when the user taps the microphone in the guide, for
+dictation. Speech recognition runs on the device through the system
+recogniser; no audio is recorded to a file or transmitted by the app.
 ```
 
 ### Sign in with Apple
