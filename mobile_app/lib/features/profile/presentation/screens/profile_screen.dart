@@ -283,9 +283,9 @@ class ProfileScreen extends ConsumerWidget {
                 // "My Courses" heading on a brand-new account reads as a
                 // failed load rather than as "you haven't bought any".
                 if (enrolled.isNotEmpty) ...[
-                  const Text(
-                    'My Courses',
-                    style: TextStyle(
+                  Text(
+                    kEducationFramingEnabled ? 'My Courses' : 'My Videos',
+                    style: const TextStyle(
                       color: _kText,
                       fontSize: 18,
                       fontWeight: FontWeight.w700,
