@@ -2,9 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../app/theme/app_theme.dart';
-import '../../../live/application/live_providers.dart';
-import '../../../live/domain/entities/live_session.dart';
-import '../../../live/presentation/widgets/live_session_card.dart';
 import '../../application/watch_providers.dart';
 import '../widgets/youtube_card.dart';
 
@@ -21,13 +18,6 @@ class WatchScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final videosAsync = ref.watch(youtubeVideosProvider);
-    final sessionsAsync = ref.watch(upcomingSessionsProvider);
-
-    // A failed session fetch shows nothing rather than an error: the
-    // YouTube list below is the bulk of the screen and must not be
-    // replaced by a message about a section that may well be empty
-    // anyway.
-    final sessions = sessionsAsync.asData?.value ?? const <LiveSession>[];
 
     return Scaffold(
       backgroundColor: AppTheme.background,
@@ -53,7 +43,7 @@ class WatchScreen extends ConsumerWidget {
             Padding(
               padding: const EdgeInsets.fromLTRB(20, 0, 20, 12),
               child: Text(
-                'Live sessions and free talks.',
+                'Free talks and teachings.',
                 style: Theme.of(context)
                     .textTheme
                     .bodySmall
@@ -79,7 +69,7 @@ class WatchScreen extends ConsumerWidget {
                   ),
                 ),
                 data: (videos) {
-                  if (videos.isEmpty && sessions.isEmpty) {
+                  if (videos.isEmpty) {
                     return const Center(
                       child: Padding(
                         padding: EdgeInsets.all(32),
@@ -97,25 +87,11 @@ class WatchScreen extends ConsumerWidget {
                     color: AppTheme.sage,
                     onRefresh: () async {
                       ref.invalidate(youtubeVideosProvider);
-                      ref.invalidate(upcomingSessionsProvider);
                     },
                     child: ListView(
                       padding: const EdgeInsets.fromLTRB(20, 4, 20, 28),
                       children: [
-                        if (sessions.isNotEmpty) ...[
-                          const _SectionLabel('Live sessions'),
-                          const SizedBox(height: 12),
-                          for (final session in sessions) ...[
-                            LiveSessionCard(session: session),
-                            const SizedBox(height: 14),
-                          ],
-                          const SizedBox(height: 10),
-                        ],
                         if (videos.isNotEmpty) ...[
-                          if (sessions.isNotEmpty) ...[
-                            const _SectionLabel('On YouTube'),
-                            const SizedBox(height: 12),
-                          ],
                           for (var i = 0; i < videos.length; i++) ...[
                             GestureDetector(
                               onTap: () => openYoutube(context, videos[i]),
