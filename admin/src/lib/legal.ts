@@ -30,14 +30,14 @@ export const legal = {
 
   /** CONFIRM: a number a customer can actually reach on a working day.
    *  Razorpay checks that one is published. */
-  phone: "+91 00000 00000",
+  phone: "+91 7373738391",
 
   /** CONFIRM: full postal address, including PIN code. */
-  address: "REPLACE WITH REGISTERED BUSINESS ADDRESS, City, State, PIN",
+  address: "SCO 269 OLD MUGAL CANAL, KARNAL, Canal Colony Karnal, Karnal, HARYANA, 132001",
 
   /** CONFIRM: the courts named in the Terms. Normally where the
    *  business is registered. */
-  jurisdiction: "Maharashtra, India",
+  jurisdiction: "Delhi, India",
 
   /** Shown on every page. Update when the wording changes, not on every
    *  deploy — a date that moves for no reason tells a reader nothing. */
