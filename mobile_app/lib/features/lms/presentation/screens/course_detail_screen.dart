@@ -14,7 +14,6 @@ import '../../../audio/application/audio_providers.dart';
 import '../../../audio/domain/entities/audio_track.dart';
 import '../../application/lms_providers.dart';
 import '../../domain/entities/lesson.dart';
-import '../../domain/entities/certificate.dart';
 import '../widgets/course_purchase_sheet.dart';
 
 class CourseDetailScreen extends ConsumerStatefulWidget {
@@ -298,17 +297,6 @@ class _CourseDetailScreenState extends ConsumerState<CourseDetailScreen>
                 const SliverToBoxAdapter(child: SizedBox(height: 10)),
               ],
 
-              // Withheld on iOS. An issued credential is the single
-              // clearest evidence that this is a course rather than a
-              // video series, and the reader-app claim in 3.1.3(a)
-              // turns on exactly that distinction. The certificate is
-              // still earned and still issued server-side — it is only
-              // not shown here — so flipping the flag back restores it
-              // with nothing to migrate.
-              if (!locked && kEducationFramingEnabled)
-                SliverToBoxAdapter(
-                  child: _CertificateSection(courseId: widget.courseId),
-                ),
 
               const SliverToBoxAdapter(child: SizedBox(height: 28)),
             ],
@@ -883,122 +871,6 @@ class _BackBar extends StatelessWidget {
           ),
         ),
       ]),
-    );
-  }
-}
-
-/// Certificate progress, shown once the course is unlocked.
-///
-/// Rendered as its own consumer rather than folded into the course
-/// screen's main provider, so a failure here can't take the curriculum
-/// down with it — the lesson list is the thing people came for.
-class _CertificateSection extends ConsumerWidget {
-  const _CertificateSection({required this.courseId});
-
-  final String courseId;
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final completion =
-        ref.watch(courseCompletionProvider(courseId)).valueOrNull;
-    final certificate =
-        ref.watch(courseCertificateProvider(courseId)).valueOrNull;
-
-    if (completion == null) return const SizedBox.shrink();
-
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 18, 20, 0),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          _CertificateBanner(
-            courseId: courseId,
-            completion: completion,
-            certificate: certificate,
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-/// Either progress toward the certificate, or the certificate itself.
-class _CertificateBanner extends ConsumerStatefulWidget {
-  const _CertificateBanner({
-    required this.courseId,
-    required this.completion,
-    this.certificate,
-  });
-
-  final String courseId;
-  final CourseCompletion completion;
-  final Certificate? certificate;
-
-  @override
-  ConsumerState<_CertificateBanner> createState() => _CertificateBannerState();
-}
-
-class _CertificateBannerState extends ConsumerState<_CertificateBanner> {
-  bool _claiming = false;
-
-  Future<void> _claim() async {
-    setState(() => _claiming = true);
-    try {
-      final certificate = await ref
-          .read(certificateDataSourceProvider)
-          .issueCertificate(widget.courseId);
-
-      if (!mounted) return;
-      ref.invalidate(courseCertificateProvider(widget.courseId));
-      ref.invalidate(myCertificatesProvider);
-      context.push('/certificate/${certificate.id}', extra: certificate);
-    } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text('$e')));
-    } finally {
-      if (mounted) setState(() => _claiming = false);
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final certificate = widget.certificate;
-    final completion = widget.completion;
-
-    if (certificate != null) {
-      return _Banner(
-        icon: Icons.workspace_premium_rounded,
-        title: 'Certificate earned',
-        subtitle: certificate.certificateNumber,
-        actionLabel: 'View',
-        onAction: () => context.push(
-          '/certificate/${certificate.id}',
-          extra: certificate,
-        ),
-      );
-    }
-
-    if (completion.complete) {
-      return _Banner(
-        icon: Icons.workspace_premium_rounded,
-        title: 'Course complete',
-        subtitle: 'Claim your certificate of completion.',
-        actionLabel: _claiming ? 'Claiming…' : 'Claim',
-        onAction: _claiming ? null : _claim,
-      );
-    }
-
-    // Nothing to say until they've actually started — an untouched course
-    // showing "0 of 12" is just noise on top of the lesson list.
-    if (completion.completedSteps == 0) return const SizedBox.shrink();
-
-    return _Banner(
-      icon: Icons.timeline_rounded,
-      title: 'Certificate progress',
-      subtitle: '${completion.completedSteps} of ${completion.totalSteps} '
-          'lessons complete',
-      progress: completion.fraction,
     );
   }
 }
