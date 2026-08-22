@@ -9,6 +9,8 @@ Character limits are the stores' own. Where a field is at its limit it is
 marked, so an edit does not silently overflow and get truncated mid-word.
 
 - **iOS bundle ID:** `com.anuragrishi.knowthyself`
+- **Apple ID (numeric):** `6786403340`
+- **SKU:** `knowthyself001`
 - **Android package:** `com.knowthyself.app`
 - **Version:** 2.1.1 (build 15 locally; CI assigns its own)
 
@@ -32,11 +34,24 @@ marked, so an edit does not silently overflow and get truncated mid-word.
 ## 2. Apple App Store Connect
 
 ### App name (30 max)
+
+> **The live name is `Know Thyself by Anurag Rishi`** (28 characters), not
+> what this file used to say. Anything asked to match the app name — the
+> External Link Account Entitlement request, in particular — must use the
+> live one exactly. That request was refused for "an invalid app name or
+> bundle ID" while the bundle id was demonstrably right, and this
+> mismatch is the likeliest reason.
+
 ```
-Know Thyself
+Know Thyself by Anurag Rishi
 ```
 
 ### Subtitle (30 max — this is 28)
+
+> Currently **empty** in App Store Connect. Apple indexes the subtitle
+> separately from the name for search, so leaving it blank forfeits 30
+> characters of the strongest keyword field available.
+
 ```
 Meditation & Inner Stillness
 ```

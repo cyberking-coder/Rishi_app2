@@ -64,15 +64,16 @@ export const contactLine = `${legal.email} or ${legal.phone}`;
  * to turn a completed payment into a support email.
  */
 export const appLinks = {
-  /** Derived from the Flutter applicationId, so this one cannot drift. */
-  play:
-    "https://play.google.com/store/apps/details?id=com.anuragrishi.knowthyself",
+  /** The ANDROID applicationId from android/app/build.gradle, which is
+   *  not the iOS bundle id — the two have never matched. This carried
+   *  com.anuragrishi.knowthyself, the iOS one, under a comment claiming
+   *  it was derived and could not drift. It was neither, and the button
+   *  led to a Play page that does not exist, on a payment confirmation. */
+  play: "https://play.google.com/store/apps/details?id=com.knowthyself.app",
 
-  /** CONFIRM: Apple assigns the numeric id at first approval, and there
-   *  is no way to derive it from the bundle id. Until it is filled in,
-   *  the checkout page hides the iOS button rather than linking
-   *  somewhere wrong — a dead App Store link on a payment confirmation
-   *  is worse than no link. Find it in App Store Connect under
-   *  General → App Information → Apple ID. */
-  appStore: "" as string,
+  /** From App Store Connect → General → App Information → Apple ID.
+   *  Apple assigns it at first submission and it cannot be derived from
+   *  the bundle id, which is why this sat empty — the checkout page hid
+   *  the iOS button rather than linking somewhere wrong. */
+  appStore: "https://apps.apple.com/app/id6786403340" as string,
 } as const;
