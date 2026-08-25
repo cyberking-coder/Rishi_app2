@@ -237,26 +237,40 @@ class _Empty extends StatelessWidget {
       children: [
         Center(
           child: Container(
-            width: 72,
-            height: 72,
+            width: 64,
+            height: 64,
             decoration: const BoxDecoration(
               gradient: AppTheme.sageGradient,
               shape: BoxShape.circle,
+              boxShadow: [
+                BoxShadow(
+                  color: Color(0x427C3AED),
+                  blurRadius: 26,
+                  offset: Offset(0, 10),
+                ),
+              ],
             ),
             child: const Icon(
-              Icons.self_improvement_rounded,
+              Icons.auto_awesome_rounded,
               color: Colors.white,
-              size: 36,
+              size: 28,
             ),
           ),
         ),
-        const SizedBox(height: 20),
+        const SizedBox(height: 16),
         const Text(
           'Ask anything about your practice',
           textAlign: TextAlign.center,
-          style: AppTheme.headline,
+          style: TextStyle(
+            fontFamily: AppTheme.text,
+            fontSize: 24,
+            height: 1.25,
+            fontWeight: FontWeight.w600,
+            letterSpacing: -0.6,
+            color: AppTheme.textPrimary,
+          ),
         ),
-        const SizedBox(height: 10),
+        const SizedBox(height: 8),
         const Text(
           'How to sit, how long for, what to play next — and what to do '
           'when it is not working. Type it, or tap the microphone and '
@@ -264,12 +278,12 @@ class _Empty extends StatelessWidget {
           textAlign: TextAlign.center,
           style: TextStyle(
             fontFamily: AppTheme.text,
-            fontSize: 14.5,
-            height: 22 / 14.5,
+            fontSize: 15,
+            height: 1.5,
             color: AppTheme.textSecondary,
           ),
         ),
-        const SizedBox(height: 28),
+        const SizedBox(height: 24),
         for (final opener in _openers)
           Padding(
             padding: const EdgeInsets.only(bottom: 10),
@@ -277,21 +291,27 @@ class _Empty extends StatelessWidget {
               onTap: () => onPick(opener),
               borderRadius: BorderRadius.circular(AppTheme.radiusRow),
               child: Container(
+                constraints: const BoxConstraints(minHeight: 52),
                 padding:
-                    const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                decoration: AppTheme.claySurface(
-                  color: AppTheme.surfaceCream,
-                  radius: AppTheme.radiusRow,
-                  small: true,
-                ),
+                    const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                decoration: AppTheme.glassSurface(),
                 child: Row(
                   children: [
                     Expanded(
-                      child: Text(opener, style: AppTheme.body),
+                      child: Text(
+                        opener,
+                        style: const TextStyle(
+                          fontFamily: AppTheme.text,
+                          fontSize: 16,
+                          height: 1.35,
+                          letterSpacing: -0.16,
+                          color: AppTheme.textPrimary,
+                        ),
+                      ),
                     ),
-                    const SizedBox(width: 10),
+                    const SizedBox(width: 12),
                     const Icon(Icons.north_east_rounded,
-                        size: 16, color: AppTheme.sage),
+                        size: 15, color: AppTheme.sage),
                   ],
                 ),
               ),
@@ -606,59 +626,79 @@ class _Composer extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // The mic lives inside the field rather than beside it. The design
+    // gives the composer one well and one violet button; three circles
+    // in a row made dictation look like a peer of send, when it is a way
+    // of filling the field send acts on.
     return Container(
       padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
-      decoration: BoxDecoration(
-        gradient: AppTheme.clayFill(),
-        boxShadow: AppTheme.navShadow,
+      decoration: const BoxDecoration(
+        color: Color(0xF0FAF8FF),
+        border: Border(top: BorderSide(color: AppTheme.border, width: 0.5)),
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.end,
         children: [
           Expanded(
             child: Container(
-              decoration: AppTheme.clayInset(radius: AppTheme.radiusRow),
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: TextField(
-                controller: controller,
-                enabled: enabled,
-                minLines: 1,
-                maxLines: 4,
-                textCapitalization: TextCapitalization.sentences,
-                textInputAction: TextInputAction.send,
-                onSubmitted: enabled ? onSend : null,
-                style: AppTheme.body,
-                decoration: InputDecoration(
-                  hintText:
-                      listening ? 'Listening…' : 'Ask the guide…',
-                  filled: false,
-                  border: InputBorder.none,
-                  enabledBorder: InputBorder.none,
-                  focusedBorder: InputBorder.none,
-                  contentPadding: const EdgeInsets.symmetric(vertical: 12),
-                ),
-              ),
-            ),
-          ),
-          const SizedBox(width: 8),
-          // Dictation. Deliberately does not send when speech ends: the
-          // recogniser mishears names and Hindi words often enough that
-          // auto-sending would spend one of the day's twenty questions on
-          // a garbled sentence the user never got to read.
-          GestureDetector(
-            onTap: onMic,
-            child: Container(
-              width: 46,
-              height: 46,
+              constraints: const BoxConstraints(minHeight: 40),
               decoration: BoxDecoration(
-                color: listening ? AppTheme.danger : AppTheme.sageSoft,
-                shape: BoxShape.circle,
-                boxShadow: listening ? AppTheme.rowShadow : null,
+                color: AppTheme.well,
+                borderRadius: BorderRadius.circular(20),
               ),
-              child: Icon(
-                listening ? Icons.stop_rounded : Icons.mic_none_rounded,
-                color: listening ? Colors.white : AppTheme.sageDark,
-                size: 23,
+              padding: const EdgeInsets.only(left: 14, right: 4),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  Expanded(
+                    child: TextField(
+                      controller: controller,
+                      enabled: enabled,
+                      minLines: 1,
+                      maxLines: 4,
+                      textCapitalization: TextCapitalization.sentences,
+                      textInputAction: TextInputAction.send,
+                      onSubmitted: enabled ? onSend : null,
+                      style: const TextStyle(
+                        fontFamily: AppTheme.text,
+                        fontSize: 16,
+                        height: 1.35,
+                        color: AppTheme.textPrimary,
+                      ),
+                      decoration: InputDecoration(
+                        hintText: listening ? 'Listening…' : 'Ask the guide',
+                        hintStyle: const TextStyle(
+                          fontFamily: AppTheme.text,
+                          fontSize: 16,
+                          color: AppTheme.textSecondary,
+                        ),
+                        filled: false,
+                        isDense: true,
+                        border: InputBorder.none,
+                        enabledBorder: InputBorder.none,
+                        focusedBorder: InputBorder.none,
+                        contentPadding:
+                            const EdgeInsets.symmetric(vertical: 10),
+                      ),
+                    ),
+                  ),
+                  // Dictation. Deliberately does not send when speech
+                  // ends: the recogniser mishears names and Hindi words
+                  // often enough that auto-sending would spend one of
+                  // the day's twenty questions on a garbled sentence the
+                  // user never got to read.
+                  IconButton(
+                    onPressed: onMic,
+                    visualDensity: VisualDensity.compact,
+                    icon: Icon(
+                      listening ? Icons.stop_rounded : Icons.mic_none_rounded,
+                      color: listening
+                          ? AppTheme.danger
+                          : AppTheme.textSecondary,
+                      size: 20,
+                    ),
+                  ),
+                ],
               ),
             ),
           ),
@@ -673,17 +713,16 @@ class _Composer extends StatelessWidget {
               return GestureDetector(
                 onTap: ready ? () => onSend(value.text) : null,
                 child: Container(
-                  width: 46,
-                  height: 46,
+                  width: 40,
+                  height: 40,
                   decoration: BoxDecoration(
                     color: ready ? AppTheme.sage : AppTheme.sageLight,
                     shape: BoxShape.circle,
-                    boxShadow: ready ? AppTheme.rowShadow : null,
                   ),
                   child: const Icon(
                     Icons.arrow_upward_rounded,
                     color: Colors.white,
-                    size: 22,
+                    size: 19,
                   ),
                 ),
               );
