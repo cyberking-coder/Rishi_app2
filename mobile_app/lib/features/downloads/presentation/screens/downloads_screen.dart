@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../../app/theme/app_theme.dart';
+import '../../../../core/config/purchase_config.dart';
 import '../../application/download_providers.dart';
 import '../../domain/entities/download_status.dart';
 import '../widgets/download_tile.dart';
@@ -173,9 +174,17 @@ class _DownloadsEmpty extends StatelessWidget {
                   // The one way out of an empty screen, stated as a
                   // button rather than left as something to work out
                   // from the tab bar.
+                  //
+                  // Worded off kEducationFramingEnabled like every other
+                  // label naming the catalogue. Hardcoding "courses"
+                  // here would have put the education word back on the
+                  // iOS build, in the one place nobody thinks to check
+                  // — a button that only appears on an empty screen.
                   FilledButton(
                     onPressed: () => context.go('/courses'),
-                    child: const Text('Browse courses'),
+                    child: Text(kEducationFramingEnabled
+                        ? 'Browse courses'
+                        : 'Browse videos'),
                   ),
                 ],
               ),
