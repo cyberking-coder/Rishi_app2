@@ -3,7 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../../app/theme/app_theme.dart';
-import '../../../../app/widgets/botanical.dart';
+import '../../../../app/widgets/soft_halo.dart';
 import '../../application/download_providers.dart';
 import '../../domain/entities/download_status.dart';
 import '../widgets/download_tile.dart';
@@ -44,10 +44,6 @@ class _DownloadsScreenState extends ConsumerState<DownloadsScreen> {
       // everything below it.
       body: Stack(
         children: [
-          const Align(
-            alignment: Alignment.bottomCenter,
-            child: MistyHills(height: 260),
-          ),
           SafeArea(
             bottom: false,
             child: Column(
@@ -168,14 +164,8 @@ class _DownloadsHeader extends StatelessWidget {
               alignment: Alignment.center,
               children: [
                 SoftHalo(size: 108),
-                Sparkles(size: 96, color: Colors.white),
                 Icon(Icons.download_rounded,
                     size: 44, color: AppTheme.sageDark),
-                Positioned(
-                  right: -14,
-                  top: 4,
-                  child: LeafSprig(size: 84, angle: -0.5, opacity: 0.8),
-                ),
               ],
             ),
           ),
@@ -201,7 +191,6 @@ class _DownloadsEmpty extends StatelessWidget {
             alignment: Alignment.center,
             children: [
               const SoftHalo(size: 190),
-              const Sparkles(size: 176, color: Colors.white),
               Container(
                 width: 104,
                 height: 104,
@@ -216,21 +205,6 @@ class _DownloadsEmpty extends StatelessWidget {
                 ),
                 child: const Icon(Icons.cloud_download_outlined,
                     size: 46, color: Colors.white),
-              ),
-              const Positioned(
-                left: 6,
-                bottom: 34,
-                child: LeafSprig(size: 92, angle: 2.9, opacity: 0.85),
-              ),
-              const Positioned(
-                right: 6,
-                bottom: 34,
-                child: LeafSprig(
-                  size: 92,
-                  angle: 0.25,
-                  opacity: 0.85,
-                  flip: true,
-                ),
               ),
             ],
           ),

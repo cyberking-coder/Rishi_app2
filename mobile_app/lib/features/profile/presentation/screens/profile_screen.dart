@@ -3,7 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../../app/theme/app_theme.dart';
-import '../../../../app/widgets/botanical.dart';
+import '../../../../app/widgets/soft_halo.dart';
 import '../../../../core/config/purchase_config.dart';
 import '../../../../core/device/device_info_service.dart';
 import '../../../../core/errors/auth_failure.dart';
@@ -62,10 +62,6 @@ class ProfileScreen extends ConsumerWidget {
         children: [
           // Behind the list, so the page closes on the same landscape the
           // splash screen opened with.
-          const Align(
-            alignment: Alignment.bottomCenter,
-            child: MistyHills(height: 280),
-          ),
           SafeArea(
             child: profileAsync.when(
           loading: () =>
@@ -117,26 +113,6 @@ class ProfileScreen extends ConsumerWidget {
                           alignment: Alignment.center,
                           children: [
                             const SoftHalo(size: 176),
-                            const Sparkles(size: 168, color: Colors.white),
-                            const Positioned(
-                              left: -6,
-                              top: 14,
-                              child: LeafSprig(
-                                size: 96,
-                                angle: 2.75,
-                                opacity: 0.75,
-                              ),
-                            ),
-                            const Positioned(
-                              right: -6,
-                              bottom: 30,
-                              child: LeafSprig(
-                                size: 90,
-                                angle: -0.45,
-                                opacity: 0.75,
-                                flip: true,
-                              ),
-                            ),
                             Container(
                               width: 112,
                               height: 112,

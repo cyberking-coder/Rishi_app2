@@ -3,7 +3,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../../app/theme/app_theme.dart';
-import '../../../../app/widgets/botanical.dart';
 import '../../../../core/config/purchase_config.dart';
 import '../../../access/application/access_providers.dart';
 import '../../../access/data/popup_seen_store.dart';
@@ -279,21 +278,6 @@ class _Header extends StatelessWidget {
                 clipBehavior: Clip.none,
                 alignment: Alignment.center,
                 children: [
-                  const Positioned(
-                    right: -34,
-                    top: 4,
-                    child: LeafSprig(size: 108, angle: -0.4, opacity: 0.55),
-                  ),
-                  const Positioned(
-                    left: -26,
-                    bottom: -6,
-                    child: LeafSprig(
-                      size: 78,
-                      angle: 2.7,
-                      opacity: 0.45,
-                      flip: true,
-                    ),
-                  ),
                   GestureDetector(
                     onTap: onProfile,
                     child: Container(

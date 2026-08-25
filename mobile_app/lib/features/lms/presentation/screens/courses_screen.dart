@@ -3,7 +3,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../../app/theme/app_theme.dart';
-import '../../../../app/widgets/botanical.dart';
 import '../../../../core/config/purchase_config.dart';
 import '../../application/lms_providers.dart';
 import '../../domain/entities/course_summary.dart';
@@ -70,23 +69,6 @@ class _CoursesScreenState extends ConsumerState<CoursesScreen> {
                           fontSize: 14.5,
                           color: AppTheme.textSecondary,
                         ),
-                      ),
-                    ],
-                  ),
-                ),
-                // Clipped to its own box so the sprig can overhang the
-                // right edge without widening the row and pushing the
-                // title into a wrap.
-                const SizedBox(
-                  width: 76,
-                  height: 76,
-                  child: Stack(
-                    clipBehavior: Clip.none,
-                    children: [
-                      Positioned(
-                        right: -34,
-                        top: 2,
-                        child: LeafSprig(size: 122, angle: -0.42, opacity: 0.6),
                       ),
                     ],
                   ),

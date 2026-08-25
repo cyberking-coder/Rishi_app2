@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 
 import '../../../../app/theme/app_theme.dart';
-import '../../../../app/widgets/botanical.dart';
 
 /// The frame every auth screen sits in: warm wash, leaves in the corners,
 /// a scrolling body, and an optional deep-sage band closing the bottom.
@@ -43,27 +42,6 @@ class AuthScaffold extends StatelessWidget {
         ),
         child: Stack(
           children: [
-            const Positioned(
-              top: -10,
-              right: -58,
-              child: LeafSprig(size: 190, angle: -0.32, opacity: 0.45, flip: true),
-            ),
-            const Positioned(
-              top: 90,
-              left: -70,
-              child: LeafSprig(size: 165, angle: 0.4, opacity: 0.4),
-            ),
-            const Positioned(
-              bottom: 190,
-              left: -74,
-              child: LeafSprig(size: 175, angle: -0.5, opacity: 0.38, flip: true),
-            ),
-            const Positioned(
-              bottom: 230,
-              right: -76,
-              child: LeafSprig(size: 170, angle: 0.45, opacity: 0.34),
-            ),
-
             SafeArea(
               // A LayoutBuilder so the footer can be pushed to the bottom
               // of the *viewport* when the content is short, and simply

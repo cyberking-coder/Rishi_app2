@@ -3,8 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../../app/theme/app_theme.dart';
-import '../../../../app/widgets/botanical.dart';
 import '../../../../app/widgets/lotus_logo.dart';
+import '../../../../app/widgets/soft_halo.dart';
 import '../../application/auth_providers.dart';
 import '../../application/auth_state.dart';
 import '../widgets/apple_sign_in_button.dart';
@@ -218,8 +218,8 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
   }
 }
 
-/// The lotus badge above the signup heading, flanked by sprigs — the
-/// design's way of saying this is the same doorway as the login screen.
+/// The lotus badge above the signup heading — the design's way of saying
+/// this is the same doorway as the login screen.
 class _SignupBadge extends StatelessWidget {
   const _SignupBadge();
 
@@ -232,7 +232,6 @@ class _SignupBadge extends StatelessWidget {
         alignment: Alignment.center,
         children: [
           const SoftHalo(size: 132),
-          const Sparkles(size: 110, color: Colors.white),
           Container(
             width: 88,
             height: 88,
@@ -244,11 +243,6 @@ class _SignupBadge extends StatelessWidget {
             child: const Center(
               child: LotusLogo(size: 46, color: AppTheme.sageDark),
             ),
-          ),
-          const Positioned(
-            right: -6,
-            bottom: 26,
-            child: LeafSprig(size: 66, angle: -0.4, opacity: 0.85),
           ),
         ],
       ),
