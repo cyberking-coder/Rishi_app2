@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../app/theme/app_theme.dart';
-import '../../../../app/widgets/botanical.dart';
+import '../../../../app/widgets/soft_halo.dart';
 import '../../application/auth_providers.dart';
 import '../../application/auth_state.dart';
 import '../widgets/auth_scaffold.dart';

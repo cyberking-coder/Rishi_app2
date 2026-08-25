@@ -1,4 +1,4 @@
-# Store listing copy — Know Thyself 2.1.1
+# Store listing copy — Know Thyself 2.1.2
 
 Everything the two stores ask for, in the order they ask for it. Replaces
 the 1.x `play-store-listing.md`, which still described a dark-violet
@@ -12,7 +12,7 @@ marked, so an edit does not silently overflow and get truncated mid-word.
 - **Apple ID (numeric):** `6786403340`
 - **SKU:** `knowthyself001`
 - **Android package:** `com.knowthyself.app`
-- **Version:** 2.1.1 (build 15 locally; CI assigns its own)
+- **Version:** 2.1.2 (build 16 locally; CI assigns its own)
 
 ---
 
@@ -152,36 +152,21 @@ meditation,mindfulness,calm,sleep,relax,spiritual,anxiety,breathe,guided,peace,h
 
 ### What's New in This Version (4000 max)
 
-Features **and** fixes together, deliberately. Build 13 was pulled from
-review before it rolled out, so nobody ever received 2.1.0 — for everyone
-installing 2.1.1 this is the release that brings the guide, the redesign and
-Sign in with Apple. Fix-only notes would describe a version they never had.
+2.1.2 is a restyle and nothing else. Resist the urge to pad it — a list of
+invented improvements next to a genuinely visual release reads as filler,
+and every extra claim is one more thing a reviewer may go looking for.
 
 ```
-• Ask the guide — a companion that knows the whole library and where you are
-  in it. Ask how to sit with a restless mind or what to play tonight, in
-  English, Hindi or Marathi. Type it, or tap the microphone and just talk.
-• A completely new look: softer, quieter, easier to read.
-• Sign in with Apple.
-• Delete your account and everything in it from Profile → Settings, at any
-  time, in two taps.
-
-Also in this update:
-
-• Fixed downloaded audio disappearing. Saving something and then returning to
-  the home screen could remove everything you had downloaded. Your downloads
-  now stay on your device until you delete them yourself. If any vanished
-  before this update they will need downloading again — the files were removed
-  and cannot be recovered.
-• The short freeze on the home screen was the same fault, and is gone with it.
-• The download button on the player is now clearly visible. It was being drawn
-  in a dark colour against the dark player background and was easy to miss.
-• The membership page opens reliably, and now says what went wrong on the rare
-  occasion it cannot.
+• A new look throughout. Softer surfaces, clearer type, and a calmer palette
+  that keeps the artwork rather than the interface in the foreground.
+• The home screen now opens on the day and a greeting, with what you were
+  last listening to — and how long is left of it — in reach straight away.
+• Episode lists say where you are up to in words rather than in colour, so a
+  glance is enough.
 ```
-> The line about downloads being unrecoverable is not padding. Anyone who lost
-> them will reopen the app expecting them back; saying so here is cheaper than
-> the support mail that follows if we do not.
+> Nothing here is a feature claim. Everything named is visible on first
+> launch, which is the test for whether a release note is honest: a reviewer
+> opening the build should be able to see each line without hunting.
 
 ### App Review Information → Notes
 ```
@@ -201,15 +186,18 @@ price. Selecting it explains that access is required and offers no way
 to obtain it. The in-app assistant does not describe how to obtain
 access, name any price, or reference any website.
 
-WHAT CHANGED SINCE THE PREVIOUS SUBMISSION
-The previous submission was made without review information, so it was
-assessed without the context above. That was our omission.
+WHAT CHANGED SINCE THE APPROVED VERSION (2.1.1)
+This update is a visual restyle. No screen was added or removed, no
+feature was added or removed, and nothing is reachable in this build
+that was not reachable in 2.1.1. Colours, typography, spacing and card
+styling changed; behaviour did not.
 
-We have also removed everything that was not the playing of previously
-acquired content. Live sessions have been removed entirely, so the app
-facilitates no real-time or person-to-person services. Completion
-certificates have been removed, so the app issues no credentials. What
-remains is a library of audio and video, and a player for it.
+Everything that made 2.1.1 a reader app is unchanged and still in place.
+Live sessions remain removed, so the app facilitates no real-time or
+person-to-person services. Completion certificates remain removed, so
+the app issues no credentials. There is still no purchase mechanism, no
+price anywhere in the app, and no link or call to action pointing to any
+external purchasing mechanism.
 
 DEMO ACCOUNT
 The account in Sign-In Information has active access, so every screen is
@@ -311,22 +299,20 @@ Know Thyself
 Guided meditation, courses and a companion to ask. Find peace within.
 ```
 
-### Release notes — 2.1.1 (build 15) (500 max — this is 331)
+### Release notes — 2.1.2 (build 16) (500 max)
 
-> Android gains nothing in this release and loses two features. Everything
-> else in the work was gated to iOS. Consider not shipping it to Play at all
-> until there is something in it for these users — the compliance problem it
-> solves does not exist on Android.
+> Unlike 2.1.1, this release is worth shipping to Play. 2.1.1 gave Android
+> users nothing and took two features away; the restyle reaches every
+> platform equally, so for once Play and the App Store get the same release
+> for the same reason.
 
 ```
-• Live sessions have been retired. If you were holding a seat for an upcoming session, please contact us at ar.happinessmovement@gmail.com.
-• Course certificates are no longer shown in the app. Certificates already issued stay valid and can still be verified online.
-• Smaller fixes and refinements throughout.
+• A new look throughout — softer surfaces, clearer type, and a calmer palette that keeps the artwork rather than the interface in the foreground.
+• The home screen opens on the day and a greeting, with whatever you were last listening to, and how long is left of it, in reach straight away.
+• Episode lists now say where you are up to in words rather than in colour.
 ```
 > Play caps release notes at 500 characters per language and truncates
-> silently rather than warning, so this is a compressed version of the App
-> Store text — same order, features before fixes. Sign in with Apple is the
-> line that had to go: it is the least relevant of them on Android.
+> silently rather than warning.
 
 ### Full description (4000 max)
 Use the App Store description above verbatim; it is within Play's limit and
@@ -412,6 +398,40 @@ declarations apply.
 
 ## 5. Before pressing submit
 
+> **2.1.1 is approved. This checklist now protects an approval rather than
+> chasing one.** The bar for 2.1.2 is lower in one way and higher in
+> another: lower because the reader-app argument has already been accepted,
+> higher because a regression now costs a live listing rather than a
+> pending one. The iOS-only items near the bottom are the ones that matter
+> — everything the approval rests on is enforced by two runtime flags that
+> a restyle could plausibly have broken.
+
+### New for 2.1.2
+
+- [ ] **Run `flutter analyze` and fix everything it reports.** No part of
+      the restyle has been compiled by anyone. It was written without a
+      Flutter toolchain available and verified only by bracket balance,
+      which catches syntax and nothing else.
+- [ ] **Run the build on a real device before submitting**, not just the
+      simulator. Layout is the part that cannot be checked by reading, and
+      the restyle changed padding and type size on every screen.
+- [ ] Check the **Downloads empty state on iOS** reads "Browse videos".
+      That button is new in 2.1.2 and only appears when there are no
+      downloads, which makes it the easiest education-framing leak in the
+      release to miss.
+- [ ] Check a **long display name** on Home and a **long plan name** on
+      Profile. Both sit next to fixed-width elements at larger type than
+      before; both are set to ellipsise, and neither has been seen do it.
+- [ ] Confirm **Devanagari renders** on a Hindi title. `AppTheme.display`
+      moved off Fraunces onto Mukta in this release, which should fix
+      mid-screen font fallback rather than cause it — but it is a
+      whole-app font change and deserves one look.
+- [ ] If the **Browse cards show no session counts**, the PostgREST
+      embedded aggregate did not resolve. Harmless by design — the line
+      hides — but worth knowing rather than discovering later.
+
+### Carried over
+
 > **The 22 August rejection happened here, not in the code.** App Review
 > Information was submitted **blank**. The reviewer therefore had no demo
 > account, signed up for a free one, found the meditations locked behind a
@@ -436,7 +456,10 @@ declarations apply.
       Apple reviewed "2.1.0 (24)" while `pubspec.yaml` had said 2.1.1 since
       before any of the reader-app work landed — a binary reporting the older
       version cannot contain it. Check the version and build number on the
-      submission screen against the commit you meant to ship.
+      submission screen against the commit you meant to ship. For this
+      release that means **2.1.2**, and a build carrying the purple
+      interface rather than the sage one — which you can tell at a glance
+      from the splash screen.
 - [ ] Open the build and confirm the bottom tab reads **Videos**, not
       **Courses**. That single word is the fastest check that the binary
       carries the reframing rather than only the purchase removal.

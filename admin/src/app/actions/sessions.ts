@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { requireAdmin } from "@/lib/auth";
 import { createAdminClient } from "@/lib/supabase/admin";
 import type { ActionResult } from "./users";
+import { shrinkImage } from "@/lib/image";
 
 /// A join link is the whole point of the card, so it is checked rather
 /// than trusted. Not checked for being Zoom specifically — a Meet or
@@ -162,17 +163,30 @@ export async function uploadSessionThumbnail(args: {
   await requireAdmin();
   const db = createAdminClient();
 
-  const bytes = Buffer.from(args.base64, "base64");
-  if (bytes.byteLength > 5 * 1024 * 1024) {
+  const raw = Buffer.from(args.base64, "base64");
+  // Checked before shrinking, not after. The cap exists to stop someone
+  // uploading a 200 MB TIFF through a server action, and that cost is
+  // paid on the way in — by the time shrinkImage has decoded it, the
+  // damage the limit guards against has already been done.
+  if (raw.byteLength > 5 * 1024 * 1024) {
     return { ok: false, error: "Thumbnails must be under 5 MB." };
   }
+
+  const shrunk = await shrinkImage(
+    raw,
+    args.contentType,
+    args.fileName.includes(".") ? args.fileName.split(".").pop()! : "jpg",
+  );
 
   const safeName = args.fileName.replace(/[^a-zA-Z0-9._-]/g, "_");
   const path = `session/${Date.now().toString(36)}-${safeName}`;
 
   const { error: uploadError } = await db.storage
     .from("covers")
-    .upload(path, bytes, { contentType: args.contentType, upsert: false });
+    .upload(path, shrunk.bytes, {
+      contentType: shrunk.contentType,
+      upsert: false,
+    });
   if (uploadError) return { ok: false, error: uploadError.message };
 
   const { data } = db.storage.from("covers").getPublicUrl(path);

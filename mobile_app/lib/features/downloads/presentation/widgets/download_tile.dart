@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../../app/theme/app_theme.dart';
+import '../../../../app/widgets/remote_image.dart';
 import '../../domain/entities/download_status.dart';
 import '../../domain/entities/download_task.dart';
 
@@ -42,23 +43,24 @@ class DownloadTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+    // A glass row rather than a divided list item. Downloads sit on the
+    // same lavender canvas as everything else, and a plain row with a
+    // hairline under it was the one place in the app still drawn like a
+    // settings list.
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: AppTheme.glassSurface(),
       child: Row(
         children: [
           ClipRRect(
-            borderRadius: BorderRadius.circular(6),
+            borderRadius: BorderRadius.circular(11),
             child: SizedBox(
-              width: 80,
-              height: 48,
-              child: task.thumbnailUrl != null
-                  ? Image.network(
-                      task.thumbnailUrl!,
-                      fit: BoxFit.cover,
-                      errorBuilder: (_, __, ___) =>
-                          const ColoredBox(color: Colors.white12),
-                    )
-                  : const ColoredBox(color: Colors.white12),
+              width: 96,
+              height: 56,
+              child: RemoteImage(
+                url: task.thumbnailUrl,
+                fallback: const _ThumbFallback(),
+              ),
             ),
           ),
           const SizedBox(width: 12),
@@ -68,31 +70,38 @@ class DownloadTile extends StatelessWidget {
               children: [
                 Text(
                   task.title,
-                  maxLines: 1,
+                  maxLines: 2,
                   overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(fontWeight: FontWeight.w600),
+                  style: const TextStyle(
+                    fontFamily: AppTheme.text,
+                    fontSize: 16,
+                    fontWeight: FontWeight.w500,
+                    letterSpacing: -0.16,
+                    height: 1.3,
+                    color: AppTheme.textPrimary,
+                  ),
                 ),
-                const SizedBox(height: 4),
+                const SizedBox(height: 3),
                 Text(
                   _subtitle,
                   style: TextStyle(
+                    fontFamily: AppTheme.text,
                     color: task.status == DownloadStatus.failed
-                        ? Colors.redAccent
+                        ? AppTheme.danger
                         : AppTheme.textSecondary,
-                    fontSize: 12,
+                    fontSize: 13,
                   ),
                 ),
                 if (task.status == DownloadStatus.downloading ||
                     task.status == DownloadStatus.paused) ...[
-                  const SizedBox(height: 6),
+                  const SizedBox(height: 7),
                   ClipRRect(
                     borderRadius: BorderRadius.circular(2),
                     child: LinearProgressIndicator(
                       value: task.progress == 0 ? null : task.progress,
                       minHeight: 3,
-                      backgroundColor: Colors.white12,
-                      valueColor:
-                          const AlwaysStoppedAnimation(AppTheme.sage),
+                      backgroundColor: AppTheme.well,
+                      valueColor: const AlwaysStoppedAnimation(AppTheme.sage),
                     ),
                   ),
                 ],
@@ -101,7 +110,9 @@ class DownloadTile extends StatelessWidget {
           ),
           _buildAction(),
           IconButton(
-            icon: const Icon(Icons.delete_outline, color: AppTheme.textSecondary),
+            visualDensity: VisualDensity.compact,
+            icon: const Icon(Icons.delete_outline,
+                size: 20, color: AppTheme.textSecondary),
             onPressed: onDelete,
           ),
         ],
@@ -113,27 +124,52 @@ class DownloadTile extends StatelessWidget {
     switch (task.status) {
       case DownloadStatus.completed:
         return IconButton(
-          icon: const Icon(Icons.play_circle_fill, color: AppTheme.sage),
+          visualDensity: VisualDensity.compact,
+          icon: const Icon(Icons.play_circle_fill,
+              size: 26, color: AppTheme.sage),
           onPressed: onPlay,
         );
       case DownloadStatus.downloading:
       case DownloadStatus.queued:
         return IconButton(
-          icon: const Icon(Icons.pause_circle_outline),
+          visualDensity: VisualDensity.compact,
+          icon: const Icon(Icons.pause_circle_outline,
+              size: 24, color: AppTheme.sageDark),
           onPressed: onPrimaryAction,
         );
       case DownloadStatus.paused:
         return IconButton(
-          icon: const Icon(Icons.play_circle_outline),
+          visualDensity: VisualDensity.compact,
+          icon: const Icon(Icons.play_circle_outline,
+              size: 24, color: AppTheme.sageDark),
           onPressed: onPrimaryAction,
         );
       case DownloadStatus.failed:
         return IconButton(
-          icon: const Icon(Icons.refresh, color: Colors.redAccent),
+          visualDensity: VisualDensity.compact,
+          icon: const Icon(Icons.refresh, size: 22, color: AppTheme.danger),
           onPressed: onPrimaryAction,
         );
       case DownloadStatus.revoked:
-        return const SizedBox(width: 48);
+        // No action, but the row still reserves the width so a revoked
+        // item's delete button lines up with every other one's.
+        return const SizedBox(width: 40);
     }
+  }
+}
+
+/// Stands in for a missing thumbnail. A violet tint rather than the
+/// white12 this used to draw — that was a leftover from the dark theme
+/// and rendered as an almost invisible smear on a light page.
+class _ThumbFallback extends StatelessWidget {
+  const _ThumbFallback();
+
+  @override
+  Widget build(BuildContext context) {
+    return const ColoredBox(
+      color: AppTheme.sageSoft,
+      child: Icon(Icons.play_arrow_rounded,
+          color: AppTheme.sageLight, size: 24),
+    );
   }
 }

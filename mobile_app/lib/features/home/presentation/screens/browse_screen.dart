@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../../app/theme/app_theme.dart';
+import '../../../../app/widgets/remote_image.dart';
 import '../../../access/application/access_providers.dart';
 import '../../../audio/application/audio_providers.dart';
 import '../../../audio/domain/entities/audio_track.dart';
@@ -189,8 +190,10 @@ class _AudioRow extends ConsumerWidget {
                 child: audio.coverArtUrl != null
                     ? ClipRRect(
                         borderRadius: BorderRadius.circular(16),
-                        child: Image.network(audio.coverArtUrl!,
-                            fit: BoxFit.cover))
+                        child: RemoteImage(
+                          url: audio.coverArtUrl,
+                          fallback: const SizedBox.shrink(),
+                        ))
                     : const Icon(Icons.headphones,
                         color: Colors.white, size: 24),
               ),

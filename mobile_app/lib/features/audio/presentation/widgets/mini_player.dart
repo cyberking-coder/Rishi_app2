@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../../app/theme/app_theme.dart';
+import '../../../../app/widgets/remote_image.dart';
 import '../../application/audio_providers.dart';
 
 /// Persistent bottom bar shown whenever a track is loaded, regardless of
@@ -72,16 +73,11 @@ class MiniPlayer extends ConsumerWidget {
                                     child: SizedBox(
                                       width: 40,
                                       height: 40,
-                                      child: mediaItem.artUri != null
-                                          ? Image.network(
-                                              mediaItem.artUri.toString(),
-                                              fit: BoxFit.cover,
-                                              errorBuilder: (_, __, ___) =>
-                                                  const ColoredBox(
-                                                      color: Colors.white12),
-                                            )
-                                          : const ColoredBox(
-                                              color: Colors.white12),
+                                      child: RemoteImage(
+                                        url: mediaItem.artUri?.toString(),
+                                        fallback: const ColoredBox(
+                                            color: AppTheme.sageSoft),
+                                      ),
                                     ),
                                   ),
                                   const SizedBox(width: 12),

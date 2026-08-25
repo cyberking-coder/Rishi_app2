@@ -24,9 +24,15 @@ class HomeRemoteDataSource {
   }
 
   Future<List<Map<String, dynamic>>> getCategories({int limit = 16}) {
+    // audio_categories(count) is a PostgREST embedded aggregate: it comes
+    // back as [{"count": n}] per row, one round trip rather than one
+    // query per category. If the relationship can't be resolved the
+    // column is simply absent, and CategorySummary reads that as zero —
+    // the Browse card then shows its name with no count line rather
+    // than failing the whole home screen over a subtitle.
     return _client
         .from('categories')
-        .select('id, name, slug')
+        .select('id, name, slug, audio_categories(count)')
         .order('sort_order', ascending: true)
         .limit(limit);
   }

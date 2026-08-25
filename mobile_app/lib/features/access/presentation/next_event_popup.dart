@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../app/theme/app_theme.dart';
+import '../../../app/widgets/remote_image.dart';
 import '../../../app/widgets/lotus_logo.dart';
 import '../domain/entities/app_popup.dart';
 
@@ -74,11 +75,10 @@ class _PopupCard extends StatelessWidget {
                     borderRadius: BorderRadius.circular(22),
                     child: ConstrainedBox(
                       constraints: const BoxConstraints(maxHeight: 320),
-                      child: Image.network(
-                        popup.imageUrl!,
-                        width: double.infinity,
+                      child: RemoteImage(
+                        url: popup.imageUrl,
                         fit: BoxFit.contain,
-                        errorBuilder: (_, __, ___) => const SizedBox.shrink(),
+                        fallback: const SizedBox.shrink(),
                       ),
                     ),
                   )

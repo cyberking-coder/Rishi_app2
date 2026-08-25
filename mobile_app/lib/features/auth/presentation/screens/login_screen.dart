@@ -3,8 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../../app/theme/app_theme.dart';
-import '../../../../app/widgets/botanical.dart';
 import '../../../../app/widgets/lotus_logo.dart';
+import '../../../../app/widgets/soft_halo.dart';
 import '../../../../core/errors/auth_failure.dart';
 import '../../application/auth_providers.dart';
 import '../../application/auth_state.dart';
@@ -185,8 +185,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 }
 
 /// The lotus in its halo, above the greeting. Smaller than the splash
-/// mark and without the sparkles — this one is identification, not a
-/// curtain-raiser.
+/// mark — this one is identification, not a curtain-raiser.
 class _BrandBadge extends StatelessWidget {
   const _BrandBadge();
 
@@ -210,11 +209,6 @@ class _BrandBadge extends StatelessWidget {
             child: const Center(
               child: LotusLogo(size: 54, color: AppTheme.sageDark),
             ),
-          ),
-          const Positioned(
-            right: 2,
-            bottom: 24,
-            child: LeafSprig(size: 74, angle: -0.35, opacity: 0.85),
           ),
         ],
       ),

@@ -8,6 +8,7 @@ import '../../../downloads/presentation/widgets/download_button.dart';
 import '../../application/audio_providers.dart';
 import '../widgets/sleep_timer_sheet.dart';
 import '../widgets/speed_selector_sheet.dart';
+import '../../../../app/widgets/remote_image.dart';
 
 // ── Design constants ──────────────────────────────────────────────────────────
 // The player is the deep end of the violet ramp — the one screen you are
@@ -185,13 +186,10 @@ class _AlbumArt extends StatelessWidget {
           child: SizedBox(
             width: size,
             height: size,
-            child: artUri != null
-                ? Image.network(
-                    artUri.toString(),
-                    fit: BoxFit.cover,
-                    errorBuilder: (_, __, ___) => _artFallback(),
-                  )
-                : _artFallback(),
+            child: RemoteImage(
+              url: artUri?.toString(),
+              fallback: _artFallback(),
+            ),
           ),
         ),
       ),
