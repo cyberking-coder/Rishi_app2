@@ -781,7 +781,9 @@ As of the end of the App Store compliance session, in priority order:
 
    Fixed by `supabase/migrations/20260825000001_lock_profile_entitlement_columns.sql` — a column-level `GRANT`, because grants are column-aware where RLS is not. **Applied to the live database on 25 August 2026.** The webhook and every admin mutation use the service role, which bypasses both RLS and grants, so nothing legitimate was affected.
 
-   Two things still outstanding from it: confirm the hole is actually shut using the transaction in Section 12, and check whether it was exploited before it was closed — the forensic query is in Section 12 under "After the fix".
+   **Verified shut the same day**: the transaction in Section 12, run against the live database as an ordinary member, returns a permission-denied error where it previously returned `UPDATE 1`.
+
+   Still outstanding: whether it was exploited in the two months it was open. The forensic query is in Section 12 under "After the fix".
 
 0b. **Apple Developer account ownership.** Registered to an individual rather than the business, so payouts land in a personal bank account and the app is legally that person's. Three routes: convert to an Organisation (needs a legal entity and a D-U-N-S number — not available to a sole proprietorship), transfer the app to the business owner's own individual account (needs their own ~₹9,000/yr membership; no D-U-N-S), or leave it and document the arrangement with a CA. **If transferring, do it before IAP subscribers exist** — Sign in with Apple identifiers are scoped to the developer team, so every existing Apple user needs migrating via Apple's transfer-identifier endpoint or they come back as strangers and lose their purchases. That migration is small today and grows with every Apple sign-in.
 
@@ -877,7 +879,7 @@ The Dart half of this repo has never been type-checked anywhere except a develop
 
 ### Findings
 
-**F-1 — CRITICAL. Self-service premium via `profiles`.** Full detail in Section 10 item 0. Fixed by migration `20260825000001`, **applied 25 August 2026**. Confirm it is actually shut:
+**F-1 — CRITICAL. Self-service premium via `profiles`.** Full detail in Section 10 item 0. Fixed by migration `20260825000001`, **applied and verified on the live database, 25 August 2026** — the transaction below now returns permission-denied where it previously returned `UPDATE 1`. Re-run it after any change to the profiles grants:
 
 ```sql
 begin;
