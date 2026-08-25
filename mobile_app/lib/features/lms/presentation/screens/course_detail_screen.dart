@@ -9,6 +9,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../../../app/theme/app_theme.dart';
+import '../../../../app/widgets/remote_image.dart';
 import '../../../../core/config/purchase_config.dart';
 import '../../../audio/application/audio_providers.dart';
 import '../../../audio/domain/entities/audio_track.dart';
@@ -312,14 +313,10 @@ class _Hero extends StatelessWidget {
       height: 236,
       width: double.infinity,
       child: Stack(fit: StackFit.expand, children: [
-        if (coverUrl != null && coverUrl!.isNotEmpty)
-          Image.network(
-            coverUrl!,
-            fit: BoxFit.cover,
-            errorBuilder: (_, __, ___) => const _HeroFallback(),
-          )
-        else
-          const _HeroFallback(),
+        RemoteImage(
+          url: coverUrl,
+          fallback: const _HeroFallback(),
+        ),
 
         // Scrim so the back button stays legible over a bright photo.
         Container(

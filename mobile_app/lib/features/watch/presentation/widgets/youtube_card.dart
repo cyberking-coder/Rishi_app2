@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../../../app/theme/app_theme.dart';
+import '../../../../app/widgets/remote_image.dart';
 import '../../domain/entities/youtube_video.dart';
 
 /// Opens the video on YouTube. External by design — the app never embeds
@@ -31,10 +32,9 @@ class YoutubeThumbnail extends StatelessWidget {
       child: AspectRatio(
         aspectRatio: 16 / 9,
         child: Stack(fit: StackFit.expand, children: [
-          Image.network(
-            video.thumbnail,
-            fit: BoxFit.cover,
-            errorBuilder: (_, __, ___) => Container(
+          RemoteImage(
+            url: video.thumbnail,
+            fallback: Container(
               decoration: const BoxDecoration(gradient: AppTheme.sageGradient),
               child: const Center(
                 child: Icon(Icons.play_circle_outline_rounded,

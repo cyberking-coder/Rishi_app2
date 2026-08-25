@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../../app/theme/app_theme.dart';
+import '../../../../app/widgets/remote_image.dart';
 import '../../../../core/config/purchase_config.dart';
 import '../../application/lms_providers.dart';
 import '../../domain/entities/course_summary.dart';
@@ -453,13 +454,10 @@ class _CourseCover extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    if (url == null || url!.isEmpty) return const _CoverFallback();
-    return Image.network(
-      url!,
-      fit: BoxFit.cover,
-      errorBuilder: (_, __, ___) => const _CoverFallback(),
-      loadingBuilder: (context, child, progress) =>
-          progress == null ? child : const _CoverFallback(),
+    return RemoteImage(
+      url: url,
+      fallback: const _CoverFallback(),
+      fallbackWhileLoading: true,
     );
   }
 }

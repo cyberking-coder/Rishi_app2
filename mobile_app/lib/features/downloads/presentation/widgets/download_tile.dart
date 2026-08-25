@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../../app/theme/app_theme.dart';
+import '../../../../app/widgets/remote_image.dart';
 import '../../domain/entities/download_status.dart';
 import '../../domain/entities/download_task.dart';
 
@@ -56,13 +57,10 @@ class DownloadTile extends StatelessWidget {
             child: SizedBox(
               width: 96,
               height: 56,
-              child: task.thumbnailUrl != null
-                  ? Image.network(
-                      task.thumbnailUrl!,
-                      fit: BoxFit.cover,
-                      errorBuilder: (_, __, ___) => const _ThumbFallback(),
-                    )
-                  : const _ThumbFallback(),
+              child: RemoteImage(
+                url: task.thumbnailUrl,
+                fallback: const _ThumbFallback(),
+              ),
             ),
           ),
           const SizedBox(width: 12),

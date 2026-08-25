@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../../app/theme/app_theme.dart';
+import '../../../../app/widgets/remote_image.dart';
 import '../../../../app/widgets/soft_halo.dart';
 import '../../../../core/config/purchase_config.dart';
 import '../../../../core/device/device_info_service.dart';
@@ -473,14 +474,10 @@ class _EnrolledCourseCard extends StatelessWidget {
               child: SizedBox(
                 width: 56,
                 height: 56,
-                child: course.coverImageUrl != null
-                    ? Image.network(
-                        course.coverImageUrl!,
-                        fit: BoxFit.cover,
-                        errorBuilder: (_, __, ___) =>
-                            const _CourseThumbFallback(),
-                      )
-                    : const _CourseThumbFallback(),
+                child: RemoteImage(
+                  url: course.coverImageUrl,
+                  fallback: const _CourseThumbFallback(),
+                ),
               ),
             ),
             const SizedBox(width: 12),

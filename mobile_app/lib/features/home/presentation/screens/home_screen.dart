@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../../app/theme/app_theme.dart';
+import '../../../../app/widgets/remote_image.dart';
 import '../../../../core/config/purchase_config.dart';
 import '../../../access/application/access_providers.dart';
 import '../../../access/data/popup_seen_store.dart';
@@ -517,13 +518,10 @@ class _ContinueCard extends ConsumerWidget {
                   child: SizedBox(
                     width: 52,
                     height: 52,
-                    child: item.coverArtUrl != null
-                        ? Image.network(
-                            item.coverArtUrl!,
-                            fit: BoxFit.cover,
-                            errorBuilder: (_, __, ___) => const _ArtFallback(),
-                          )
-                        : const _ArtFallback(),
+                    child: RemoteImage(
+                      url: item.coverArtUrl,
+                      fallback: const _ArtFallback(),
+                    ),
                   ),
                 ),
                 const SizedBox(width: 12),
@@ -873,15 +871,10 @@ class _CourseMiniCard extends StatelessWidget {
         child: Stack(
           fit: StackFit.expand,
           children: [
-            if (course.coverImageUrl != null &&
-                course.coverImageUrl!.isNotEmpty)
-              Image.network(
-                course.coverImageUrl!,
-                fit: BoxFit.cover,
-                errorBuilder: (_, __, ___) => const _MiniCover(),
-              )
-            else
-              const _MiniCover(),
+            RemoteImage(
+              url: course.coverImageUrl,
+              fallback: const _MiniCover(),
+            ),
 
             // A scrim from the left rather than the bottom. Course covers
             // in this library put the teacher on the right, and a bottom
@@ -1090,15 +1083,10 @@ class _FeaturedRow extends ConsumerWidget {
                         ),
                         clipBehavior: Clip.antiAlias,
                         child: Stack(fit: StackFit.expand, children: [
-                          if (audio.coverArtUrl != null &&
-                              audio.coverArtUrl!.isNotEmpty)
-                            Image.network(
-                              audio.coverArtUrl!,
-                              fit: BoxFit.cover,
-                              errorBuilder: (_, __, ___) => const _MiniCover(),
-                            )
-                          else
-                            const _MiniCover(),
+                          RemoteImage(
+                            url: audio.coverArtUrl,
+                            fallback: const _MiniCover(),
+                          ),
                           if (locked) const PremiumLockBadge(),
                           const Positioned(
                             right: 10,
