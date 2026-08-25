@@ -1,9 +1,15 @@
 import 'package:flutter/material.dart';
 
-/// Calm learning theme: sage green on warm cream. Sage carries every
-/// interactive affordance, cream carries content surfaces, and the two
-/// stay far enough apart in luminance that text never needs a shadow to
-/// stay readable.
+/// Purple glass: a light theme on a violet palette running light to
+/// dark — lavender canvas, mid-violet accent, deep-purple player — with
+/// frosted surfaces for cards, bars and the tab bar.
+///
+/// Replaces the sage-on-cream system. The token NAMES are deliberately
+/// unchanged: 32 files read from this class, and renaming `sage` to
+/// `violet` would have meant touching every one of them to change what
+/// colour comes out of it. The names describe roles here — [sage] is
+/// "the primary action colour", whatever hue that currently is — which
+/// is what let this palette land in one file.
 ///
 /// Screens should read from here rather than declaring their own
 /// constants — the old per-screen colour blocks are what let the app
@@ -12,32 +18,42 @@ class AppTheme {
   AppTheme._();
 
   // ── Core palette ────────────────────────────────────────────────────
-  /// Page background. Warm off-white, never pure white — pure white next
-  /// to the cream cards reads as a rendering bug rather than a choice.
-  static const Color background = Color(0xFFF2F2EF);
+  /// Page background. Lavender canvas — the tint is what makes the
+  /// frosted white surfaces above it read as glass rather than as
+  /// plain cards.
+  static const Color background = Color(0xFFF5F2FC);
 
   /// Cards and sheets that sit on [background].
   static const Color surface = Color(0xFFFFFFFF);
 
-  /// Secondary surface for list rows — the cream tone from the reference
-  /// lesson list. Warmer than [surface] so stacked rows separate without
-  /// borders.
-  static const Color surfaceCream = Color(0xFFFBF7EC);
+  /// Secondary surface for list rows. The palest violet, so stacked
+  /// rows separate from [surface] without borders.
+  static const Color surfaceCream = Color(0xFFF5F3FF);
+
+  /// Frosted card fill: white at 60%, over [background]. Pair with a
+  /// BackdropFilter where the thing behind it is worth blurring;
+  /// on a flat background the translucency alone carries it.
+  static const Color glass = Color(0x99FFFFFF);
+
+  /// The deep end of the ramp — the player, and anything that should
+  /// read as a surface you are inside rather than on.
+  static const Color deep = Color(0xFF2A1650);
+  static const Color deepest = Color(0xFF1E1830);
 
   /// Primary brand + every primary action.
-  static const Color sage = Color(0xFF5F8D7E);
-  static const Color sageDark = Color(0xFF44675C);
-  static const Color sageLight = Color(0xFF8FB3A6);
+  static const Color sage = Color(0xFF7C3AED);
+  static const Color sageDark = Color(0xFF6D28D9);
+  static const Color sageLight = Color(0xFFA78BFA);
 
   /// Tinted fills for pills, badges and icon chips.
-  static const Color sageSoft = Color(0xFFE3EDE8);
+  static const Color sageSoft = Color(0xFFEDE9FE);
 
-  /// Warm accent, used sparingly — bookmarks, highlights, "new" flags.
-  static const Color sand = Color(0xFFEFD9A8);
-  static const Color sandSoft = Color(0xFFFAF0DA);
+  /// Secondary accent, used sparingly — highlights, "new" flags.
+  static const Color sand = Color(0xFFC4B5FD);
+  static const Color sandSoft = Color(0xFFEDE9FE);
 
-  /// Locked / premium invitation. NOT destructive — see [danger].
-  static const Color clay = Color(0xFFC97B5A);
+  /// Locked / members-only. NOT destructive — see [danger].
+  static const Color clay = Color(0xFF6D28D9);
 
   /// Destructive only: delete, revoke, payment failed.
   ///
@@ -46,21 +62,21 @@ class AppTheme {
   /// faintly like a threat.
   static const Color danger = Color(0xFFB23A2E);
 
-  /// Certificate seals only. A deeper [sand] — the pale original doesn't
-  /// read as an award against cream.
-  static const Color gold = Color(0xFFD6B36B);
+  /// Kept for the certificate seal, which iOS no longer renders and
+  /// Android still can. A deeper [sand].
+  static const Color gold = Color(0xFF8B5CF6);
 
   // ── Text ────────────────────────────────────────────────────────────
-  static const Color textPrimary = Color(0xFF25332C);
-  static const Color textSecondary = Color(0xFF7C8A83);
+  static const Color textPrimary = Color(0xFF1E1830);
+  static const Color textSecondary = Color(0xFF7D7395);
   static const Color textOnSage = Color(0xFFFFFFFF);
 
   // ── Lines ───────────────────────────────────────────────────────────
-  /// textPrimary at 8%.
-  static const Color border = Color(0x1425332C);
+  /// textPrimary at 9%.
+  static const Color border = Color(0x171E1830);
 
-  /// textPrimary at 14%, for edges that must survive on cream.
-  static const Color borderStrong = Color(0x2425332C);
+  /// textPrimary at 16%, for edges that must survive on a tinted canvas.
+  static const Color borderStrong = Color(0x291E1830);
 
   // ── Shape ───────────────────────────────────────────────────────────
   // Claymorphism reads as a soft solid you could press a thumb into.
@@ -68,11 +84,11 @@ class AppTheme {
   // card just looks like a card with an odd shadow — and it needs the
   // radius to stay proportional as surfaces shrink, so a chip is as
   // rounded relative to its size as a card is.
-  static const double radiusCard = 28;
-  static const double radiusRow = 22;
+  static const double radiusCard = 24;
+  static const double radiusRow = 16;
 
-  /// Inner tiles: lesson leads, avatars, icon chips.
-  static const double radiusTile = 18;
+  /// Inner tiles: episode leads, avatars, icon chips.
+  static const double radiusTile = 12;
   static const double radiusPill = 999;
 
   // ── Type ────────────────────────────────────────────────────────────
@@ -149,54 +165,57 @@ class AppTheme {
   /// Clay lift: a dark shadow low-right and a light one high-left.
   ///
   /// The pair is what makes a surface read as a soft solid rather than a
-  /// card floating over a page — one light source above-left, and the
-  /// highlight is as load-bearing as the shadow. Dropping the light one
-  /// leaves an ordinary drop shadow.
-  ///
-  /// Flutter has no inset BoxShadow, so the inner light that completes the
-  /// effect is faked with a gradient in [clayFill] instead.
+  /// card floating over a page. Purple glass throws a single soft shadow
+  /// a long way down rather than the two-light clay model this replaced —
+  /// the surface is meant to read as translucent and hovering, not as a
+  /// solid you could press a thumb into.
   static List<BoxShadow> get cardShadow => const [
         BoxShadow(
-          color: Color(0x2225332C),
-          blurRadius: 28,
-          offset: Offset(8, 12),
+          color: Color(0x291E1830),
+          blurRadius: 60,
+          offset: Offset(0, 24),
         ),
         BoxShadow(
-          color: Color(0xE6FFFFFF),
-          blurRadius: 22,
-          offset: Offset(-7, -9),
+          color: Color(0x0F1E1830),
+          blurRadius: 8,
+          offset: Offset(0, 2),
         ),
       ];
 
-  /// The same light, closer in — for rows, chips and small tiles.
+  /// Barely there — for rows, chips and small tiles, where the long
+  /// throw of [cardShadow] would muddy a stack.
   static List<BoxShadow> get rowShadow => const [
         BoxShadow(
-          color: Color(0x1A25332C),
-          blurRadius: 16,
-          offset: Offset(4, 6),
+          color: Color(0x0D1E1830),
+          blurRadius: 2,
+          offset: Offset(0, 1),
         ),
         BoxShadow(
-          color: Color(0xCCFFFFFF),
-          blurRadius: 12,
-          offset: Offset(-4, -5),
+          color: Color(0x0A1E1830),
+          blurRadius: 0,
+          spreadRadius: 0.5,
         ),
       ];
 
-  /// The top-left-lit gradient that stands in for an inner highlight.
+  /// The frosted fill: a translucent white that lets the lavender canvas
+  /// through, brightest at the top edge where a glass panel catches the
+  /// light. Kept subtle — pushed harder it stops reading as glass and
+  /// starts reading as a grey card.
   ///
-  /// Subtle on purpose: at any real strength it reads as a gloss and the
-  /// surface stops looking like clay and starts looking like plastic.
+  /// Still called clayFill because 32 files call it. The name is wrong
+  /// for what it now draws and renaming it would be a rename commit
+  /// across the whole app, which is not what a restyle should cost.
   static LinearGradient clayFill([Color? base]) {
-    final c = base ?? surface;
+    final c = base ?? glass;
     return LinearGradient(
       begin: Alignment.topLeft,
       end: Alignment.bottomRight,
       colors: [
-        Color.alphaBlend(const Color(0x14FFFFFF), c),
+        Color.alphaBlend(const Color(0x40FFFFFF), c),
         c,
-        Color.alphaBlend(const Color(0x0A25332C), c),
+        Color.alphaBlend(const Color(0x0D1E1830), c),
       ],
-      stops: const [0, 0.55, 1],
+      stops: const [0, 0.5, 1],
     );
   }
 
@@ -220,9 +239,9 @@ class AppTheme {
     );
   }
 
-  /// A pressed-in well: search fields, progress tracks, empty slots.
-  /// Reverses the light so the surface reads as carved rather than
-  /// raised — the counterpart that makes the raised pieces legible.
+  /// A recessed well: search fields, progress tracks, empty slots. A
+  /// flat violet tint rather than a carved one — on glass there is no
+  /// depth to carve into.
   static BoxDecoration clayInset({Color? color, double? radius}) {
     final c = color ?? sageSoft;
     return BoxDecoration(
@@ -230,7 +249,7 @@ class AppTheme {
         begin: Alignment.topLeft,
         end: Alignment.bottomRight,
         colors: [
-          Color.alphaBlend(const Color(0x1425332C), c),
+          Color.alphaBlend(const Color(0x141E1830), c),
           c,
           Color.alphaBlend(const Color(0x14FFFFFF), c),
         ],
@@ -242,22 +261,25 @@ class AppTheme {
 
   static List<BoxShadow> get navShadow => const [
         BoxShadow(
-          color: Color(0x2225332C),
-          blurRadius: 30,
-          offset: Offset(0, -6),
-        ),
-        BoxShadow(
-          color: Color(0xB3FFFFFF),
-          blurRadius: 16,
-          offset: Offset(0, -14),
+          color: Color(0x1F1E1830),
+          blurRadius: 40,
+          offset: Offset(0, -8),
         ),
       ];
 
-  /// Hero gradient for the home banner and course covers with no image.
+  /// Hero gradient for the home banner and covers with no image.
   static const LinearGradient sageGradient = LinearGradient(
     begin: Alignment.topLeft,
     end: Alignment.bottomRight,
-    colors: [Color(0xFF6E9A8B), Color(0xFF4E7A6C)],
+    colors: [Color(0xFF8B5CF6), Color(0xFF4C1D95)],
+  );
+
+  /// The deep end of the ramp, for the player. Dark enough that artwork
+  /// and white controls sit on it without a scrim.
+  static const LinearGradient deepGradient = LinearGradient(
+    begin: Alignment.topCenter,
+    end: Alignment.bottomCenter,
+    colors: [Color(0xFF2A1650), Color(0xFF1E1830)],
   );
 
   /// Maps the design's ramp onto Material's slots so a widget that asks
