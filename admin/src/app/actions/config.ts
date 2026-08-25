@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { requireAdmin } from "@/lib/auth";
 import { createAdminClient } from "@/lib/supabase/admin";
 import type { ActionResult } from "./users";
+import { shrinkImage } from "@/lib/image";
 
 /** One scheduled pop-up. `weekday` is ISO-8601: 1 = Monday … 7 = Sunday,
  *  null = every day. */
@@ -53,12 +54,19 @@ export async function uploadPopupImage(
   await requireAdmin();
   const admin = createAdminClient();
 
-  const buffer = Buffer.from(base64, "base64");
-  const path = `popup/${popupKey}.${ext}`;
+  const shrunk = await shrinkImage(
+    Buffer.from(base64, "base64"),
+    mimeType,
+    ext,
+  );
+  const path = `popup/${popupKey}.${shrunk.ext}`;
 
   const { error } = await admin.storage
     .from("covers")
-    .upload(path, buffer, { contentType: mimeType, upsert: true });
+    .upload(path, shrunk.bytes, {
+      contentType: shrunk.contentType,
+      upsert: true,
+    });
 
   if (error) return { ok: false, error: error.message };
 

@@ -6,6 +6,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { slugify } from "@/lib/utils";
 import type { CourseStatus, LessonType, ResourceType } from "@/lib/types";
 import type { ActionResult } from "./users";
+import { shrinkImage } from "@/lib/image";
 
 // Same conventions as actions/content.ts: requireAdmin() first,
 // service-role client for the mutation, ActionResult return shape,
@@ -84,15 +85,22 @@ export async function uploadCourseCover(args: {
   await requireAdmin();
   const db = createAdminClient();
 
-  const ext = args.fileName.includes(".")
-    ? args.fileName.split(".").pop()
-    : "jpg";
-  const path = `course/${args.courseId}/cover.${ext}`;
-  const bytes = Buffer.from(args.base64, "base64");
+  const shrunk = await shrinkImage(
+    Buffer.from(args.base64, "base64"),
+    args.contentType,
+    args.fileName.includes(".") ? args.fileName.split(".").pop()! : "jpg",
+  );
+  // The extension comes from what was actually stored, not from what
+  // the admin picked: a PNG re-encoded to JPEG under a .png path is a
+  // file whose name lies about its contents.
+  const path = `course/${args.courseId}/cover.${shrunk.ext}`;
 
   const { error: uploadError } = await db.storage
     .from("covers")
-    .upload(path, bytes, { contentType: args.contentType, upsert: true });
+    .upload(path, shrunk.bytes, {
+      contentType: shrunk.contentType,
+      upsert: true,
+    });
   if (uploadError) return { ok: false, error: uploadError.message };
 
   const { data } = db.storage.from("covers").getPublicUrl(path);
