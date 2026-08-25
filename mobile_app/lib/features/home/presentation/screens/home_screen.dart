@@ -123,9 +123,27 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
 
   String _greeting() {
     final h = DateTime.now().hour;
-    if (h < 12) return "Let's start the day gently";
-    if (h < 17) return 'A pause for the afternoon';
-    return 'Wind down for the evening';
+    if (h < 12) return 'Good morning';
+    if (h < 17) return 'Good afternoon';
+    return 'Good evening';
+  }
+
+  /// "Sunday, 23 August" — the eyebrow above the greeting.
+  ///
+  /// Spelled out here rather than via intl's DateFormat: the app does not
+  /// otherwise depend on intl, and one line of names is cheaper than a
+  /// package plus locale initialisation for a single string.
+  String _today() {
+    const days = [
+      'Monday', 'Tuesday', 'Wednesday', 'Thursday',
+      'Friday', 'Saturday', 'Sunday',
+    ];
+    const months = [
+      'January', 'February', 'March', 'April', 'May', 'June',
+      'July', 'August', 'September', 'October', 'November', 'December',
+    ];
+    final now = DateTime.now();
+    return '${days[now.weekday - 1]}, ${now.day} ${months[now.month - 1]}';
   }
 
   @override
@@ -160,11 +178,12 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
           children: [
             _Header(
               username: username,
+              eyebrow: _today(),
               greeting: _greeting(),
               daysLeft: daysLeft,
               onProfile: () => context.go('/profile'),
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 22),
 
             _SearchBar(onTap: () => context.push('/search')),
             const SizedBox(height: 12),
@@ -179,7 +198,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
 
 
             _SectionTitle(
-              title: 'Categories',
+              title: 'Browse',
               action: 'See all',
               onAction: () => context.push('/search'),
             ),
@@ -192,7 +211,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
             // Audio leads: it's the app's core content and was previously
             // below the courses row, far enough down that it went unseen.
             _SectionTitle(
-              title: 'Featured for you',
+              title: 'Featured',
               action: 'See all',
               onAction: () => context.push('/search'),
             ),
@@ -227,12 +246,14 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
 
 class _Header extends StatelessWidget {
   final String username;
+  final String eyebrow;
   final String greeting;
   final int? daysLeft;
   final VoidCallback onProfile;
 
   const _Header({
     required this.username,
+    required this.eyebrow,
     required this.greeting,
     required this.onProfile,
     this.daysLeft,
@@ -245,66 +266,58 @@ class _Header extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(children: [
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // Eyebrow above, display line below — the design puts
-                  // the time of day in small caps and the person's name
-                  // in the serif, rather than the other way round: the
-                  // greeting is context, the name is the moment.
-                  Text(
-                    greeting.toUpperCase(),
-                    style: AppTheme.label,
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    'Hi, $username',
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: AppTheme.displayLarge,
-                  ),
-                ],
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // The date is the eyebrow and the greeting is the
+                    // display line, which is the design's arrangement
+                    // and the opposite of what was here. The name moved
+                    // into the avatar: at 32px a long display name
+                    // ellipsised on nearly every phone, and a greeting
+                    // truncated mid-name is worse than no name at all.
+                    Text(eyebrow.toUpperCase(), style: AppTheme.label),
+                    const SizedBox(height: 2),
+                    Text(
+                      greeting,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: AppTheme.displayLarge,
+                    ),
+                  ],
+                ),
               ),
-            ),
-            // The sprig is painted behind the avatar and allowed to run
-            // off the right edge, which is what makes the leaves read as
-            // part of the page rather than as a badge on the avatar.
-            SizedBox(
-              width: 62,
-              height: 62,
-              child: Stack(
-                clipBehavior: Clip.none,
-                alignment: Alignment.center,
-                children: [
-                  GestureDetector(
-                    onTap: onProfile,
-                    child: Container(
-                      width: 52,
-                      height: 52,
-                      decoration: BoxDecoration(
-                        gradient: AppTheme.sageGradient,
-                        shape: BoxShape.circle,
-                        boxShadow: AppTheme.rowShadow,
-                      ),
-                      child: Center(
-                        child: Text(
-                          username.characters.first.toUpperCase(),
-                          style: const TextStyle(
-                            fontFamily: AppTheme.text,
-                            color: Colors.white,
-                            fontSize: 20,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
+              const SizedBox(width: 12),
+              // A soft lavender disc with a deep-violet initial, not a
+              // saturated gradient chip. It sits beside a 32px heading
+              // and has to stay quieter than it.
+              GestureDetector(
+                onTap: onProfile,
+                child: Container(
+                  width: 38,
+                  height: 38,
+                  decoration: const BoxDecoration(
+                    color: AppTheme.sageSoft,
+                    shape: BoxShape.circle,
+                  ),
+                  child: Center(
+                    child: Text(
+                      username.characters.first.toUpperCase(),
+                      style: const TextStyle(
+                        fontFamily: AppTheme.text,
+                        color: Color(0xFF4C1D95),
+                        fontSize: 15,
+                        fontWeight: FontWeight.w600,
                       ),
                     ),
                   ),
-                ],
+                ),
               ),
-            ),
-          ]),
+            ],
+          ),
           if (daysLeft != null && daysLeft! <= 7) ...[
             const SizedBox(height: 14),
             Container(
@@ -351,22 +364,18 @@ class _GuideBar extends StatelessWidget {
       child: GestureDetector(
         onTap: onTap,
         child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-          decoration: AppTheme.claySurface(
-            color: AppTheme.sageSoft,
-            radius: AppTheme.radiusRow,
-            small: true,
-          ),
+          padding: const EdgeInsets.all(12),
+          decoration: AppTheme.glassSurface(),
           child: Row(children: [
             Container(
               width: 34,
               height: 34,
-              decoration: const BoxDecoration(
-                gradient: AppTheme.sageGradient,
-                shape: BoxShape.circle,
+              decoration: BoxDecoration(
+                color: AppTheme.sageSoft,
+                borderRadius: BorderRadius.circular(11),
               ),
               child: const Icon(Icons.self_improvement_rounded,
-                  size: 19, color: Colors.white),
+                  size: 19, color: AppTheme.sageDark),
             ),
             const SizedBox(width: 12),
             const Expanded(
@@ -415,21 +424,24 @@ class _SearchBar extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 20),
       child: GestureDetector(
         onTap: onTap,
+        // A shallow well rather than a raised pill. Search is not a
+        // feature of the page, it is a hole in it — and a lifted white
+        // capsule directly under a 32px heading competed with it.
         child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 17),
+          height: 38,
+          padding: const EdgeInsets.symmetric(horizontal: 8),
           decoration: BoxDecoration(
-            gradient: AppTheme.clayFill(AppTheme.surface),
-            borderRadius: BorderRadius.circular(AppTheme.radiusPill),
-            boxShadow: AppTheme.cardShadow,
+            color: AppTheme.well,
+            borderRadius: BorderRadius.circular(11),
           ),
           child: const Row(children: [
-            Icon(Icons.search_rounded, size: 23, color: AppTheme.textSecondary),
-            SizedBox(width: 12),
+            Icon(Icons.search_rounded, size: 18, color: AppTheme.textSecondary),
+            SizedBox(width: 8),
             Text(
-              'Search for anything',
+              'Search',
               style: TextStyle(
                 fontFamily: AppTheme.text,
-                fontSize: 15.5,
+                fontSize: 15,
                 color: AppTheme.textSecondary,
               ),
             ),
@@ -454,36 +466,18 @@ class _SectionTitle extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.fromLTRB(20, 0, 12, 0),
       child: Row(children: [
-        Expanded(
-          child: Text(
-            title,
-            style: const TextStyle(
-              fontFamily: AppTheme.display,
-              fontSize: 21,
-              fontWeight: FontWeight.w600,
-              color: AppTheme.textPrimary,
-            ),
-          ),
-        ),
+        Expanded(child: Text(title, style: AppTheme.headline)),
         if (action != null)
           TextButton(
             onPressed: onAction,
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  action!,
-                  style: const TextStyle(
-                    fontFamily: AppTheme.text,
-                    fontSize: 13.5,
-                    fontWeight: FontWeight.w600,
-                    color: AppTheme.sageDark,
-                  ),
-                ),
-                const SizedBox(width: 2),
-                const Icon(Icons.chevron_right_rounded,
-                    size: 18, color: AppTheme.sageDark),
-              ],
+            child: Text(
+              action!,
+              style: const TextStyle(
+                fontFamily: AppTheme.text,
+                fontSize: 14.5,
+                fontWeight: FontWeight.w500,
+                color: AppTheme.sageDark,
+              ),
             ),
           ),
       ]),
@@ -510,82 +504,100 @@ class _ContinueCard extends ConsumerWidget {
           padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
           child: GestureDetector(
             onTap: () => _resume(context, ref, item),
+            // Glass on the canvas, not a solid violet slab. The violet
+            // is spent on the one thing that should be tapped — the play
+            // button — instead of on the whole card, which is what made
+            // the old one shout over every section below it.
             child: Container(
-              padding: const EdgeInsets.all(14),
-              decoration: BoxDecoration(
-                gradient: AppTheme.sageGradient,
-                borderRadius: BorderRadius.circular(AppTheme.radiusCard),
-                boxShadow: AppTheme.cardShadow,
-              ),
+              padding: const EdgeInsets.all(12),
+              decoration: AppTheme.glassSurface(),
               child: Row(children: [
                 ClipRRect(
-                  borderRadius: BorderRadius.circular(16),
+                  borderRadius: BorderRadius.circular(11),
                   child: SizedBox(
-                    width: 54,
-                    height: 54,
+                    width: 52,
+                    height: 52,
                     child: item.coverArtUrl != null
                         ? Image.network(
                             item.coverArtUrl!,
                             fit: BoxFit.cover,
-                            errorBuilder: (_, __, ___) =>
-                                const ColoredBox(color: Colors.white24),
+                            errorBuilder: (_, __, ___) => const _ArtFallback(),
                           )
-                        : const ColoredBox(
-                            color: Colors.white24,
-                            child: Icon(Icons.music_note_rounded,
-                                color: Colors.white70),
-                          ),
+                        : const _ArtFallback(),
                   ),
                 ),
-                const SizedBox(width: 13),
+                const SizedBox(width: 12),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       const Text(
-                        'CONTINUE LISTENING',
+                        'CONTINUE',
                         style: TextStyle(
-                          fontSize: 9.5,
-                          letterSpacing: 0.8,
-                          fontWeight: FontWeight.w800,
-                          color: Colors.white70,
+                          fontFamily: AppTheme.text,
+                          fontSize: 11,
+                          letterSpacing: 0.66,
+                          fontWeight: FontWeight.w600,
+                          color: AppTheme.sageDark,
                         ),
                       ),
-                      const SizedBox(height: 4),
+                      const SizedBox(height: 1),
                       Text(
                         item.title,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: const TextStyle(
-                          fontSize: 14.5,
-                          fontWeight: FontWeight.w700,
-                          color: Colors.white,
+                          fontFamily: AppTheme.text,
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
+                          letterSpacing: -0.16,
+                          color: AppTheme.textPrimary,
                         ),
                       ),
                       const SizedBox(height: 8),
-                      ClipRRect(
-                        borderRadius: BorderRadius.circular(4),
-                        child: LinearProgressIndicator(
-                          value: item.progressFraction,
-                          backgroundColor: Colors.white24,
-                          valueColor:
-                              const AlwaysStoppedAnimation(Colors.white),
-                          minHeight: 4,
+                      Row(children: [
+                        Expanded(
+                          child: ClipRRect(
+                            borderRadius: BorderRadius.circular(2),
+                            child: LinearProgressIndicator(
+                              value: item.progressFraction,
+                              backgroundColor: AppTheme.well,
+                              valueColor:
+                                  const AlwaysStoppedAnimation(AppTheme.sage),
+                              minHeight: 3,
+                            ),
+                          ),
                         ),
-                      ),
+                        const SizedBox(width: 8),
+                        Text(
+                          _remaining(item),
+                          style: const TextStyle(
+                            fontFamily: AppTheme.text,
+                            fontSize: 11,
+                            color: AppTheme.textSecondary,
+                          ),
+                        ),
+                      ]),
                     ],
                   ),
                 ),
-                const SizedBox(width: 10),
+                const SizedBox(width: 12),
                 Container(
-                  width: 40,
-                  height: 40,
+                  width: 44,
+                  height: 44,
                   decoration: const BoxDecoration(
-                    color: Colors.white,
+                    color: AppTheme.sage,
                     shape: BoxShape.circle,
+                    boxShadow: [
+                      BoxShadow(
+                        color: Color(0x477C3AED),
+                        blurRadius: 16,
+                        offset: Offset(0, 6),
+                      ),
+                    ],
                   ),
                   child: const Icon(Icons.play_arrow_rounded,
-                      color: AppTheme.sage, size: 24),
+                      color: Colors.white, size: 22),
                 ),
               ]),
             ),
@@ -593,6 +605,17 @@ class _ContinueCard extends ConsumerWidget {
         );
       },
     );
+  }
+
+  /// "4 min left", or "Almost done" under a minute.
+  ///
+  /// Time remaining rather than a percentage: the question somebody
+  /// glancing at this card is asking is whether they have time to finish
+  /// it now, and 78% does not answer that.
+  String _remaining(ContinueListeningItem item) {
+    final left = item.durationSeconds - item.progressSeconds;
+    if (left <= 60) return 'Almost done';
+    return '${(left / 60).round()} min left';
   }
 
   Future<void> _resume(
@@ -621,6 +644,23 @@ class _ContinueCard extends ConsumerWidget {
   }
 }
 
+/// Stands in for missing cover art at thumbnail size.
+///
+/// A flat tint, not the hero gradient: at 52px a two-stop gradient reads
+/// as a smudge, and the tile only has to say "there is artwork here".
+class _ArtFallback extends StatelessWidget {
+  const _ArtFallback();
+
+  @override
+  Widget build(BuildContext context) {
+    return const ColoredBox(
+      color: AppTheme.sageSoft,
+      child: Icon(Icons.music_note_rounded,
+          color: AppTheme.sageLight, size: 22),
+    );
+  }
+}
+
 // ── Categories ───────────────────────────────────────────────────────
 
 class _CategoriesRow extends ConsumerWidget {
@@ -632,11 +672,11 @@ class _CategoriesRow extends ConsumerWidget {
     final async = ref.watch(categoriesProvider);
 
     return async.maybeWhen(
-      orElse: () => const SizedBox(height: 104),
+      orElse: () => const SizedBox(height: 112),
       data: (categories) {
         if (categories.isEmpty) return const SizedBox.shrink();
         return SizedBox(
-          height: 104,
+          height: 112,
           child: ListView.separated(
             scrollDirection: Axis.horizontal,
             padding: const EdgeInsets.symmetric(horizontal: 20),
@@ -644,39 +684,58 @@ class _CategoriesRow extends ConsumerWidget {
             separatorBuilder: (_, __) => const SizedBox(width: 12),
             itemBuilder: (_, i) {
               final c = categories[i];
+              // The ramp cycles by position, so the row keeps its
+              // light-to-dark rhythm however many categories the admin
+              // has published. Keying it off the category id instead
+              // would reshuffle the colours whenever one was renamed.
+              final ramp = _browseRamps[i % _browseRamps.length];
               return GestureDetector(
                 onTap: () => onTap(c),
-                child: SizedBox(
-                  width: 74,
+                child: Container(
+                  width: 112,
+                  padding: const EdgeInsets.fromLTRB(12, 16, 12, 16),
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: ramp.fill,
+                    ),
+                    borderRadius: BorderRadius.circular(AppTheme.radiusRow),
+                  ),
                   child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Container(
-                        width: 68,
-                        height: 68,
-                        decoration: AppTheme.claySurface(
-                          color: AppTheme.surfaceCream,
-                          radius: 22,
-                          small: true,
-                        ),
-                        child: Icon(
-                          _categoryIcon(c.name, c.slug),
-                          size: 30,
-                          color: AppTheme.sageDark,
-                        ),
+                      Icon(
+                        _categoryIcon(c.name, c.slug),
+                        size: 24,
+                        color: ramp.ink,
                       ),
-                      const SizedBox(height: 7),
+                      const Spacer(),
                       Text(
                         c.name,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        textAlign: TextAlign.center,
                         style: const TextStyle(
                           fontFamily: AppTheme.text,
-                          fontSize: 12.5,
+                          fontSize: 14,
                           fontWeight: FontWeight.w600,
+                          letterSpacing: -0.14,
                           color: AppTheme.textPrimary,
                         ),
                       ),
+                      if (c.audioCount > 0) ...[
+                        const SizedBox(height: 2),
+                        Text(
+                          c.audioCount == 1
+                              ? '1 session'
+                              : '${c.audioCount} sessions',
+                          style: const TextStyle(
+                            fontFamily: AppTheme.text,
+                            fontSize: 12,
+                            color: AppTheme.textSecondary,
+                          ),
+                        ),
+                      ],
                     ],
                   ),
                 ),
@@ -688,6 +747,24 @@ class _CategoriesRow extends ConsumerWidget {
     );
   }
 }
+
+/// One step of the Browse row's colour ramp: the card's wash and the
+/// ink its glyph is drawn in.
+class _BrowseRamp {
+  final List<Color> fill;
+  final Color ink;
+  const _BrowseRamp(this.fill, this.ink);
+}
+
+/// Three washes running light to dark, with the glyph darkening to keep
+/// up. Each is the design's gradient at its stated opacity, flattened
+/// against the lavender canvas — a translucent gradient over a
+/// horizontally scrolling row would smear whatever slid beneath it.
+const _browseRamps = [
+  _BrowseRamp([Color(0xFFF5EFFE), Color(0xFFE8DDFB)], Color(0xFF7C3AED)),
+  _BrowseRamp([Color(0xFFE7DCFA), Color(0xFFD5C4F5)], Color(0xFF5B21B6)),
+  _BrowseRamp([Color(0xFFD8C9F3), Color(0xFFC5AEEE)], Color(0xFF3B1A78)),
+];
 
 /// Picks a glyph for a category from its name.
 ///
@@ -974,39 +1051,44 @@ class _FeaturedRow extends ConsumerWidget {
     final access = ref.watch(accessStateProvider).valueOrNull;
 
     return async.maybeWhen(
-      orElse: () => const SizedBox(height: 268),
+      orElse: () => const SizedBox(height: 200),
       data: (audios) {
         if (audios.isEmpty) return const SizedBox.shrink();
 
         return SizedBox(
-          // Fixed rather than intrinsic: every card is the same height so
-          // the duration pills line up across the row, which is what
-          // stops a two-line title from shunting one card's footer down.
-          height: 268,
+          // Fixed rather than intrinsic: every cover starts at the same
+          // height so the row reads as a shelf, and a two-line title on
+          // one card can't shunt its neighbour's caption down.
+          height: 200,
           child: ListView.separated(
             scrollDirection: Axis.horizontal,
             padding: const EdgeInsets.symmetric(horizontal: 20),
             itemCount: audios.length,
-            separatorBuilder: (_, __) => const SizedBox(width: 14),
+            separatorBuilder: (_, __) => const SizedBox(width: 12),
             itemBuilder: (_, i) {
               final audio = audios[i];
               final locked = audio.isPremium && access?.hasAccess != true;
 
+              // Cover, then caption on the canvas — no card around the
+              // pair. The design carries these on the page itself, which
+              // is what lets two of them sit side by side without the
+              // row turning into a wall of boxes.
               return GestureDetector(
                 onTap: () => onPlay(audio),
-                child: Container(
-                  width: 208,
-                  decoration: AppTheme.claySurface(),
-                  clipBehavior: Clip.antiAlias,
+                child: SizedBox(
+                  width: 168,
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      // The cover is edge-to-edge across the card's top,
-                      // with only its own corners rounded — a floated
-                      // thumbnail inside a card reads as two cards.
-                      SizedBox(
-                        height: 148,
+                      Container(
+                        height: 152,
                         width: double.infinity,
+                        decoration: BoxDecoration(
+                          borderRadius:
+                              BorderRadius.circular(AppTheme.radiusRow),
+                          boxShadow: AppTheme.tileShadow,
+                        ),
+                        clipBehavior: Clip.antiAlias,
                         child: Stack(fit: StackFit.expand, children: [
                           if (audio.coverArtUrl != null &&
                               audio.coverArtUrl!.isNotEmpty)
@@ -1025,46 +1107,27 @@ class _FeaturedRow extends ConsumerWidget {
                           ),
                         ]),
                       ),
-                      Expanded(
-                        child: Padding(
-                          padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                audio.title,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: const TextStyle(
-                                  fontFamily: AppTheme.text,
-                                  fontSize: 15,
-                                  fontWeight: FontWeight.w700,
-                                  color: AppTheme.textPrimary,
-                                ),
-                              ),
-                              if (audio.artist != null &&
-                                  audio.artist!.trim().isNotEmpty) ...[
-                                const SizedBox(height: 2),
-                                Text(
-                                  'by ${audio.artist!.trim()}',
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: const TextStyle(
-                                    fontFamily: AppTheme.text,
-                                    fontSize: 13,
-                                    color: AppTheme.textSecondary,
-                                  ),
-                                ),
-                              ],
-                              const Spacer(),
-                              if (audio.durationSeconds != null)
-                                _MetaPill(
-                                  icon: Icons.schedule_rounded,
-                                  label:
-                                      '${(audio.durationSeconds! / 60).round()} Min',
-                                ),
-                            ],
-                          ),
+                      const SizedBox(height: 8),
+                      Text(
+                        audio.title,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          fontFamily: AppTheme.text,
+                          fontSize: 15,
+                          fontWeight: FontWeight.w600,
+                          letterSpacing: -0.15,
+                          color: AppTheme.textPrimary,
+                        ),
+                      ),
+                      Text(
+                        _audioMeta(audio),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          fontFamily: AppTheme.text,
+                          fontSize: 13,
+                          color: AppTheme.textSecondary,
                         ),
                       ),
                     ],
@@ -1076,6 +1139,21 @@ class _FeaturedRow extends ConsumerWidget {
         );
       },
     );
+  }
+
+  /// "Anurag Rishi · 12 min", dropping whichever half is missing.
+  ///
+  /// One caption line rather than an artist line plus a duration pill:
+  /// the pill was a second piece of chrome under a cover that already
+  /// has a play button on it.
+  String _audioMeta(AudioSummary audio) {
+    final parts = <String>[
+      if (audio.artist != null && audio.artist!.trim().isNotEmpty)
+        audio.artist!.trim(),
+      if (audio.durationSeconds != null)
+        '${(audio.durationSeconds! / 60).round()} min',
+    ];
+    return parts.join(' · ');
   }
 }
 
@@ -1105,41 +1183,6 @@ class _PlayBubble extends StatelessWidget {
       ),
       child: const Icon(Icons.play_arrow_rounded,
           size: 26, color: AppTheme.sageDark),
-    );
-  }
-}
-
-/// A small tinted pill for a piece of metadata — duration, lesson count.
-class _MetaPill extends StatelessWidget {
-  final IconData icon;
-  final String label;
-
-  const _MetaPill({required this.icon, required this.label});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-      decoration: BoxDecoration(
-        color: AppTheme.sageSoft,
-        borderRadius: BorderRadius.circular(AppTheme.radiusPill),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, size: 13, color: AppTheme.sageDark),
-          const SizedBox(width: 5),
-          Text(
-            label,
-            style: const TextStyle(
-              fontFamily: AppTheme.text,
-              fontSize: 12,
-              fontWeight: FontWeight.w600,
-              color: AppTheme.sageDark,
-            ),
-          ),
-        ],
-      ),
     );
   }
 }

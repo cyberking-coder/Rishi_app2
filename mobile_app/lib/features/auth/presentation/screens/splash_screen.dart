@@ -108,9 +108,9 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
                   ),
                   const SizedBox(height: 22),
                   // ── Wordmark ──
-                  // Fraunces, not a heavy sans. The serif is the
-                  // brand's voice everywhere else in the app and the
-                  // opening screen is where it should be loudest.
+                  // AppTheme.display, whatever that currently is —
+                  // the wordmark should never be the one place in the
+                  // app running its own face.
                   const Text(
                     'Anurag Rishi',
                     style: TextStyle(

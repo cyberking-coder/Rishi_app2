@@ -35,6 +35,16 @@ class AppTheme {
   /// on a flat background the translucency alone carries it.
   static const Color glass = Color(0x99FFFFFF);
 
+  /// The lit top edge of a glass panel: white at 70%, drawn as a 1px
+  /// border. Without it a translucent card has no edge at all against
+  /// the lavender canvas and reads as a smudge rather than a surface.
+  static const Color glassEdge = Color(0xB3FFFFFF);
+
+  /// The recessed fill for search fields and progress tracks:
+  /// [textPrimary] at 6%. Darker than a tint and lighter than a border,
+  /// which is what makes a well read as carved out of the page.
+  static const Color well = Color(0x0F1E1830);
+
   /// The deep end of the ramp — the player, and anything that should
   /// read as a surface you are inside rather than on.
   static const Color deep = Color(0xFF2A1650);
@@ -92,30 +102,48 @@ class AppTheme {
   static const double radiusPill = 999;
 
   // ── Type ────────────────────────────────────────────────────────────
-  /// Display serif. Latin only — Devanagari falls back, which is why
-  /// display text that may be Hindi uses [text] at w600 instead.
-  static const String display = 'Fraunces';
+  /// Display family. Was Fraunces, the brand serif; the purple-glass
+  /// design has no serif anywhere — every heading in it is the system
+  /// sans at w600 with tight tracking — so this now points at the same
+  /// family as [text].
+  ///
+  /// The constant survives the change rather than being deleted, for the
+  /// same reason [sage] did: it names a role ("the heading family"), 32
+  /// files read it, and repointing it re-skins all of them from here.
+  /// It also means the serif can come back in one line if the brand
+  /// wants it back.
+  ///
+  /// A side benefit: Fraunces is Latin-only, so any Hindi title styled
+  /// with it fell back to a different face mid-screen. Mukta covers
+  /// both, so that no longer happens anywhere.
+  static const String display = 'Mukta';
 
   /// Text family for everything else. Covers Latin AND Devanagari, so
   /// Hinglish sits in one family rather than switching mid-sentence.
   static const String text = 'Mukta';
 
-  /// Greetings, now-playing title, the recipient's name. 27/32 w500.
+  /// Greetings, now-playing title, the recipient's name. 32/36 w600.
+  ///
+  /// Bigger and heavier than the serif it replaces, and tracked in
+  /// rather than out. A sans at w500 and neutral tracking reads as a
+  /// paragraph that happens to be large; the design's headings are set
+  /// tight enough that the line reads as one object.
   static const TextStyle displayLarge = TextStyle(
     fontFamily: display,
-    fontSize: 27,
-    height: 32 / 27,
-    fontWeight: FontWeight.w500,
-    letterSpacing: -0.27,
+    fontSize: 32,
+    height: 36 / 32,
+    fontWeight: FontWeight.w600,
+    letterSpacing: -0.96,
     color: textPrimary,
   );
 
-  /// Screen and cover titles. 22/26 w500.
+  /// Screen and section titles. 22/26 w600.
   static const TextStyle headline = TextStyle(
     fontFamily: display,
     fontSize: 22,
     height: 26 / 22,
-    fontWeight: FontWeight.w500,
+    fontWeight: FontWeight.w600,
+    letterSpacing: -0.44,
     color: textPrimary,
   );
 
@@ -140,9 +168,9 @@ class AppTheme {
   /// that transforms its own text hides the real string from search.
   static const TextStyle label = TextStyle(
     fontFamily: text,
-    fontSize: 12,
+    fontSize: 13,
     fontWeight: FontWeight.w600,
-    letterSpacing: 1.44,
+    letterSpacing: 0.52,
     color: textSecondary,
   );
 
@@ -239,6 +267,38 @@ class AppTheme {
     );
   }
 
+  /// The design's shadow-sm: a hairline lift plus a half-pixel ring.
+  /// For covers and tiles that need an edge but not a lift.
+  static List<BoxShadow> get tileShadow => const [
+        BoxShadow(
+          color: Color(0x0D1E1830),
+          blurRadius: 2,
+          offset: Offset(0, 1),
+        ),
+        BoxShadow(
+          color: Color(0x0A1E1830),
+          spreadRadius: 0.5,
+        ),
+      ];
+
+  /// A frosted panel: translucent white with a lit edge. The design's
+  /// signature surface, and the one thing that separates this system
+  /// from a flat card with a shadow.
+  ///
+  /// Note there is no BackdropFilter here. Wrap the call site in one
+  /// where something is genuinely behind the panel worth blurring —
+  /// artwork, the player. Over the flat lavender canvas a blur costs a
+  /// full-surface filter pass and produces the same pixels the
+  /// translucency already gives.
+  static BoxDecoration glassSurface({double? radius}) {
+    return BoxDecoration(
+      color: const Color(0x80FFFFFF),
+      borderRadius: BorderRadius.circular(radius ?? radiusRow),
+      border: Border.all(color: glassEdge),
+      boxShadow: tileShadow,
+    );
+  }
+
   /// A recessed well: search fields, progress tracks, empty slots. A
   /// flat violet tint rather than a carved one — on glass there is no
   /// depth to carve into.
@@ -286,9 +346,10 @@ class AppTheme {
   /// for `titleMedium` gets the same type as one styled by hand.
   static TextTheme _textTheme(TextTheme base, Color onSurface) {
     // Order matters. apply() sets the family on EVERY slot, so it has to
-    // run first — putting it last would overwrite the Fraunces on the
-    // display slots below and silently render the whole app in Mukta.
-    // The ramp is layered on top, and only it ever names Fraunces.
+    // run first — putting it last would overwrite the family on the
+    // display slots below with this one. Harmless while [display] and
+    // [text] resolve to the same face, and a silent bug the moment they
+    // diverge again.
     return base
         .apply(
           fontFamily: text,
