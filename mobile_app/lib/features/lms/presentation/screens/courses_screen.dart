@@ -42,36 +42,24 @@ class _CoursesScreenState extends ConsumerState<CoursesScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          // Title and a search affordance, no strapline. The design
+          // gives every tab a bare one-word heading; the sentence that
+          // was here explained the tab to somebody already looking at
+          // it, and pushed the first card off the fold.
           Padding(
-            padding: const EdgeInsets.fromLTRB(20, 14, 20, 16),
+            padding: const EdgeInsets.fromLTRB(20, 10, 12, 16),
             child: Row(
               children: [
                 Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        kEducationFramingEnabled ? 'Courses' : 'Videos',
-                        style: const TextStyle(
-                          fontFamily: AppTheme.display,
-                          fontSize: 30,
-                          fontWeight: FontWeight.w600,
-                          color: AppTheme.textPrimary,
-                        ),
-                      ),
-                      const SizedBox(height: 5),
-                      Text(
-                        kEducationFramingEnabled
-                            ? 'Guided programmes, one lesson at a time.'
-                            : 'Guided video series, one episode at a time.',
-                        style: const TextStyle(
-                          fontFamily: AppTheme.text,
-                          fontSize: 14.5,
-                          color: AppTheme.textSecondary,
-                        ),
-                      ),
-                    ],
+                  child: Text(
+                    kEducationFramingEnabled ? 'Courses' : 'Videos',
+                    style: AppTheme.displayLarge,
                   ),
+                ),
+                IconButton(
+                  onPressed: () => context.push('/search'),
+                  icon: const Icon(Icons.search_rounded,
+                      size: 21, color: AppTheme.sageDark),
                 ),
               ],
             ),
@@ -81,7 +69,7 @@ class _CoursesScreenState extends ConsumerState<CoursesScreen> {
             selected: _filter,
             onChanged: (f) => setState(() => _filter = f),
           ),
-          const SizedBox(height: 6),
+          const SizedBox(height: 10),
 
           Expanded(
             child: async.when(
@@ -150,63 +138,64 @@ class _FilterRow extends StatelessWidget {
     _CourseFilter.notStarted: 'Not started',
   };
 
-  static const _icons = {
-    _CourseFilter.all: Icons.eco_outlined,
-    _CourseFilter.inProgress: Icons.schedule_rounded,
-    _CourseFilter.notStarted: Icons.play_circle_outline_rounded,
-  };
-
   @override
   Widget build(BuildContext context) {
-    return SizedBox(
-      height: 50,
-      child: ListView(
-        scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.symmetric(horizontal: 20),
-        children: [
-          for (final entry in _labels.entries) ...[
-            Builder(builder: (context) {
-              final isSelected = selected == entry.key;
-              return GestureDetector(
-                onTap: () => onChanged(entry.key),
-                child: Container(
-                  margin: const EdgeInsets.only(right: 10),
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: 18, vertical: 11),
-                  decoration: BoxDecoration(
-                    color: isSelected ? AppTheme.sage : AppTheme.surface,
-                    borderRadius: BorderRadius.circular(AppTheme.radiusPill),
-                    boxShadow: isSelected ? null : AppTheme.rowShadow,
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(
-                        _icons[entry.key],
-                        size: 17,
-                        color: isSelected
-                            ? AppTheme.textOnSage
-                            : AppTheme.textSecondary,
+    // A segmented control, not a scrolling row of pills. There are
+    // exactly three mutually exclusive views and they all fit — pills
+    // implied a list that might continue past the right edge, and a
+    // filled violet pill made the current filter look like the primary
+    // action on the screen.
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 20),
+      child: Container(
+        padding: const EdgeInsets.all(2),
+        decoration: BoxDecoration(
+          color: const Color(0x121E1830),
+          borderRadius: BorderRadius.circular(9),
+        ),
+        child: Row(
+          children: [
+            for (final entry in _labels.entries)
+              Expanded(
+                child: GestureDetector(
+                  // Opaque so a tap anywhere in the segment counts, not
+                  // only on the glyphs of the label itself.
+                  behavior: HitTestBehavior.opaque,
+                  onTap: () => onChanged(entry.key),
+                  child: Container(
+                    height: 30,
+                    alignment: Alignment.center,
+                    decoration: selected == entry.key
+                        ? BoxDecoration(
+                            color: AppTheme.surface,
+                            borderRadius: BorderRadius.circular(7),
+                            boxShadow: const [
+                              BoxShadow(
+                                color: Color(0x1F1E1830),
+                                blurRadius: 3,
+                                offset: Offset(0, 1),
+                              ),
+                            ],
+                          )
+                        : null,
+                    child: Text(
+                      entry.value,
+                      style: TextStyle(
+                        fontFamily: AppTheme.text,
+                        fontSize: 13,
+                        fontWeight: selected == entry.key
+                            ? FontWeight.w600
+                            : FontWeight.w400,
+                        color: selected == entry.key
+                            ? AppTheme.textPrimary
+                            : const Color(0xFF544A6E),
                       ),
-                      const SizedBox(width: 7),
-                      Text(
-                        entry.value,
-                        style: TextStyle(
-                          fontFamily: AppTheme.text,
-                          fontSize: 14,
-                          fontWeight: FontWeight.w600,
-                          color: isSelected
-                              ? AppTheme.textOnSage
-                              : AppTheme.textSecondary,
-                        ),
-                      ),
-                    ],
+                    ),
                   ),
                 ),
-              );
-            }),
+              ),
           ],
-        ],
+        ),
       ),
     );
   }
@@ -265,8 +254,8 @@ class _EmptyState extends StatelessWidget {
   }
 }
 
-/// Catalog card. Also used by the home screen's course row, so it keeps
-/// its own layout self-contained rather than depending on page padding.
+/// Catalog card. Keeps its own layout self-contained rather than
+/// depending on page padding, so it can be dropped into any list.
 class CourseCard extends StatelessWidget {
   final CourseSummary course;
 
@@ -282,156 +271,111 @@ class CourseCard extends StatelessWidget {
         context.push('/course/${course.id}', extra: course.title);
       },
       child: Container(
-        decoration: BoxDecoration(
-          gradient: AppTheme.clayFill(),
-          borderRadius: BorderRadius.circular(AppTheme.radiusCard),
-          boxShadow: AppTheme.cardShadow,
-        ),
+        decoration: AppTheme.glassSurface(radius: AppTheme.radiusCard),
         clipBehavior: Clip.antiAlias,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            AspectRatio(
-              aspectRatio: 16 / 9,
-              child: Stack(fit: StackFit.expand, children: [
-                _CourseCover(url: course.coverImageUrl),
-                // Price is the headline on a locked course; an owned one
-                // says so instead, since the number is no longer a
-                // decision the user has to make.
-                Positioned(
-                  top: 10,
-                  right: 10,
-                  child: Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                    decoration: BoxDecoration(
-                      color: Colors.white.withValues(alpha: 0.94),
-                      borderRadius: BorderRadius.circular(AppTheme.radiusPill),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(
-                          course.owned
-                              ? Icons.check_circle_rounded
-                              : course.isFree
-                                  ? Icons.lock_open_rounded
-                                  : Icons.lock_rounded,
-                          size: 12,
-                          color: course.owned || course.isFree
-                              ? AppTheme.sage
-                              : AppTheme.clay,
-                        ),
-                        const SizedBox(width: 4),
-                        Text(
-                          course.owned
-                              ? (kEducationFramingEnabled ? 'Enrolled' : 'Yours')
-                              : kPurchaseUiEnabled || course.isFree
-                                  ? course.priceLabel
-                                  : 'Locked',
-                          style: TextStyle(
-                            fontSize: 10.5,
-                            fontWeight: FontWeight.w800,
-                            color: course.owned || course.isFree
-                                ? AppTheme.sage
-                                : AppTheme.clay,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ]),
+            SizedBox(
+              height: 176,
+              width: double.infinity,
+              child: _CourseCover(url: course.coverImageUrl),
             ),
             Padding(
-              padding: const EdgeInsets.fromLTRB(14, 12, 14, 14),
+              padding: const EdgeInsets.all(16),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    course.title,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      fontFamily: AppTheme.text,
-                      fontSize: 19,
-                      fontWeight: FontWeight.w700,
-                      color: AppTheme.textPrimary,
-                      height: 1.25,
-                    ),
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              course.title,
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                fontFamily: AppTheme.text,
+                                fontSize: 20,
+                                fontWeight: FontWeight.w600,
+                                letterSpacing: -0.4,
+                                color: AppTheme.textPrimary,
+                                height: 1.25,
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              '${course.lessonCount} '
+                              '${course.lessonCount == 1 ? kPartWord : "${kPartWord}s"}',
+                              style: const TextStyle(
+                                fontFamily: AppTheme.text,
+                                fontSize: 13,
+                                color: AppTheme.textSecondary,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      // Moved off the cover art and onto the card body.
+                      // A white pill floating over a photograph had to
+                      // fight whatever was behind it; here the chip has
+                      // a surface of its own and can be quiet.
+                      _StatusChip(course: course),
+                    ],
                   ),
                   if (course.description != null &&
                       course.description!.trim().isNotEmpty) ...[
-                    const SizedBox(height: 8),
+                    const SizedBox(height: 12),
                     Text(
                       course.description!,
                       maxLines: 3,
                       overflow: TextOverflow.ellipsis,
                       style: const TextStyle(
                         fontFamily: AppTheme.text,
-                        fontSize: 14,
-                        color: AppTheme.textSecondary,
+                        fontSize: 15,
+                        color: Color(0xFF544A6E),
                         height: 1.5,
                       ),
                     ),
                   ],
-                  const SizedBox(height: 14),
-                  // A rule above the meta row, as in the design: it
-                  // separates the description from the facts about the
-                  // course without needing a second card.
-                  const Divider(height: 1, color: AppTheme.border),
-                  const SizedBox(height: 14),
-                  Row(children: [
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 12, vertical: 8),
-                      decoration: BoxDecoration(
-                        color: AppTheme.sageSoft,
-                        borderRadius:
-                            BorderRadius.circular(AppTheme.radiusPill),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          const Icon(Icons.play_lesson_outlined,
-                              size: 15, color: AppTheme.sageDark),
-                          const SizedBox(width: 6),
-                          Text(
-                            '${course.lessonCount} '
-                            '${course.lessonCount == 1 ? kPartWord : "${kPartWord}s"}',
-                            style: const TextStyle(
-                              fontFamily: AppTheme.text,
-                              fontSize: 13,
-                              color: AppTheme.sageDark,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    const Spacer(),
-                    if (course.isStarted)
-                      Text(
-                        '${(course.progressFraction * 100).round()}% complete',
-                        style: const TextStyle(
-                          fontFamily: AppTheme.text,
-                          fontSize: 13,
-                          color: AppTheme.sageDark,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                  ]),
                   if (course.isStarted) ...[
-                    const SizedBox(height: 9),
+                    const SizedBox(height: 16),
                     ClipRRect(
-                      borderRadius: BorderRadius.circular(4),
+                      borderRadius: BorderRadius.circular(2),
                       child: LinearProgressIndicator(
                         value: course.progressFraction,
-                        backgroundColor: AppTheme.sageSoft,
-                        valueColor:
-                            const AlwaysStoppedAnimation(AppTheme.sage),
-                        minHeight: 5,
+                        backgroundColor: AppTheme.well,
+                        valueColor: const AlwaysStoppedAnimation(AppTheme.sage),
+                        minHeight: 3,
                       ),
+                    ),
+                    const SizedBox(height: 8),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          course.completedLessonCount >= course.lessonCount
+                              ? 'Completed'
+                              : 'In progress',
+                          style: const TextStyle(
+                            fontFamily: AppTheme.text,
+                            fontSize: 13,
+                            color: AppTheme.textSecondary,
+                          ),
+                        ),
+                        Text(
+                          '${(course.progressFraction * 100).round()}%',
+                          style: const TextStyle(
+                            fontFamily: AppTheme.text,
+                            fontSize: 13,
+                            color: AppTheme.textSecondary,
+                          ),
+                        ),
+                      ],
                     ),
                   ],
                 ],
@@ -439,6 +383,63 @@ class CourseCard extends StatelessWidget {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+/// Owned, free, priced, or locked — in one chip.
+///
+/// Price is the headline on a course somebody might buy; an owned one
+/// says so instead, because the number is no longer a decision they
+/// have to make. On iOS, where no purchase can be offered in the app,
+/// a priced course reads "Locked" rather than showing a figure the app
+/// has no way to charge.
+class _StatusChip extends StatelessWidget {
+  final CourseSummary course;
+
+  const _StatusChip({required this.course});
+
+  @override
+  Widget build(BuildContext context) {
+    final positive = course.owned || course.isFree;
+    final label = course.owned
+        ? (kEducationFramingEnabled ? 'Enrolled' : 'Yours')
+        : kPurchaseUiEnabled || course.isFree
+            ? course.priceLabel
+            : 'Locked';
+
+    return Container(
+      height: 24,
+      padding: const EdgeInsets.symmetric(horizontal: 9),
+      decoration: BoxDecoration(
+        color: positive ? AppTheme.sageSoft : AppTheme.well,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            course.owned
+                ? Icons.check_circle_rounded
+                : course.isFree
+                    ? Icons.lock_open_rounded
+                    : Icons.lock_rounded,
+            size: 13,
+            color: positive ? const Color(0xFF4C1D95) : AppTheme.textSecondary,
+          ),
+          const SizedBox(width: 4),
+          Text(
+            label,
+            style: TextStyle(
+              fontFamily: AppTheme.text,
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+              color:
+                  positive ? const Color(0xFF4C1D95) : AppTheme.textSecondary,
+            ),
+          ),
+        ],
       ),
     );
   }
