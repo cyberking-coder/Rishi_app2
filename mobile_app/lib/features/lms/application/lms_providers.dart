@@ -22,8 +22,19 @@ final lmsRepositoryProvider = Provider<LmsRepository>((ref) {
   return LmsRepositoryImpl(ref.watch(lmsRemoteDataSourceProvider));
 });
 
+/// Kept alive deliberately — see the note on the home providers.
+///
+/// This one is read by Home, the Courses tab AND Profile's enrolled
+/// list, so without it a single scroll down and back up on Home cost
+/// three screens their data and fired a refetch when any of them next
+/// appeared. It is invalidated on pull-to-refresh, after a purchase,
+/// and after an access grant, which are the moments it can actually
+/// have changed.
 final coursesProvider = FutureProvider.autoDispose<List<CourseSummary>>(
-  (ref) => ref.watch(lmsRepositoryProvider).getCourses(),
+  (ref) {
+    ref.keepAlive();
+    return ref.watch(lmsRepositoryProvider).getCourses();
+  },
 );
 
 final courseDetailProvider =

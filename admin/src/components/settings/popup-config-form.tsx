@@ -1,15 +1,24 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { CalendarDays, Clock, ImagePlus, Plus, Trash2, X } from "lucide-react";
+import {
+  CalendarDays,
+  Clock,
+  ImagePlus,
+  Plus,
+  Trash2,
+  TriangleAlert,
+  X,
+} from "lucide-react";
 import {
   deletePopup,
   savePopup,
   uploadPopupImage,
   type AppPopup,
 } from "@/app/actions/config";
+import { checkPopupForIos } from "@/lib/ios-content-policy";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -153,6 +162,15 @@ function PopupCard({
 
   const [ctaRoute, setCtaRoute] = useState(popup?.cta_route ?? "");
   const [ctaLabel, setCtaLabel] = useState(popup?.cta_label ?? "");
+  const [hideOnIos, setHideOnIos] = useState(popup?.hide_on_ios ?? false);
+
+  // Recomputed as the author types. The same rule runs in the app and is
+  // what actually withholds the pop-up; this is only so nobody has to
+  // discover it by noticing iPhone users never mention the message.
+  const iosCheck = useMemo(
+    () => checkPopupForIos({ title, body, cta_label: ctaLabel }),
+    [title, body, ctaLabel],
+  );
 
   const dateRef = useRef<HTMLInputElement>(null);
   const timeRef = useRef<HTMLInputElement>(null);
@@ -213,6 +231,7 @@ function PopupCard({
       sort_order: position - 1,
       cta_route: ctaRoute || null,
       cta_label: ctaLabel || null,
+      hide_on_ios: hideOnIos,
     });
     setBusy(false);
     if (!result.ok) return toast.error(result.error);
@@ -260,6 +279,68 @@ function PopupCard({
             <Label htmlFor={`enabled-${uploadKeyRef.current}`}>
               Enable pop-up
             </Label>
+          </div>
+
+          {/* iOS visibility.
+              The App Store approved this app as a reader app under
+              Guideline 3.1.3(a), which forbids any purchase call to
+              action. Pop-up text is the one thing an admin can put on an
+              iOS screen without a code change, so the app checks it and
+              withholds the pop-up if it reads as commerce. This says so
+              while it is still being written. */}
+          {iosCheck.violates && !hideOnIos && (
+            <div className="flex gap-2 rounded-md border border-amber-300/60 bg-amber-50 p-3 text-sm text-amber-900 dark:border-amber-700/50 dark:bg-amber-950/40 dark:text-amber-200">
+              <TriangleAlert className="mt-0.5 h-4 w-4 shrink-0" />
+              <div className="space-y-1">
+                <p className="font-medium">
+                  This pop-up will not be shown on iPhones.
+                </p>
+                <p>
+                  The {iosCheck.fields.join(" and ")}{" "}
+                  {iosCheck.fields.length > 1 ? "read" : "reads"} as a
+                  purchase prompt
+                  {iosCheck.matches.length > 0 && (
+                    <>
+                      {" "}
+                      (&ldquo;
+                      <span className="font-medium">
+                        {iosCheck.matches.join("&rdquo;, &ldquo;")}
+                      </span>
+                      &rdquo;)
+                    </>
+                  )}
+                  . The iOS app ships as a reader app and may not show a
+                  price or a call to buy, so it withholds pop-ups like
+                  this one. Android members still see it in full.
+                </p>
+                <p className="text-amber-800/80 dark:text-amber-300/80">
+                  Reword it to reach iPhone members too, or leave it as
+                  it is if the message is meant for Android.
+                </p>
+              </div>
+            </div>
+          )}
+
+          <div className="flex items-start gap-2">
+            <input
+              id={`hide-ios-${uploadKeyRef.current}`}
+              type="checkbox"
+              checked={hideOnIos}
+              onChange={(e) => setHideOnIos(e.target.checked)}
+              className="mt-1 h-4 w-4 accent-primary"
+            />
+            <div className="space-y-0.5">
+              <Label htmlFor={`hide-ios-${uploadKeyRef.current}`}>
+                Hide on iPhone
+              </Label>
+              <p className="text-xs text-muted-foreground">
+                Tick this when the ARTWORK carries a price or wording like
+                &ldquo;Register Now&rdquo;. Nothing can read the words
+                inside an image, so this is the only way to keep such a
+                pop-up off iPhones. The text above is checked
+                automatically.
+              </p>
+            </div>
           </div>
 
           <div className="space-y-2">

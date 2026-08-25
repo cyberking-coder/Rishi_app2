@@ -812,7 +812,14 @@ class _CoursesRow extends ConsumerWidget {
     final async = ref.watch(coursesProvider);
 
     return async.maybeWhen(
-      orElse: () => const SizedBox(height: 190),
+      // 260, matching the loaded row exactly. It used to be 190, and the
+      // 70px difference was the second half of the scroll stutter: when
+      // the data arrived, everything above the viewport grew by 70px and
+      // the scroll offset shifted under the user's finger. That reads as
+      // the list catching on something. Every other row on this screen
+      // already reserved its true height; this was the one that did not,
+      // and it is the one the stutter was reported against.
+      orElse: () => const SizedBox(height: 260),
       data: (courses) {
         if (courses.isEmpty) {
           return Padding(

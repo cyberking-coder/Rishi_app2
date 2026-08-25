@@ -779,7 +779,11 @@ As of the end of the App Store compliance session, in priority order:
 
 0. **CRITICAL — any signed-in user can grant themselves premium access.** Found in the 25 August audit; see Section 12 for the full reasoning. `profiles_update_own` constrains which *row* a user may update and that `role` may not be escalated, but says nothing about the other columns — and RLS structurally cannot, because a `with check` sees only the new row and never the old one. `has_active_access()` decides entitlement by reading two of those unconstrained columns. One PostgREST call against their own row, using the anon key that ships inside the APK, unlocks the entire premium library and every DRM licence with it. No payment involved.
 
-   Fix written and committed as `supabase/migrations/20260825000001_lock_profile_entitlement_columns.sql` — a column-level `GRANT`, because grants are column-aware where RLS is not. **Not yet applied to the live database.** The webhook and every admin mutation use the service role, which bypasses both RLS and grants, so nothing legitimate breaks. Apply it, then confirm with the transaction in Section 12.
+   Fixed by `supabase/migrations/20260825000001_lock_profile_entitlement_columns.sql` — a column-level `GRANT`, because grants are column-aware where RLS is not. **Applied to the live database on 25 August 2026.** The webhook and every admin mutation use the service role, which bypasses both RLS and grants, so nothing legitimate was affected.
+
+   **Verified shut the same day**: the transaction in Section 12, run against the live database as an ordinary member, returns a permission-denied error where it previously returned `UPDATE 1`.
+
+   Still outstanding: whether it was exploited in the two months it was open. The forensic query is in Section 12 under "After the fix".
 
 0b. **Apple Developer account ownership.** Registered to an individual rather than the business, so payouts land in a personal bank account and the app is legally that person's. Three routes: convert to an Organisation (needs a legal entity and a D-U-N-S number — not available to a sole proprietorship), transfer the app to the business owner's own individual account (needs their own ~₹9,000/yr membership; no D-U-N-S), or leave it and document the arrangement with a CA. **If transferring, do it before IAP subscribers exist** — Sign in with Apple identifiers are scoped to the developer team, so every existing Apple user needs migrating via Apple's transfer-identifier endpoint or they come back as strangers and lose their purchases. That migration is small today and grows with every Apple sign-in.
 
@@ -875,7 +879,7 @@ The Dart half of this repo has never been type-checked anywhere except a develop
 
 ### Findings
 
-**F-1 — CRITICAL. Self-service premium via `profiles`.** Full detail in Section 10 item 0. Fix committed as migration `20260825000001`, not yet applied. Verify on the live database with:
+**F-1 — CRITICAL. Self-service premium via `profiles`.** Full detail in Section 10 item 0. Fixed by migration `20260825000001`, **applied and verified on the live database, 25 August 2026** — the transaction below now returns permission-denied where it previously returned `UPDATE 1`. Re-run it after any change to the profiles grants:
 
 ```sql
 begin;
@@ -890,11 +894,63 @@ rollback;
 
 The `rollback` matters — run this inside the transaction as written so it never actually grants anything.
 
+#### After the fix: was it used before it was closed?
+
+The hole was open from June until 25 August. Nothing logged profile writes, so the only evidence is the state itself: an account holding access that no payment explains.
+
+```sql
+select p.id, u.email, p.subscription_tier,
+       p.access_started_at, p.access_expires_at, p.updated_at
+  from public.profiles p
+  join auth.users u on u.id = p.id
+ where p.role = 'user'
+   and (case when p.access_expires_at is not null
+             then p.access_expires_at > now()
+             else p.access_started_at is not null end)
+   and not exists (select 1 from public.subscriptions s
+                    where s.user_id = p.id and s.status in ('active','trialing'))
+   and not exists (select 1 from public.payments pay
+                    where pay.user_id = p.id and pay.status = 'succeeded')
+ order by p.updated_at desc;
+```
+
+**This lists candidates, not culprits.** Every access an admin granted by hand through the dashboard also has no payment behind it and will appear here, as will comped accounts and the demo account given to App Review. The rows to look at are ones nobody remembers granting — and `updated_at` is the tell, because the `trg_profiles_updated_at` trigger stamps it on any write, including a self-grant.
+
 **F-2 — HIGH. CI never type-checks the Dart.** `codemagic.yaml` runs `flutter pub get` then `flutter build` for all three workflows. There is no `flutter analyze`, no `flutter test`, and `mobile_app/test/` does not exist. The consequence is not theoretical: a scripted edit during the restyle deleted `_SettingsSheet`, `_SettingsSheetState` and `_SheetTile` — 282 lines including account deletion — and nothing caught it until a developer ran a local release build days later. `flutter analyze` would have failed in seconds. Add it as a step before `flutter build` in every workflow.
 
-**F-3 — HIGH, unfixable in code. Pop-up content is unvalidated free text rendered on iOS.** `next_event_popup.dart` renders `popup.title`, `popup.body`, `popup.ctaText` and `popup.imageUrl` exactly as an admin typed or uploaded them, with no platform gating. An admin writing "Register ₹499" or uploading artwork with "Register Now" baked into the pixels puts a purchase call-to-action on an iOS screen, which is precisely what the 3.1.3(a) exception forbids, and `kPurchaseUiEnabled` cannot reach inside a string from the database or a JPEG. Mitigation has to be a validation guard in the admin plus a runtime scrub on iOS; neither exists yet.
+**F-3 — HIGH. Pop-up content was unvalidated free text rendered on iOS. FIXED 25 August 2026.**
 
-**F-4 — MEDIUM. Renewing early silently forfeits the remaining days.** `razorpay-webhook/index.ts` sets `access_expires_at = now + interval` on every captured membership payment, rather than extending from whichever of `now` and the existing expiry is later. A member with 20 days left who renews receives 30 days, not 50. Money is taken for time the member already had.
+`next_event_popup.dart` rendered `title`, `body`, `ctaText` and `imageUrl` exactly as an admin typed or uploaded them, with no platform gating — so "Register ₹499", or artwork with "Register Now" in the pixels, put the purchase call to action 3.1.3(a) forbids straight onto an iOS screen. `kPurchaseUiEnabled` cannot reach inside a string that arrives at runtime, let alone a JPEG.
+
+Closed in three parts:
+
+* **Text, automatically.** `core/config/ios_content_policy.dart` inspects title, body and button label for currency amounts and commerce verbs. A pop-up that trips it is withheld from iOS entirely — not redacted, because "Register ₹499 for the workshop" with the price stripped still reads as an instruction to register for a paid event, and a half-scrubbed sentence looks like a bug to the member and like evasion to a reviewer. Android is untouched and still shows everything in full. Enforcement lives in the app, not the admin, because an admin warning can be dismissed and says nothing about the rows already in the table.
+* **Artwork, deliberately.** `app_popups.hide_on_ios` (migration `20260825000002`), surfaced as a "Hide on iPhone" switch on the pop-up form. Nothing in this stack can read the words baked into an image, so that judgement belongs to whoever made it.
+* **The default button label was itself the problem.** `ctaText` fell back to **"Register Now"** when no label was set — a purchase call to action shipped in the binary, on by default, for any pop-up whose author left the field blank. The iOS fallback is now "View".
+
+The same rule exists twice, in `mobile_app/lib/core/config/ios_content_policy.dart` and `admin/src/lib/ios-content-policy.ts`, because Dart and TypeScript cannot share code. **They must be changed together**; both files say so in their headers, and a parity check comparing the two pattern strings is cheap enough to run whenever either is touched. The admin copy only warns as the author types; the Dart copy is what protects the listing.
+
+**F-9 — HIGH. The home screen refetched over the network on every scroll-back. FIXED 25 August 2026.**
+
+Reported as "it lags scrolling from the bottom up, and gets stuck in the course section repeatedly". Two independent causes, neither of them images — which is why the decode fix in the same session did not help.
+
+* **Every home provider is `autoDispose`, and Home is a plain `ListView`**, which unmounts children once they pass its cache extent. Scrolling to the bottom therefore disposed the rows near the top, dropping the last listener on `coursesProvider`, `featuredAudiosProvider`, `categoriesProvider`, `continueListeningProvider` and `youtubeVideosProvider`, which threw their data away. Scrolling back up remounted them and re-fetched — every time, in both directions. The stall is a network round trip happening on a scroll gesture. Fixed with `ref.keepAlive()` on the five; freshness is unchanged, because pull-to-refresh already invalidates all of them explicitly. Deliberately not applied to the `.family` providers, whose keys are user input and would become an unbounded cache.
+* **`_CoursesRow` reserved 190px while loading and 260px once loaded.** Every other row on the screen already reserved its true height; this was the only one that did not, which is why the report named the course section specifically. When the data arrived, everything above the viewport grew by 70px and the scroll offset shifted under the user's finger — which reads as the list catching on something rather than as a row resizing.
+
+The lesson worth keeping: the first fix was aimed at a real defect (13 MB decodes) that was **not** the defect being reported. The symptom named a specific section, and the one row differing from its neighbours was the one named. That detail was in the report from the beginning and it took a second pass to use it.
+
+**F-4 — MEDIUM. Renewing early silently forfeited the remaining days. FIXED 25 August 2026.**
+
+`razorpay-webhook/index.ts` set `access_expires_at = now + interval` on every captured membership payment. A member with 20 days left who renewed received 30 days, not 50 — money taken for time they already owned. Renewing early is precisely what the expiry-reminder flow asks people to do, so the members punished hardest were the ones who acted on it.
+
+It now extends from whichever is later, `now` or the existing expiry. A lapsed window is deliberately not extended from: somebody returning after six months away would otherwise have their new month land in the past and unlock nothing.
+
+Two things surfaced while fixing it:
+
+* **Unlimited access was being destroyed.** `access_expires_at IS NULL` with a start date set is how `has_active_access()` expresses unlimited. The old code wrote a date over it unconditionally, so a member an admin had given unlimited access, who then bought a month, ended up with access that expires — having paid for the downgrade. The window is now left alone for such an account, and the payment still recorded.
+* **The subscription row disagreed with the access window.** `current_period_start` was the moment the payment landed rather than when the paid period begins, and Profile → Subscription reads its "Renews / Expires" line straight off that row. On an early renewal the app would have shown two different dates for the same thing.
+
+Verified against seven cases including early renewal, a six-month lapse, an expiry falling exactly at `now`, a brand-new free account, an unlimited member, and a yearly plan bought 200 days early.
 
 **F-5 — LOW. Two admin list queries swallow their errors.** `listPlans()` (`actions/plans.ts:39`) and `listPopups()` (`actions/config.ts:40`) destructure `{ data }` and return `data ?? []`, discarding `error`. A failed query renders as an empty list with nothing to explain it — the exact trap this log records being hit three times already, and which the storefront page now handles correctly. Admin-only surfaces, so the blast radius is confusion rather than data loss.
 
