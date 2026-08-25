@@ -235,12 +235,8 @@ class _CourseDetailScreenState extends ConsumerState<CourseDetailScreen>
                       // Missed in the first pass: the tab, the counts and
                       // the buttons all said episode while the list they
                       // sit above still announced itself as Lessons.
-                      kEducationFramingEnabled ? 'Lessons' : 'Episodes',
-                      style: const TextStyle(
-                        fontSize: 17,
-                        fontWeight: FontWeight.w800,
-                        color: AppTheme.textPrimary,
-                      ),
+                      kEducationFramingEnabled ? 'LESSONS' : 'EPISODES',
+                      style: AppTheme.label,
                     ),
                   ),
               ),
@@ -268,12 +264,7 @@ class _CourseDetailScreenState extends ConsumerState<CourseDetailScreen>
                         padding: const EdgeInsets.fromLTRB(20, 10, 20, 8),
                         child: Text(
                           module.title.toUpperCase(),
-                          style: const TextStyle(
-                            fontSize: 11.5,
-                            fontWeight: FontWeight.w800,
-                            color: AppTheme.textSecondary,
-                            letterSpacing: 0.6,
-                          ),
+                          style: AppTheme.label.copyWith(fontSize: 11.5),
                         ),
                       ),
                   ),
@@ -416,66 +407,59 @@ class _MetaCard extends StatelessWidget {
     final started = completed > 0;
 
     return Container(
-      padding: const EdgeInsets.all(18),
-      decoration: BoxDecoration(
-        gradient: AppTheme.clayFill(),
-        borderRadius: BorderRadius.circular(AppTheme.radiusCard),
-        boxShadow: AppTheme.cardShadow,
-      ),
+      padding: const EdgeInsets.all(16),
+      decoration: AppTheme.glassSurface(radius: AppTheme.radiusCard),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Text(
-          title,
-          style: const TextStyle(
-            fontFamily: AppTheme.display,
-            fontSize: 22,
-            height: 26 / 22,
-            fontWeight: FontWeight.w500,
-            color: AppTheme.textPrimary,
-          ),
-        ),
-        if (description != null && description!.trim().isNotEmpty) ...[
-          const SizedBox(height: 8),
-          Text(
-            description!,
-            style: const TextStyle(
-              fontSize: 13,
-              color: AppTheme.textSecondary,
-              height: 1.55,
-            ),
-          ),
-        ],
-        const SizedBox(height: 14),
-
-        Row(children: [
-          const Icon(Icons.play_lesson_outlined, size: 15, color: AppTheme.sage),
-          const SizedBox(width: 6),
-          Text(
-            '$lessonCount ${lessonCount == 1 ? kPartWord : "${kPartWord}s"}',
-            style: const TextStyle(
-              fontSize: 12.5,
-              color: AppTheme.textPrimary,
-              fontWeight: FontWeight.w600,
+        Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: const TextStyle(
+                    fontFamily: AppTheme.text,
+                    fontSize: 20,
+                    height: 1.2,
+                    fontWeight: FontWeight.w600,
+                    letterSpacing: -0.4,
+                    color: AppTheme.textPrimary,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  '$lessonCount ${lessonCount == 1 ? kPartWord : "${kPartWord}s"}',
+                  style: const TextStyle(
+                    fontFamily: AppTheme.text,
+                    fontSize: 13,
+                    color: AppTheme.textSecondary,
+                  ),
+                ),
+              ],
             ),
           ),
           if (locked) ...[
             const SizedBox(width: 12),
             Container(
-              padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
+              height: 24,
+              padding: const EdgeInsets.symmetric(horizontal: 9),
               decoration: BoxDecoration(
-                color: AppTheme.sandSoft,
-                borderRadius: BorderRadius.circular(AppTheme.radiusPill),
+                color: AppTheme.well,
+                borderRadius: BorderRadius.circular(12),
               ),
               child: Row(mainAxisSize: MainAxisSize.min, children: [
-                const Icon(Icons.lock_rounded, size: 11, color: AppTheme.clay),
+                const Icon(Icons.lock_rounded,
+                    size: 13, color: AppTheme.textSecondary),
                 const SizedBox(width: 4),
                 Text(
                   // The lock stays on iOS, the price does not: locked
                   // content may be shown, priced content may not.
                   kPurchaseUiEnabled ? priceLabel : 'Locked',
                   style: const TextStyle(
-                    fontSize: 10.5,
-                    fontWeight: FontWeight.w700,
-                    color: AppTheme.clay,
+                    fontFamily: AppTheme.text,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: AppTheme.textSecondary,
                   ),
                 ),
               ]),
@@ -483,30 +467,52 @@ class _MetaCard extends StatelessWidget {
           ],
         ]),
 
+        if (description != null && description!.trim().isNotEmpty) ...[
+          const SizedBox(height: 12),
+          Text(
+            description!,
+            style: const TextStyle(
+              fontFamily: AppTheme.text,
+              fontSize: 15,
+              color: Color(0xFF544A6E),
+              height: 1.5,
+            ),
+          ),
+        ],
+
         if (started && !locked) ...[
-          const SizedBox(height: 14),
-          Row(children: [
-            Expanded(
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(4),
-                child: LinearProgressIndicator(
-                  value: progress,
-                  backgroundColor: AppTheme.sageSoft,
-                  valueColor: const AlwaysStoppedAnimation(AppTheme.sage),
-                  minHeight: 6,
+          const SizedBox(height: 16),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(2),
+            child: LinearProgressIndicator(
+              value: progress,
+              backgroundColor: AppTheme.well,
+              valueColor: const AlwaysStoppedAnimation(AppTheme.sage),
+              minHeight: 3,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                completed >= lessonCount ? 'Completed' : 'In progress',
+                style: const TextStyle(
+                  fontFamily: AppTheme.text,
+                  fontSize: 13,
+                  color: AppTheme.textSecondary,
                 ),
               ),
-            ),
-            const SizedBox(width: 10),
-            Text(
-              '$completed/$lessonCount',
-              style: const TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w700,
-                color: AppTheme.sage,
+              Text(
+                '${(progress * 100).round()}%',
+                style: const TextStyle(
+                  fontFamily: AppTheme.text,
+                  fontSize: 13,
+                  color: AppTheme.textSecondary,
+                ),
               ),
-            ),
-          ]),
+            ],
+          ),
         ],
 
         if (locked || nextLessonTitle != null) ...[
@@ -562,17 +568,29 @@ class _LessonTile extends StatelessWidget {
     }
   }
 
+  /// "Not started · 14 min" — state first, then the fact about it.
+  ///
+  /// The state used to live only in the leading badge, as one of three
+  /// shades. Saying it in words costs nothing and means the row reads
+  /// without anyone having to learn what the tint means.
   String get _subtitle {
     if (!lesson.isPlayable) return 'Unavailable';
+
+    final state = locked
+        ? 'Locked'
+        : lesson.completed
+            ? 'Completed'
+            : 'Not started';
+
     switch (lesson.type) {
       case LessonType.audio:
         final secs = lesson.audioDurationSeconds;
-        if (secs == null) return 'Audio';
-        return 'Audio · ${(secs / 60).ceil()} min';
+        if (secs == null) return '$state · Audio';
+        return '$state · ${(secs / 60).ceil()} min';
       case LessonType.video:
-        return 'Video';
+        return '$state · Video';
       case LessonType.text:
-        return 'Reading';
+        return '$state · Reading';
     }
   }
 
@@ -581,83 +599,71 @@ class _LessonTile extends StatelessWidget {
     final done = lesson.completed && !locked;
 
     return Container(
-      decoration: BoxDecoration(
-        gradient: AppTheme.clayFill(AppTheme.surfaceCream),
-        borderRadius: BorderRadius.circular(AppTheme.radiusRow),
-        boxShadow: AppTheme.cardShadow,
-      ),
+      decoration: AppTheme.glassSurface(),
       clipBehavior: Clip.antiAlias,
       child: Column(children: [
         InkWell(
-        onTap: onTap,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
-          child: Row(children: [
-            // Leading badge shows state first (locked / done) and falls
-            // back to the media type — the state is what decides whether
-            // tapping does anything.
-            Container(
-              width: 38,
-              height: 38,
-              decoration: BoxDecoration(
-                color: locked
-                    ? AppTheme.sandSoft
-                    : done
-                        ? AppTheme.sage
-                        : AppTheme.surface,
-                borderRadius: BorderRadius.circular(16),
+          onTap: onTap,
+          child: Padding(
+            padding: const EdgeInsets.all(12),
+            child: Row(children: [
+              // Leading badge shows state first (locked / done) and
+              // falls back to the media type — the state is what
+              // decides whether tapping does anything.
+              Container(
+                width: 52,
+                height: 52,
+                decoration: BoxDecoration(
+                  color: done ? AppTheme.sage : AppTheme.sageSoft,
+                  borderRadius: BorderRadius.circular(11),
+                ),
+                child: Icon(
+                  locked
+                      ? Icons.lock_rounded
+                      : done
+                          ? Icons.check_rounded
+                          : _typeIcon,
+                  size: 22,
+                  color: done ? Colors.white : AppTheme.sageDark,
+                ),
               ),
-              child: Icon(
-                locked
-                    ? Icons.lock_rounded
-                    : done
-                        ? Icons.check_rounded
-                        : _typeIcon,
-                size: 19,
-                color: locked
-                    ? AppTheme.clay
-                    : done
-                        ? Colors.white
-                        : AppTheme.sage,
-              ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    '$number. ${lesson.title}',
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      fontSize: 13.5,
-                      fontWeight: FontWeight.w700,
-                      height: 1.3,
-                      color: lesson.isPlayable
-                          ? AppTheme.textPrimary
-                          : AppTheme.textSecondary,
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      '$number. ${lesson.title}',
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontFamily: AppTheme.text,
+                        fontSize: 16,
+                        fontWeight: FontWeight.w500,
+                        letterSpacing: -0.16,
+                        height: 1.3,
+                        color: lesson.isPlayable
+                            ? AppTheme.textPrimary
+                            : AppTheme.textSecondary,
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: 3),
-                  Text(
-                    _subtitle,
-                    style: const TextStyle(
-                      fontSize: 11.5,
-                      color: AppTheme.textSecondary,
+                    const SizedBox(height: 3),
+                    Text(
+                      _subtitle,
+                      style: const TextStyle(
+                        fontFamily: AppTheme.text,
+                        fontSize: 13,
+                        color: AppTheme.textSecondary,
+                      ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
-            ),
-            const SizedBox(width: 8),
-            Icon(
-              Icons.chevron_right_rounded,
-              size: 20,
-              color: AppTheme.textSecondary.withValues(alpha: 0.6),
-            ),
-          ]),
-        ),
+              const SizedBox(width: 8),
+              const Icon(Icons.chevron_right_rounded,
+                  size: 18, color: Color(0xFF9890AC)),
+            ]),
+          ),
         ),
 
         // Attachments sit under the lesson they belong to, visually
