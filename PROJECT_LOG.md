@@ -918,7 +918,17 @@ select p.id, u.email, p.subscription_tier,
 
 **F-2 — HIGH. CI never type-checks the Dart.** `codemagic.yaml` runs `flutter pub get` then `flutter build` for all three workflows. There is no `flutter analyze`, no `flutter test`, and `mobile_app/test/` does not exist. The consequence is not theoretical: a scripted edit during the restyle deleted `_SettingsSheet`, `_SettingsSheetState` and `_SheetTile` — 282 lines including account deletion — and nothing caught it until a developer ran a local release build days later. `flutter analyze` would have failed in seconds. Add it as a step before `flutter build` in every workflow.
 
-**F-3 — HIGH, unfixable in code. Pop-up content is unvalidated free text rendered on iOS.** `next_event_popup.dart` renders `popup.title`, `popup.body`, `popup.ctaText` and `popup.imageUrl` exactly as an admin typed or uploaded them, with no platform gating. An admin writing "Register ₹499" or uploading artwork with "Register Now" baked into the pixels puts a purchase call-to-action on an iOS screen, which is precisely what the 3.1.3(a) exception forbids, and `kPurchaseUiEnabled` cannot reach inside a string from the database or a JPEG. Mitigation has to be a validation guard in the admin plus a runtime scrub on iOS; neither exists yet.
+**F-3 — HIGH. Pop-up content was unvalidated free text rendered on iOS. FIXED 25 August 2026.**
+
+`next_event_popup.dart` rendered `title`, `body`, `ctaText` and `imageUrl` exactly as an admin typed or uploaded them, with no platform gating — so "Register ₹499", or artwork with "Register Now" in the pixels, put the purchase call to action 3.1.3(a) forbids straight onto an iOS screen. `kPurchaseUiEnabled` cannot reach inside a string that arrives at runtime, let alone a JPEG.
+
+Closed in three parts:
+
+* **Text, automatically.** `core/config/ios_content_policy.dart` inspects title, body and button label for currency amounts and commerce verbs. A pop-up that trips it is withheld from iOS entirely — not redacted, because "Register ₹499 for the workshop" with the price stripped still reads as an instruction to register for a paid event, and a half-scrubbed sentence looks like a bug to the member and like evasion to a reviewer. Android is untouched and still shows everything in full. Enforcement lives in the app, not the admin, because an admin warning can be dismissed and says nothing about the rows already in the table.
+* **Artwork, deliberately.** `app_popups.hide_on_ios` (migration `20260825000002`), surfaced as a "Hide on iPhone" switch on the pop-up form. Nothing in this stack can read the words baked into an image, so that judgement belongs to whoever made it.
+* **The default button label was itself the problem.** `ctaText` fell back to **"Register Now"** when no label was set — a purchase call to action shipped in the binary, on by default, for any pop-up whose author left the field blank. The iOS fallback is now "View".
+
+The same rule exists twice, in `mobile_app/lib/core/config/ios_content_policy.dart` and `admin/src/lib/ios-content-policy.ts`, because Dart and TypeScript cannot share code. **They must be changed together**; both files say so in their headers, and a parity check comparing the two pattern strings is cheap enough to run whenever either is touched. The admin copy only warns as the author types; the Dart copy is what protects the listing.
 
 **F-4 — MEDIUM. Renewing early silently forfeits the remaining days.** `razorpay-webhook/index.ts` sets `access_expires_at = now + interval` on every captured membership payment, rather than extending from whichever of `now` and the existing expiry is later. A member with 20 days left who renews receives 30 days, not 50. Money is taken for time the member already had.
 

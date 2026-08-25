@@ -39,23 +39,38 @@ class AccessRemoteDataSource {
   /// would hit. Losing the pop-up entirely in that window would be a
   /// silent regression nobody would connect to a missing migration.
   Future<List<AppPopup>> _fetchPopups() async {
-    try {
-      final rows = await _client
-          .from('app_popups')
-          .select(
-            'id, title, body, image_url, weekday, starts_at, sort_order, '
-            'cta_route, cta_label',
-          )
-          .eq('enabled', true)
-          .order('sort_order', ascending: true);
+    // Two selects, not one. `hide_on_ios` arrived in migration
+    // 20260825000002, and asking for a column the database does not
+    // have fails the whole query — which the catch below would turn
+    // into "fall back to the legacy single pop-up", silently losing
+    // every scheduled one until somebody connected the two facts.
+    //
+    // So the newer shape is tried first and the older one is a real
+    // fallback rather than an error path. An app build ahead of its
+    // database keeps working, with the text check still guarding iOS
+    // and only the artwork switch unavailable.
+    const withFlag = 'id, title, body, image_url, weekday, starts_at, '
+        'sort_order, cta_route, cta_label, hide_on_ios';
+    const withoutFlag = 'id, title, body, image_url, weekday, starts_at, '
+        'sort_order, cta_route, cta_label';
 
-      return [
-        for (final row in rows as List)
-          AppPopup.fromMap(Map<String, dynamic>.from(row as Map)),
-      ];
-    } catch (_) {
-      return _fetchLegacyPopup();
+    for (final columns in const [withFlag, withoutFlag]) {
+      try {
+        final rows = await _client
+            .from('app_popups')
+            .select(columns)
+            .eq('enabled', true)
+            .order('sort_order', ascending: true);
+
+        return [
+          for (final row in rows as List)
+            AppPopup.fromMap(Map<String, dynamic>.from(row as Map)),
+        ];
+      } catch (_) {
+        // Try the older shape, then the legacy table.
+      }
     }
+    return _fetchLegacyPopup();
   }
 
   Future<List<AppPopup>> _fetchLegacyPopup() async {
