@@ -10,12 +10,15 @@ import '../widgets/sleep_timer_sheet.dart';
 import '../widgets/speed_selector_sheet.dart';
 
 // ── Design constants ──────────────────────────────────────────────────────────
-const _kBg = Color(0xFF1B2723);         // deep sage, immersive stage
-const _kRing1 = Color(0xFFEFD9A8);      // sand outer ring
-const _kRing2 = Color(0xFF8FB3A6);      // sage inner ring
-const _kAccent = Color(0xFF8FB3A6);     // buttons / active
+// The player is the deep end of the violet ramp — the one screen you are
+// inside rather than on, which is why it keeps its own constants instead
+// of reading the light-theme tokens.
+const _kBg = Color(0xFF2A1650);         // deep purple, immersive stage
+const _kRing1 = Color(0xFFC4B5FD);      // pale violet outer ring
+const _kRing2 = Color(0xFFA78BFA);      // mid violet inner ring
+const _kAccent = Color(0xFFA78BFA);     // buttons / active
 const _kTextPrimary = Colors.white;
-const _kTextSecondary = Color(0xFFA8BBB2);
+const _kTextSecondary = Color(0xFFBCB4CC);
 
 class NowPlayingScreen extends ConsumerWidget {
   const NowPlayingScreen({super.key});
