@@ -779,7 +779,9 @@ As of the end of the App Store compliance session, in priority order:
 
 0. **CRITICAL — any signed-in user can grant themselves premium access.** Found in the 25 August audit; see Section 12 for the full reasoning. `profiles_update_own` constrains which *row* a user may update and that `role` may not be escalated, but says nothing about the other columns — and RLS structurally cannot, because a `with check` sees only the new row and never the old one. `has_active_access()` decides entitlement by reading two of those unconstrained columns. One PostgREST call against their own row, using the anon key that ships inside the APK, unlocks the entire premium library and every DRM licence with it. No payment involved.
 
-   Fix written and committed as `supabase/migrations/20260825000001_lock_profile_entitlement_columns.sql` — a column-level `GRANT`, because grants are column-aware where RLS is not. **Not yet applied to the live database.** The webhook and every admin mutation use the service role, which bypasses both RLS and grants, so nothing legitimate breaks. Apply it, then confirm with the transaction in Section 12.
+   Fixed by `supabase/migrations/20260825000001_lock_profile_entitlement_columns.sql` — a column-level `GRANT`, because grants are column-aware where RLS is not. **Applied to the live database on 25 August 2026.** The webhook and every admin mutation use the service role, which bypasses both RLS and grants, so nothing legitimate was affected.
+
+   Two things still outstanding from it: confirm the hole is actually shut using the transaction in Section 12, and check whether it was exploited before it was closed — the forensic query is in Section 12 under "After the fix".
 
 0b. **Apple Developer account ownership.** Registered to an individual rather than the business, so payouts land in a personal bank account and the app is legally that person's. Three routes: convert to an Organisation (needs a legal entity and a D-U-N-S number — not available to a sole proprietorship), transfer the app to the business owner's own individual account (needs their own ~₹9,000/yr membership; no D-U-N-S), or leave it and document the arrangement with a CA. **If transferring, do it before IAP subscribers exist** — Sign in with Apple identifiers are scoped to the developer team, so every existing Apple user needs migrating via Apple's transfer-identifier endpoint or they come back as strangers and lose their purchases. That migration is small today and grows with every Apple sign-in.
 
@@ -875,7 +877,7 @@ The Dart half of this repo has never been type-checked anywhere except a develop
 
 ### Findings
 
-**F-1 — CRITICAL. Self-service premium via `profiles`.** Full detail in Section 10 item 0. Fix committed as migration `20260825000001`, not yet applied. Verify on the live database with:
+**F-1 — CRITICAL. Self-service premium via `profiles`.** Full detail in Section 10 item 0. Fixed by migration `20260825000001`, **applied 25 August 2026**. Confirm it is actually shut:
 
 ```sql
 begin;
@@ -889,6 +891,28 @@ rollback;
 ```
 
 The `rollback` matters — run this inside the transaction as written so it never actually grants anything.
+
+#### After the fix: was it used before it was closed?
+
+The hole was open from June until 25 August. Nothing logged profile writes, so the only evidence is the state itself: an account holding access that no payment explains.
+
+```sql
+select p.id, u.email, p.subscription_tier,
+       p.access_started_at, p.access_expires_at, p.updated_at
+  from public.profiles p
+  join auth.users u on u.id = p.id
+ where p.role = 'user'
+   and (case when p.access_expires_at is not null
+             then p.access_expires_at > now()
+             else p.access_started_at is not null end)
+   and not exists (select 1 from public.subscriptions s
+                    where s.user_id = p.id and s.status in ('active','trialing'))
+   and not exists (select 1 from public.payments pay
+                    where pay.user_id = p.id and pay.status = 'succeeded')
+ order by p.updated_at desc;
+```
+
+**This lists candidates, not culprits.** Every access an admin granted by hand through the dashboard also has no payment behind it and will appear here, as will comped accounts and the demo account given to App Review. The rows to look at are ones nobody remembers granting — and `updated_at` is the tell, because the `trg_profiles_updated_at` trigger stamps it on any write, including a self-grant.
 
 **F-2 — HIGH. CI never type-checks the Dart.** `codemagic.yaml` runs `flutter pub get` then `flutter build` for all three workflows. There is no `flutter analyze`, no `flutter test`, and `mobile_app/test/` does not exist. The consequence is not theoretical: a scripted edit during the restyle deleted `_SettingsSheet`, `_SettingsSheetState` and `_SheetTile` — 282 lines including account deletion — and nothing caught it until a developer ran a local release build days later. `flutter analyze` would have failed in seconds. Add it as a step before `flutter build` in every workflow.
 
