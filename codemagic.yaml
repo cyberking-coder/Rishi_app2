@@ -65,6 +65,19 @@ workflows:
           cd mobile_app
           flutter pub get
 
+      # Fails the build on ERRORS only. Deliberately not on warnings or
+      # infos: the project has a handful of pre-existing ones, and a step
+      # that is red on arrival gets disabled within a week rather than
+      # fixed. Errors are the ones that matter here — a scripted edit
+      # during the restyle deleted three whole classes including account
+      # deletion, and nothing caught it until a local release build days
+      # later, because CI had gone straight from pub get to build without
+      # ever type-checking the Dart.
+      - name: Analyze
+        script: |
+          cd mobile_app
+          flutter analyze --no-fatal-infos --no-fatal-warnings
+
       - name: Install CocoaPods
         script: |
           cd mobile_app/ios
@@ -142,6 +155,19 @@ workflows:
           cd mobile_app
           flutter pub get
 
+      # Fails the build on ERRORS only. Deliberately not on warnings or
+      # infos: the project has a handful of pre-existing ones, and a step
+      # that is red on arrival gets disabled within a week rather than
+      # fixed. Errors are the ones that matter here — a scripted edit
+      # during the restyle deleted three whole classes including account
+      # deletion, and nothing caught it until a local release build days
+      # later, because CI had gone straight from pub get to build without
+      # ever type-checking the Dart.
+      - name: Analyze
+        script: |
+          cd mobile_app
+          flutter analyze --no-fatal-infos --no-fatal-warnings
+
       - name: Flutter build appbundle
         # Obfuscated, with the symbol files kept as an artifact below.
         # Without them a crash report from Play is unreadable, and they
@@ -211,6 +237,19 @@ workflows:
         script: |
           cd mobile_app
           flutter pub get
+
+      # Fails the build on ERRORS only. Deliberately not on warnings or
+      # infos: the project has a handful of pre-existing ones, and a step
+      # that is red on arrival gets disabled within a week rather than
+      # fixed. Errors are the ones that matter here — a scripted edit
+      # during the restyle deleted three whole classes including account
+      # deletion, and nothing caught it until a local release build days
+      # later, because CI had gone straight from pub get to build without
+      # ever type-checking the Dart.
+      - name: Analyze
+        script: |
+          cd mobile_app
+          flutter analyze --no-fatal-infos --no-fatal-warnings
 
       - name: Flutter build apk
         script: |

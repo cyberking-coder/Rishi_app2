@@ -192,8 +192,10 @@ See Section 7 for the bug-fix chronology of the LMS/payments work (Phases 0-5).
 ## 6. Store Submission Status
 
 - **Google Play**: live. Unaffected by any of the App Store work — the Android build keeps its in-app checkout and full Razorpay margin.
-- **Apple App Store**: live at 2.1.0. **2.1.1 was rejected under Guideline 3.1.1** and is being resubmitted as a reader app under 3.1.3(a) — see Section 7.
-- **The Apple Developer account is registered to an individual, not the business.** That decides where App Store payouts land, whose name appears as the seller, and who legally owns the app. It does not block anything, and it gets harder to unwind the longer it runs. Section 10 has the options; note that Apple's Organisation enrolment needs a legal entity (a sole proprietorship is not eligible), which is what a D-U-N-S number is for — it has nothing to do with which storefronts you sell in.
+- **Apple App Store**: **approved and live at 2.1.1.** Accepted 25 August 2026 (submission `dfea1e52-3073-4163-aa09-fb5dcb0f0d42`), set to release automatically. Apple ID `6786403340`; listing at `apps.apple.com/app/know-thyself-by-anurag-rishi/id6786403340`. The reader-app framing under Guideline 3.1.3(a) was accepted on the third attempt: 3.1.1 for the external checkout, then a second rejection where the reader-app argument was never assessed because the App Review Notes field was submitted blank, then this one.
+- **The approval is conditional on what the binary does NOT contain**, and nothing enforces that but two runtime flags in `core/config/purchase_config.dart`. No purchase mechanism, no price string anywhere, no live sessions, no certificates, no education vocabulary — on iOS only. Any future release has to be walked against that list before submission, because a single survivor loses the 3.1.3(a) exception rather than merely failing review. The audit in Section 12 confirms the gating is complete in code today, and names the one hole code cannot close.
+- **2.1.2 is prepped and unbuilt** — the purple-glass restyle plus the image-performance work, version `2.1.2+16`, store copy written in `docs/store-listing.md`. It has never been compiled by CI or run on a device.
+- **The Apple Developer account is registered to an individual, not the business.** That decides where App Store payouts land, whose name appears as the seller, and who legally owns the app. Now that the listing is public, the seller line on it reads as that individual's legal name. It does not block anything, and it gets harder to unwind the longer it runs. Section 10 has the options; note that Apple's Organisation enrolment needs a legal entity (a sole proprietorship is not eligible), which is what a D-U-N-S number is for — it has nothing to do with which storefronts you sell in.
 - APK release build: signed with keystore in `key.properties` (gitignored, keep backed up separately)
 - App version: `pubspec.yaml` sets the version **name**; the build **number** comes from Codemagic's `$BUILD_NUMBER` and overrides the `+N` in the file. This is why Apple reviewed build 22 while the file said `+14` — not a mismatch to fix.
 
@@ -775,12 +777,9 @@ The admin app doesn't use this layering — it's a much thinner app, and Next.js
 
 As of the end of the App Store compliance session, in priority order:
 
-0. **The App Store rejection is the live item.** The iOS reader-app build and the storefront are written and pushed but neither has been deployed or submitted. Before submitting:
-   - Fill the demo account in `docs/store-listing.md` → App Review Notes with an account that **has active access**. A reviewer who only ever sees locked screens rejects on that alone, and it is the most common failure for apps of this shape.
-   - Walk the iOS build signed out and on a free account and confirm no price, no "Get Access", no "Register • ₹…" and no link to `pay.anuragrishi.com` survives anywhere.
-   - Check the scheduled pop-up's CTA label in Admin → Settings. It is free text in the database, so "Register ₹499" would put a price on an iOS screen that no code change can catch.
-   - Decide the sequencing: submitting before the storefront is deployed ships the 2.1.1 fixes but means iOS sells nothing in the meantime. Existing customers are unaffected either way — they sign in and everything works.
-   - The Flutter side has **not been compiled** — there is no Flutter toolchain in the environment it was written in. Codemagic is the first build.
+0. **CRITICAL — any signed-in user can grant themselves premium access.** Found in the 25 August audit; see Section 12 for the full reasoning. `profiles_update_own` constrains which *row* a user may update and that `role` may not be escalated, but says nothing about the other columns — and RLS structurally cannot, because a `with check` sees only the new row and never the old one. `has_active_access()` decides entitlement by reading two of those unconstrained columns. One PostgREST call against their own row, using the anon key that ships inside the APK, unlocks the entire premium library and every DRM licence with it. No payment involved.
+
+   Fix written and committed as `supabase/migrations/20260825000001_lock_profile_entitlement_columns.sql` — a column-level `GRANT`, because grants are column-aware where RLS is not. **Not yet applied to the live database.** The webhook and every admin mutation use the service role, which bypasses both RLS and grants, so nothing legitimate breaks. Apply it, then confirm with the transaction in Section 12.
 
 0b. **Apple Developer account ownership.** Registered to an individual rather than the business, so payouts land in a personal bank account and the app is legally that person's. Three routes: convert to an Organisation (needs a legal entity and a D-U-N-S number — not available to a sole proprietorship), transfer the app to the business owner's own individual account (needs their own ~₹9,000/yr membership; no D-U-N-S), or leave it and document the arrangement with a CA. **If transferring, do it before IAP subscribers exist** — Sign in with Apple identifiers are scoped to the developer team, so every existing Apple user needs migrating via Apple's transfer-identifier endpoint or they come back as strangers and lose their purchases. That migration is small today and grows with every Apple sign-in.
 
@@ -854,4 +853,69 @@ The push fan-out originally broke at about **1,000 devices, silently** — an un
 
 ---
 
-*Last updated: 12 August 2026, after the App Store 3.1.1 rejection — the iOS reader-app build and the public storefront it forced. Before that: live sessions, push notifications and the fan-out scaling work (2 August); Phases 3b, 4 and 5 landed in one extended session earlier still. See the bug-fix chronology at the end of Section 7 for what broke along the way and why.*
+## 12. Codebase audit — 25 August 2026
+
+A full read of `mobile_app/lib` (125 files, 16.4k lines), `admin/src` (109 files, 14.3k lines) and `supabase` (60 files, 8.2k lines), plus everything in the repo that could actually be executed.
+
+### What was VERIFIED by running it, versus read
+
+| Check | Result |
+|---|---|
+| `npx tsc --noEmit` (admin) | **passes, 0 errors** |
+| `npm run build` (admin, full Next production build) | **passes** |
+| `sharp` resolves in the committed lockfile | **yes** — `npm ci` on Vercel will not break |
+| Image resize rule vs every box size in the app | **verified by execution** — no upscaling on any device profile |
+| Supabase URL rewriting vs real URL shapes | **verified** — cache-buster preserved, Bunny and YouTube untouched |
+| RLS enabled on all 42 tables, all with policies | **verified by parsing every migration** |
+| Secrets committed to the repo | **none** — only the public anon key, which is public by design |
+| Flutter analyze / build / tests | **NOT RUN — no toolchain in this environment** |
+| Deno typecheck of edge functions | **NOT RUN — no Deno in this environment** |
+
+The Dart half of this repo has never been type-checked anywhere except a developer's own machine. That is not a stylistic gap; see F-2.
+
+### Findings
+
+**F-1 — CRITICAL. Self-service premium via `profiles`.** Full detail in Section 10 item 0. Fix committed as migration `20260825000001`, not yet applied. Verify on the live database with:
+
+```sql
+begin;
+  set local role authenticated;
+  set local request.jwt.claims = '{"sub":"<a free user uuid>","role":"authenticated"}';
+  update public.profiles
+     set access_expires_at = now() + interval '1 year'
+   where id = '<the same uuid>';
+  -- BEFORE the fix this reports UPDATE 1. After it, a permission error.
+rollback;
+```
+
+The `rollback` matters — run this inside the transaction as written so it never actually grants anything.
+
+**F-2 — HIGH. CI never type-checks the Dart.** `codemagic.yaml` runs `flutter pub get` then `flutter build` for all three workflows. There is no `flutter analyze`, no `flutter test`, and `mobile_app/test/` does not exist. The consequence is not theoretical: a scripted edit during the restyle deleted `_SettingsSheet`, `_SettingsSheetState` and `_SheetTile` — 282 lines including account deletion — and nothing caught it until a developer ran a local release build days later. `flutter analyze` would have failed in seconds. Add it as a step before `flutter build` in every workflow.
+
+**F-3 — HIGH, unfixable in code. Pop-up content is unvalidated free text rendered on iOS.** `next_event_popup.dart` renders `popup.title`, `popup.body`, `popup.ctaText` and `popup.imageUrl` exactly as an admin typed or uploaded them, with no platform gating. An admin writing "Register ₹499" or uploading artwork with "Register Now" baked into the pixels puts a purchase call-to-action on an iOS screen, which is precisely what the 3.1.3(a) exception forbids, and `kPurchaseUiEnabled` cannot reach inside a string from the database or a JPEG. Mitigation has to be a validation guard in the admin plus a runtime scrub on iOS; neither exists yet.
+
+**F-4 — MEDIUM. Renewing early silently forfeits the remaining days.** `razorpay-webhook/index.ts` sets `access_expires_at = now + interval` on every captured membership payment, rather than extending from whichever of `now` and the existing expiry is later. A member with 20 days left who renews receives 30 days, not 50. Money is taken for time the member already had.
+
+**F-5 — LOW. Two admin list queries swallow their errors.** `listPlans()` (`actions/plans.ts:39`) and `listPopups()` (`actions/config.ts:40`) destructure `{ data }` and return `data ?? []`, discarding `error`. A failed query renders as an empty list with nothing to explain it — the exact trap this log records being hit three times already, and which the storefront page now handles correctly. Admin-only surfaces, so the blast radius is confusion rather than data loss.
+
+**F-6 — LOW. ESLint is not configured.** `npm run lint` drops into Next's interactive setup prompt, which in CI would hang until the job times out. There is no `.eslintrc*` or `eslint.config.*` in `admin/`.
+
+**F-7 — LOW. `features/live/` is dead but load-bearing.** No live-session UI is reachable — no routes, no screens, nothing imports the entities — which is what makes the "live sessions have been removed entirely" claim in the App Review notes true. But `upcomingSessionsProvider` and `paidSessionsProvider` are still defined, and `pushRegistrationProvider` is *also* filed there, which is the only reason the module still exists and is imported by `app_shell.dart`. Push registration belongs somewhere else; leaving it in a folder named `live` keeps a compliance-sensitive module alive for an unrelated reason.
+
+**F-8 — LOW. A user can mark their own lessons complete.** `lesson_progress_update_own` permits it by design. It affects progress percentages and, if certificates are ever re-enabled, could be used to claim one unearned. Not an access-control issue — no content unlocks — and certificates are currently withheld on iOS and unissued in practice.
+
+### What was checked and found sound
+
+Worth recording, because "no finding" is only useful if you know where it was looked for.
+
+- **`razorpay-webhook`** is the strongest code in the repository. Signature verified over the raw body before any parsing; idempotency claimed in `webhook_events` *before* the work it guards and explicitly released if that work fails, so a failed delivery cannot poison a payment permanently; duplicate purchases recorded as refund-owed rather than silently colliding with the partial unique index; every early exit logged with its reason.
+- **Licence issuance** (`issue-audio-license`, `issue-playback-license`) verifies the JWT and re-checks entitlement server-side via `has_active_access` / course access. Client-side ownership flags are never trusted. Note that F-1 defeated these too, which is what makes it critical rather than merely embarrassing.
+- **RLS**: enabled on all 42 tables, every one with policies. Writes to `subscriptions`, `payments` and `course_purchases` are admin-only. Aside from F-1 and F-8, every user-writable table holds only that user's own data.
+- **iOS compliance gating** is complete in code: all four price render sites are behind `kPurchaseUiEnabled`, the purchase sheet renders neither price nor buy button on iOS, and no live-session UI is reachable. F-3 is the gap, and it is in data rather than code.
+- **No secrets committed.** No `.env` tracked, no service-role key, no Razorpay secret. The Supabase anon key in `app_config.dart` is public by design.
+- **`BuildContext` across async gaps**: five candidates flagged by pattern, all five confirmed false positives on inspection.
+- **The 12 `RemoteImage` call sites** are type-correct at every one.
+
+---
+
+*Last updated: 25 August 2026, the day the App Store approved 2.1.1 as a reader app. That session also produced the purple-glass restyle, the image-decode and upload-resize work, and the full codebase audit in Section 12 — which found a critical entitlement hole that had been open since June. Before that: the App Store 3.1.1 rejection on 12 August — the iOS reader-app build and the public storefront it forced. Before that: live sessions, push notifications and the fan-out scaling work (2 August); Phases 3b, 4 and 5 landed in one extended session earlier still. See the bug-fix chronology at the end of Section 7 for what broke along the way and why.*
