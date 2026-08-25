@@ -58,24 +58,29 @@ class _BottomNav extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // A floating bar rather than a full-width edge-to-edge one: it sits
-    // inset from all three sides so the page's background — the misty
-    // hills on Downloads and Profile — carries on running underneath it,
-    // which is what makes those screens read as one continuous scene.
-    return SafeArea(
-      top: false,
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(14, 0, 14, 10),
-        child: Container(
-          decoration: BoxDecoration(
-            gradient: AppTheme.clayFill(AppTheme.surface),
-            borderRadius: BorderRadius.circular(AppTheme.radiusCard),
-            boxShadow: AppTheme.cardShadow,
-          ),
-          child: SizedBox(
-            height: 66,
-            child: Row(
-              children: [
+    // Edge to edge, replacing the floating pill: the design puts the bar
+    // on the page's own edge rather than hovering it inside a card.
+    //
+    // Deliberately NOT a BackdropFilter. The shell lays this out in a
+    // Column below the page, so nothing is behind the bar to blur — a
+    // filter here would cost a full-screen blur every frame and show
+    // nothing for it. Real glass needs the shell to become a Stack with
+    // the page running underneath, which means giving every screen
+    // bottom padding so its last row is not hidden. That is a change
+    // worth making on its own rather than smuggled into a restyle.
+    return DecoratedBox(
+      decoration: const BoxDecoration(
+        color: Color(0xFAFAF8FF),
+        border: Border(
+          top: BorderSide(color: AppTheme.border, width: 0.5),
+        ),
+      ),
+      child: SafeArea(
+        top: false,
+        child: SizedBox(
+          height: 56,
+          child: Row(
+            children: [
               _NavItem(
                 icon: Icons.home_outlined,
                 activeIcon: Icons.home_rounded,
@@ -111,8 +116,7 @@ class _BottomNav extends StatelessWidget {
                   selected: current == AppTab.profile,
                   onTap: () => _go(context, AppTab.profile),
                 ),
-              ],
-            ),
+            ],
           ),
         ),
       ),
@@ -144,61 +148,28 @@ class _NavItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final color = selected ? AppTheme.sageDark : AppTheme.textSecondary;
+    // Colour alone carries the active state now — no chip behind the
+    // icon and no rule above it. On a translucent bar both of those read
+    // as smudges rather than as indicators, because there is no solid
+    // ground for them to sit on.
+    final color = selected ? AppTheme.sage : AppTheme.textSecondary;
 
     return Expanded(
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(AppTheme.radiusCard),
-        child: Stack(
-          alignment: Alignment.center,
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            // The short rule above the active tab. Sits on the bar's own
-            // top edge, which is what ties the indicator to the bar
-            // rather than to the icon floating below it.
-            if (selected)
-              Positioned(
-                top: 0,
-                child: Container(
-                  width: 26,
-                  height: 3.5,
-                  decoration: BoxDecoration(
-                    color: AppTheme.sageDark,
-                    borderRadius: BorderRadius.circular(AppTheme.radiusPill),
-                  ),
-                ),
+            Icon(selected ? activeIcon : icon, size: 23, color: color),
+            const SizedBox(height: 3),
+            Text(
+              label,
+              style: TextStyle(
+                fontFamily: AppTheme.text,
+                fontSize: 10,
+                color: color,
+                fontWeight: selected ? FontWeight.w600 : FontWeight.w500,
               ),
-            Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-                  decoration: BoxDecoration(
-                    // A soft chip behind the active icon only. On the
-                    // inactive ones it would turn the bar into four
-                    // buttons, which is the look the floating bar exists
-                    // to get away from.
-                    color: selected ? AppTheme.sageSoft : Colors.transparent,
-                    borderRadius: BorderRadius.circular(AppTheme.radiusPill),
-                  ),
-                  child: Icon(
-                    selected ? activeIcon : icon,
-                    size: 23,
-                    color: color,
-                  ),
-                ),
-                const SizedBox(height: 3),
-                Text(
-                  label,
-                  style: TextStyle(
-                    fontFamily: AppTheme.text,
-                    fontSize: 11,
-                    color: color,
-                    fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
-                  ),
-                ),
-              ],
             ),
           ],
         ),
