@@ -930,6 +930,15 @@ Closed in three parts:
 
 The same rule exists twice, in `mobile_app/lib/core/config/ios_content_policy.dart` and `admin/src/lib/ios-content-policy.ts`, because Dart and TypeScript cannot share code. **They must be changed together**; both files say so in their headers, and a parity check comparing the two pattern strings is cheap enough to run whenever either is touched. The admin copy only warns as the author types; the Dart copy is what protects the listing.
 
+**F-9 — HIGH. The home screen refetched over the network on every scroll-back. FIXED 25 August 2026.**
+
+Reported as "it lags scrolling from the bottom up, and gets stuck in the course section repeatedly". Two independent causes, neither of them images — which is why the decode fix in the same session did not help.
+
+* **Every home provider is `autoDispose`, and Home is a plain `ListView`**, which unmounts children once they pass its cache extent. Scrolling to the bottom therefore disposed the rows near the top, dropping the last listener on `coursesProvider`, `featuredAudiosProvider`, `categoriesProvider`, `continueListeningProvider` and `youtubeVideosProvider`, which threw their data away. Scrolling back up remounted them and re-fetched — every time, in both directions. The stall is a network round trip happening on a scroll gesture. Fixed with `ref.keepAlive()` on the five; freshness is unchanged, because pull-to-refresh already invalidates all of them explicitly. Deliberately not applied to the `.family` providers, whose keys are user input and would become an unbounded cache.
+* **`_CoursesRow` reserved 190px while loading and 260px once loaded.** Every other row on the screen already reserved its true height; this was the only one that did not, which is why the report named the course section specifically. When the data arrived, everything above the viewport grew by 70px and the scroll offset shifted under the user's finger — which reads as the list catching on something rather than as a row resizing.
+
+The lesson worth keeping: the first fix was aimed at a real defect (13 MB decodes) that was **not** the defect being reported. The symptom named a specific section, and the one row differing from its neighbours was the one named. That detail was in the report from the beginning and it took a second pass to use it.
+
 **F-4 — MEDIUM. Renewing early silently forfeited the remaining days. FIXED 25 August 2026.**
 
 `razorpay-webhook/index.ts` set `access_expires_at = now + interval` on every captured membership payment. A member with 20 days left who renewed received 30 days, not 50 — money taken for time they already owned. Renewing early is precisely what the expiry-reminder flow asks people to do, so the members punished hardest were the ones who acted on it.

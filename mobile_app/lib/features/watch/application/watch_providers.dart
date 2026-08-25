@@ -9,7 +9,11 @@ final youtubeRemoteDataSourceProvider =
   return YoutubeRemoteDataSource(ref.watch(supabaseClientProvider));
 });
 
+/// Kept alive — see the note on the home providers. This one sits at
+/// the very bottom of Home, so it is the row most likely to be scrolled
+/// past and back to.
 final youtubeVideosProvider =
     FutureProvider.autoDispose<List<YoutubeVideo>>((ref) {
+  ref.keepAlive();
   return ref.watch(youtubeRemoteDataSourceProvider).getVideos();
 });
