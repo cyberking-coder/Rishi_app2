@@ -122,11 +122,17 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     }
   }
 
-  String _greeting() {
-    final h = DateTime.now().hour;
-    if (h < 12) return 'Good morning';
-    if (h < 17) return 'Good afternoon';
-    return 'Good evening';
+  /// First name only.
+  ///
+  /// The headline is 32px, and the room beside the avatar is about 300pt
+  /// — roughly eighteen characters. "Hi, Priyanka Deshmukh" does not fit
+  /// and would ellipsise into "Hi, Priyanka Deshm…", which is worse than
+  /// either the full name or the first one. A display name is also
+  /// frequently just the first name already, in which case this changes
+  /// nothing.
+  String _firstName(String full) {
+    final first = full.trim().split(RegExp(r'\s+')).first;
+    return first.isEmpty ? full.trim() : first;
   }
 
   /// "Sunday, 23 August" — the eyebrow above the greeting.
@@ -180,7 +186,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
             _Header(
               username: username,
               eyebrow: _today(),
-              greeting: _greeting(),
+              displayName: _firstName(username),
               daysLeft: daysLeft,
               onProfile: () => context.go('/profile'),
             ),
@@ -246,16 +252,19 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
 // ── Header ───────────────────────────────────────────────────────────
 
 class _Header extends StatelessWidget {
+  /// The full name, used for the avatar's initial.
   final String username;
   final String eyebrow;
-  final String greeting;
+
+  /// What the greeting says after "Hi," — the first name.
+  final String displayName;
   final int? daysLeft;
   final VoidCallback onProfile;
 
   const _Header({
     required this.username,
     required this.eyebrow,
-    required this.greeting,
+    required this.displayName,
     required this.onProfile,
     this.daysLeft,
   });
@@ -274,16 +283,17 @@ class _Header extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // The date is the eyebrow and the greeting is the
-                    // display line, which is the design's arrangement
-                    // and the opposite of what was here. The name moved
-                    // into the avatar: at 32px a long display name
-                    // ellipsised on nearly every phone, and a greeting
-                    // truncated mid-name is worse than no name at all.
+                    // The date is the eyebrow, the person is the display
+                    // line. This said "Good morning" for a while, which
+                    // greeted nobody in particular and could go stale:
+                    // it is computed when the screen builds, so an app
+                    // left open from morning to evening kept insisting
+                    // it was morning. A name is true whenever it is
+                    // read.
                     Text(eyebrow.toUpperCase(), style: AppTheme.label),
                     const SizedBox(height: 2),
                     Text(
-                      greeting,
+                      'Hi, $displayName',
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: AppTheme.displayLarge,
