@@ -930,7 +930,18 @@ Closed in three parts:
 
 The same rule exists twice, in `mobile_app/lib/core/config/ios_content_policy.dart` and `admin/src/lib/ios-content-policy.ts`, because Dart and TypeScript cannot share code. **They must be changed together**; both files say so in their headers, and a parity check comparing the two pattern strings is cheap enough to run whenever either is touched. The admin copy only warns as the author types; the Dart copy is what protects the listing.
 
-**F-4 — MEDIUM. Renewing early silently forfeits the remaining days.** `razorpay-webhook/index.ts` sets `access_expires_at = now + interval` on every captured membership payment, rather than extending from whichever of `now` and the existing expiry is later. A member with 20 days left who renews receives 30 days, not 50. Money is taken for time the member already had.
+**F-4 — MEDIUM. Renewing early silently forfeited the remaining days. FIXED 25 August 2026.**
+
+`razorpay-webhook/index.ts` set `access_expires_at = now + interval` on every captured membership payment. A member with 20 days left who renewed received 30 days, not 50 — money taken for time they already owned. Renewing early is precisely what the expiry-reminder flow asks people to do, so the members punished hardest were the ones who acted on it.
+
+It now extends from whichever is later, `now` or the existing expiry. A lapsed window is deliberately not extended from: somebody returning after six months away would otherwise have their new month land in the past and unlock nothing.
+
+Two things surfaced while fixing it:
+
+* **Unlimited access was being destroyed.** `access_expires_at IS NULL` with a start date set is how `has_active_access()` expresses unlimited. The old code wrote a date over it unconditionally, so a member an admin had given unlimited access, who then bought a month, ended up with access that expires — having paid for the downgrade. The window is now left alone for such an account, and the payment still recorded.
+* **The subscription row disagreed with the access window.** `current_period_start` was the moment the payment landed rather than when the paid period begins, and Profile → Subscription reads its "Renews / Expires" line straight off that row. On an early renewal the app would have shown two different dates for the same thing.
+
+Verified against seven cases including early renewal, a six-month lapse, an expiry falling exactly at `now`, a brand-new free account, an unlimited member, and a yearly plan bought 200 days early.
 
 **F-5 — LOW. Two admin list queries swallow their errors.** `listPlans()` (`actions/plans.ts:39`) and `listPopups()` (`actions/config.ts:40`) destructure `{ data }` and return `data ?? []`, discarding `error`. A failed query renders as an empty list with nothing to explain it — the exact trap this log records being hit three times already, and which the storefront page now handles correctly. Admin-only surfaces, so the blast radius is confusion rather than data loss.
 

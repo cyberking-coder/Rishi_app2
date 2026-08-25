@@ -253,9 +253,13 @@ async function processEvent(
   // sparser WhatsApp message, never a blocked payment.
   const { data: profile } = await supabase
     .from("profiles")
-    .select("display_name, access_started_at")
+    .select("display_name, access_started_at, access_expires_at")
     .eq("id", userId)
-    .maybeSingle<{ display_name: string | null; access_started_at: string | null }>();
+    .maybeSingle<{
+      display_name: string | null;
+      access_started_at: string | null;
+      access_expires_at: string | null;
+    }>();
 
   // Billing details collected on our own checkout form (see
   // admin/src/app/checkout) are the most reliable source - they're what
@@ -314,15 +318,52 @@ async function processEvent(
   // payment.captured — grant access.
   const days = PLAN_INTERVAL_DAYS[plan.billing_interval] ?? 30;
   const now = new Date();
-  const periodEnd = new Date(now.getTime() + days * 24 * 60 * 60 * 1000);
+
+  // Extend from whichever is later: now, or the time they already have.
+  //
+  // This used to be `now + days` unconditionally, which quietly took
+  // money for time the member already owned. Renewing with 20 days left
+  // bought 30 days and destroyed 20 — and renewing early is exactly
+  // what a reminder email asks people to do, so the members punished
+  // hardest were the ones who acted on it.
+  //
+  // A LAPSED window must not be extended from, or somebody returning
+  // after six months away would have their new month land in the past
+  // and unlock nothing. max() handles both: an expiry behind us loses
+  // to `now`.
+  const existingExpiry = profile?.access_expires_at
+    ? new Date(profile.access_expires_at)
+    : null;
+  const extendFrom =
+    existingExpiry && existingExpiry.getTime() > now.getTime()
+      ? existingExpiry
+      : now;
+  const periodEnd = new Date(
+    extendFrom.getTime() + days * 24 * 60 * 60 * 1000,
+  );
+
+  // Unlimited access is `access_expires_at IS NULL` with a start date
+  // set — see has_active_access(). Writing a date over that would
+  // convert a member an admin gave unlimited access into one whose
+  // access ends in a month, and they would have paid for the
+  // privilege. If they are already unlimited, the window is left alone
+  // and the payment is still recorded below.
+  const isUnlimited =
+    profile != null &&
+    profile.access_expires_at === null &&
+    profile.access_started_at !== null;
+
+  const accessPatch: Record<string, string> = {
+    access_started_at: profile?.access_started_at ?? now.toISOString(),
+    subscription_tier: "premium",
+  };
+  if (!isUnlimited) {
+    accessPatch.access_expires_at = periodEnd.toISOString();
+  }
 
   const { error: profileError } = await supabase
     .from("profiles")
-    .update({
-      access_expires_at: periodEnd.toISOString(),
-      access_started_at: profile?.access_started_at ?? now.toISOString(),
-      subscription_tier: "premium",
-    })
+    .update(accessPatch)
     .eq("id", userId);
 
   if (profileError) {
@@ -331,7 +372,10 @@ async function processEvent(
   }
   console.log("[razorpay-webhook] access granted", {
     userId,
-    accessExpiresAt: periodEnd.toISOString(),
+    // Both, so a support question about "why does my access end then"
+    // is answerable from the logs alone.
+    extendedFrom: extendFrom.toISOString(),
+    accessExpiresAt: isUnlimited ? "unlimited (left as-is)" : periodEnd.toISOString(),
   });
 
   const { data: existingSub } = await supabase
@@ -344,12 +388,19 @@ async function processEvent(
 
   let subscriptionId: string | null = existingSub?.id ?? null;
 
+  // The subscription row records the same window the profile now
+  // carries, so `current_period_start` is when the paid period actually
+  // begins — not the moment the payment landed. On an early renewal
+  // those differ, and Profile → Subscription reads its "Renews /
+  // Expires" line straight off this row: a period that disagreed with
+  // the access window would have the app telling the member two
+  // different dates for the same thing.
   if (subscriptionId) {
     await supabase
       .from("subscriptions")
       .update({
         status: "active",
-        current_period_start: now.toISOString(),
+        current_period_start: extendFrom.toISOString(),
         current_period_end: periodEnd.toISOString(),
       })
       .eq("id", subscriptionId);
@@ -361,7 +412,7 @@ async function processEvent(
         plan_id: plan.id,
         status: "active",
         payment_provider: "razorpay",
-        current_period_start: now.toISOString(),
+        current_period_start: extendFrom.toISOString(),
         current_period_end: periodEnd.toISOString(),
       })
       .select("id")
