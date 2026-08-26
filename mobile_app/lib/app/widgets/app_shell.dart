@@ -5,7 +5,7 @@ import 'package:go_router/go_router.dart';
 import '../../core/config/purchase_config.dart';
 import '../theme/app_theme.dart';
 import '../../features/audio/presentation/widgets/mini_player.dart';
-import '../../features/live/application/live_providers.dart';
+import '../../core/push/push_registration.dart';
 
 /// One of the app's four top-level destinations. Courses is a peer of
 /// Home rather than a row buried inside it — learning is its own mode of
