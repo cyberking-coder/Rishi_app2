@@ -198,7 +198,22 @@ class _AlbumArt extends StatelessWidget {
 }
 
 // ── Seek / progress bar ──────────────────────────────────────────────────────
-class _SeekBar extends StatelessWidget {
+/// The scrubber.
+///
+/// It is stateful for one reason: while a finger is on the thumb, the
+/// slider must be driven by the finger and by nothing else.
+///
+/// The earlier version was stateless and read its value straight off
+/// `positionStream`, seeking on every `onChanged`. That has two costs.
+/// The thumb fights the finger — each rebuild during a drag snaps it back
+/// toward wherever the player actually is — and every pointer movement
+/// becomes a real seek, which over a signed remote URL means the platform
+/// player discards its buffer and issues a fresh range request, dozens of
+/// times per drag. Backwards was the worse direction, since a backward
+/// seek leaves the retained forward buffer behind and always refetches.
+///
+/// So: one seek, on release.
+class _SeekBar extends StatefulWidget {
   final dynamic handler;
   final MediaItem media;
   final String Function(Duration) fmt;
@@ -207,18 +222,86 @@ class _SeekBar extends StatelessWidget {
       {required this.handler, required this.media, required this.fmt});
 
   @override
+  State<_SeekBar> createState() => _SeekBarState();
+}
+
+class _SeekBarState extends State<_SeekBar> {
+  /// Where the finger is, in milliseconds. Non-null only during a drag.
+  double? _dragMs;
+
+  /// Where we asked the player to go, held after release.
+  ///
+  /// A seek is not instant, and the position stream keeps reporting the
+  /// OLD position until it lands. Without this the thumb would jump back
+  /// to where the track was for a beat and then forward again — the
+  /// snap-back the drag state was meant to remove, reappearing at the
+  /// moment of release. We keep showing the target until the player
+  /// reports a position near it, or until [_pendingExpiry] passes so a
+  /// seek that never lands (a dead network, a stall) cannot freeze the
+  /// bar permanently.
+  Duration? _pending;
+  DateTime? _pendingExpiry;
+
+  /// How close the reported position must get before we trust it again.
+  /// Generous, because the platform player settles a seek at the nearest
+  /// decodable frame rather than the exact millisecond asked for.
+  static const _tolerance = Duration(milliseconds: 750);
+
+  void _onChangeStart(double v) => setState(() => _dragMs = v);
+
+  void _onChanged(double v) => setState(() => _dragMs = v);
+
+  void _onChangeEnd(double v) {
+    final target = Duration(milliseconds: v.toInt());
+    setState(() {
+      _dragMs = null;
+      _pending = target;
+      _pendingExpiry = DateTime.now().add(const Duration(seconds: 3));
+    });
+    widget.handler.seek(target);
+  }
+
+  /// The position to draw: the finger if one is down, then an unlanded
+  /// seek target, then the player itself.
+  Duration _displayed(Duration streamPos) {
+    if (_dragMs != null) {
+      return Duration(milliseconds: _dragMs!.toInt());
+    }
+
+    final pending = _pending;
+    if (pending != null) {
+      final landed = (streamPos - pending).abs() <= _tolerance;
+      final expired = DateTime.now().isAfter(_pendingExpiry!);
+      if (landed || expired) {
+        // Clearing state inside build would be a rebuild-during-build, so
+        // defer it by a frame. Until then we keep drawing the target,
+        // which is what the next frame will show anyway.
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) setState(() {
+            _pending = null;
+            _pendingExpiry = null;
+          });
+        });
+      }
+      return expired ? streamPos : pending;
+    }
+
+    return streamPos;
+  }
+
+  @override
   Widget build(BuildContext context) {
     return StreamBuilder<Duration?>(
-      stream: handler.durationStream,
+      stream: widget.handler.durationStream,
       builder: (context, durSnap) {
         final duration = durSnap.data ??
-            handler.currentDuration ??
-            media.duration ??
+            widget.handler.currentDuration ??
+            widget.media.duration ??
             Duration.zero;
         return StreamBuilder<Duration>(
-          stream: handler.positionStream,
+          stream: widget.handler.positionStream,
           builder: (context, posSnap) {
-            var pos = posSnap.data ?? Duration.zero;
+            var pos = _displayed(posSnap.data ?? Duration.zero);
             if (pos > duration) pos = duration;
             final maxMs = duration.inMilliseconds
                 .toDouble()
@@ -244,8 +327,9 @@ class _SeekBar extends StatelessWidget {
                     max: maxMs,
                     value: (pos.inMilliseconds.toDouble())
                         .clamp(0.0, maxMs) as double,
-                    onChanged: (v) =>
-                        handler.seek(Duration(milliseconds: v.toInt())),
+                    onChangeStart: _onChangeStart,
+                    onChanged: _onChanged,
+                    onChangeEnd: _onChangeEnd,
                   ),
                 ),
                 Padding(
@@ -253,10 +337,13 @@ class _SeekBar extends StatelessWidget {
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Text(fmt(pos),
+                      // Reads the dragged time, not the playing time, so
+                      // the number under the thumb tells you where you
+                      // are about to land.
+                      Text(widget.fmt(pos),
                           style: const TextStyle(
                               color: _kTextSecondary, fontSize: 12)),
-                      Text(fmt(duration),
+                      Text(widget.fmt(duration),
                           style: const TextStyle(
                               color: _kTextSecondary, fontSize: 12)),
                     ],
