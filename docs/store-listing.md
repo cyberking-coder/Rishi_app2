@@ -152,21 +152,31 @@ meditation,mindfulness,calm,sleep,relax,spiritual,anxiety,breathe,guided,peace,h
 
 ### What's New in This Version (4000 max)
 
-2.1.2 is a restyle and nothing else. Resist the urge to pad it — a list of
-invented improvements next to a genuinely visual release reads as filler,
-and every extra claim is one more thing a reviewer may go looking for.
+Written after the release settled, not before it. The first draft of this
+said "2.1.2 is a restyle and nothing else", which stopped being true when
+the scroll fix and the greeting change landed. A release note describing
+the release you planned rather than the one you shipped is the same
+mistake as padding it.
+
+Everything below is visible on first launch. That is the test for whether
+a release note is honest — a reviewer opening the build should be able to
+see each line without hunting for it.
 
 ```
 • A new look throughout. Softer surfaces, clearer type, and a calmer palette
   that keeps the artwork rather than the interface in the foreground.
-• The home screen now opens on the day and a greeting, with what you were
-  last listening to — and how long is left of it — in reach straight away.
+• Home greets you by name, with whatever you were last listening to — and
+  how long is left of it — in reach straight away.
+• Smoother scrolling, and covers that load faster and use far less memory.
 • Episode lists say where you are up to in words rather than in colour, so a
   glance is enough.
+• Downloads explains itself when it is empty, instead of leaving you on a
+  blank screen.
 ```
-> Nothing here is a feature claim. Everything named is visible on first
-> launch, which is the test for whether a release note is honest: a reviewer
-> opening the build should be able to see each line without hunting.
+> Deliberately not mentioned: the pop-up platform rules and the checkout
+> country selector. The first is invisible to users, and the second is on
+> the website rather than in the app — an iOS release note pointing at a
+> web checkout is exactly the kind of line 3.1.3(a) is about.
 
 ### App Review Information → Notes
 ```
