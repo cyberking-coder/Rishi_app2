@@ -179,11 +179,22 @@ class AudioPlayerHandler extends BaseAudioHandler
     await _player.seek(target < Duration.zero ? Duration.zero : target);
   }
 
-  /// Seek forwards 15 seconds (clamped to the track duration).
+  /// Seek forwards 15 seconds, clamped to the track duration when we know
+  /// it.
+  ///
+  /// The null case is the whole point of writing it this way. `duration`
+  /// is not known until the player has parsed the asset, which over a
+  /// signed remote URL takes long enough for a listener to have tapped
+  /// this already. The previous version defaulted the unknown duration to
+  /// zero and clamped against it, so `target > dur` was always true and
+  /// the tap seeked to 0:00 — a forward button that jumped to the
+  /// beginning. With the duration unknown we simply don't clamp: the
+  /// platform player will refuse or settle a seek past the end itself,
+  /// which is a far better failure than rewinding the track.
   Future<void> forward15() async {
-    final dur = _player.duration ?? Duration.zero;
     final target = _player.position + const Duration(seconds: 15);
-    await _player.seek(target > dur ? dur : target);
+    final dur = _player.duration;
+    await _player.seek(dur != null && target > dur ? dur : target);
   }
 
   /// Whether the current track is set to loop.

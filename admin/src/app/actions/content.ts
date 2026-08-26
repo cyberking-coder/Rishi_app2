@@ -109,6 +109,22 @@ export async function presignContentUpload(args: {
   }
 }
 
+/**
+ * The content_assets.asset_type for an uploaded audio object.
+ *
+ * Only the two single-file containers are produced here — 'audio_hls'
+ * would come from a transcode pipeline that does not exist yet. Anything
+ * unrecognised falls back to 'audio_mp3', which is what the constraint
+ * accepted before this function existed and what the overwhelming
+ * majority of uploads are.
+ */
+function audioAssetType(objectKey: string): "audio_mp3" | "audio_m4a" {
+  const ext = objectKey.split(".").pop()?.toLowerCase();
+  return ext === "m4a" || ext === "m4b" || ext === "aac" || ext === "mp4"
+    ? "audio_m4a"
+    : "audio_mp3";
+}
+
 /** Records the uploaded object path and moves the row into processing. */
 export async function attachUpload(args: {
   kind: ContentKind;
@@ -130,7 +146,14 @@ export async function attachUpload(args: {
   // (which read content_assets, not videos.r2_path) can serve this file.
   // For the MVP the uploaded file IS the playable asset (progressive
   // mp4/mp3); a transcode pipeline would instead add HLS rendition rows.
-  const assetType = args.kind === "video" ? "video_mp4" : "audio_mp3";
+  //
+  // The audio label is derived rather than assumed. It used to be
+  // hardcoded to audio_mp3, so an admin who exported M4A — the format
+  // that actually seeks properly on iOS — had it filed under the wrong
+  // type, and issue-audio-license, which picks a rendition by label,
+  // would have been choosing on a lie.
+  const assetType =
+    args.kind === "video" ? "video_mp4" : audioAssetType(args.objectKey);
   const { error: assetError } = await db.from("content_assets").insert({
     content_type: args.kind,
     content_id: args.contentId,

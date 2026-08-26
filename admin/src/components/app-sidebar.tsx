@@ -3,7 +3,6 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {
-  Award,
   BarChart3,
   CreditCard,
   Film,
@@ -16,7 +15,6 @@ import {
   Tags,
   TicketPercent,
   Users,
-  Video,
   Youtube,
 } from "lucide-react";
 import { cn } from "@/lib/utils";

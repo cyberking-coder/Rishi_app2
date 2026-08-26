@@ -31,11 +31,17 @@ export interface PlanInput {
 export async function listPlans(): Promise<SubscriptionPlan[]> {
   await requireAdmin();
   const db = createAdminClient();
-  const { data } = await db
+  const { data, error } = await db
     .from("subscription_plans")
     .select("id, name, description, price, currency, billing_interval, is_active, created_at")
     .order("price", { ascending: true })
     .returns<SubscriptionPlan[]>();
+
+  // F-5 from the 25 August audit: `const { data }` discarded `error`, so
+  // a failed query rendered as "no plans yet" — on the page an admin uses
+  // to check what the app is charging. An empty list and a broken query
+  // must not look alike, least of all here.
+  if (error) throw new Error(`Could not load plans: ${error.message}`);
   return data ?? [];
 }
 

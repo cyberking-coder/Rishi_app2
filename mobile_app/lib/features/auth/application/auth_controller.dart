@@ -2,9 +2,9 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/errors/auth_failure.dart';
+import '../../../core/push/push_registration.dart';
 import '../../../core/push/push_service.dart';
 import '../../audio/application/audio_providers.dart';
-import '../../live/application/live_providers.dart';
 import 'auth_providers.dart';
 import 'auth_state.dart';
 
@@ -88,7 +88,7 @@ class AuthController extends Notifier<AuthState> {
       try {
         final token = await PushService.currentToken();
         if (token != null) {
-          await ref.read(liveSessionsDataSourceProvider)
+          await ref.read(pushTokenDataSourceProvider)
               .unregisterPushToken(token);
         }
       } catch (e) {

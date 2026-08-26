@@ -33,7 +33,6 @@ import type {
   Audio,
   Course,
   CourseModule,
-  LessonResource,
   LessonType,
   LessonWithMedia,
   ResourceType,

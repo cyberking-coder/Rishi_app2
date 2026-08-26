@@ -30,6 +30,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import type { ContentKind } from "@/lib/types";
+import { AudioFormatNotice } from "./audio-format-notice";
 
 export function UploadContentDialog({ kind }: { kind: ContentKind }) {
   const router = useRouter();
@@ -258,13 +259,17 @@ export function UploadContentDialog({ kind }: { kind: ContentKind }) {
           </div>
           <div className="space-y-2">
             <Label htmlFor="uc-file">File</Label>
+            {/* The explicit extensions matter for m4a: some platforms
+                report it as audio/x-m4a, which "audio/*" does not always
+                match, and it is the format we most want uploadable. */}
             <Input
               id="uc-file"
               type="file"
-              accept={kind === "video" ? "video/*" : "audio/*"}
+              accept={kind === "video" ? "video/*" : "audio/*,.mp3,.m4a"}
               required
               onChange={(e) => setFile(e.target.files?.[0] ?? null)}
             />
+            {kind === "audio" && <AudioFormatNotice file={file} />}
           </div>
           <div className="space-y-2">
             <Label htmlFor="uc-cover">Cover image (optional)</Label>

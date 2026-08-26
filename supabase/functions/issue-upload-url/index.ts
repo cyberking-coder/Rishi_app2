@@ -22,8 +22,10 @@ import {
 
 const ADMIN_ROLES = ["admin", "content_manager"];
 
+// Keep in step with the content_assets.asset_type CHECK constraint —
+// see supabase/migrations/20260826000001_allow_audio_m4a_asset.sql.
 const VALID_ASSET_TYPES = new Set([
-  "video_hls", "video_mp4", "audio_hls", "audio_mp3",
+  "video_hls", "video_mp4", "audio_hls", "audio_mp3", "audio_m4a",
   "poster", "thumbnail", "trailer", "subtitle",
 ]);
 
