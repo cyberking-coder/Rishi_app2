@@ -15,6 +15,8 @@ interface CreateOrderBody {
   name?: string;
   phone?: string;
   email?: string;
+  /** ISO-3166 alpha-2 from the checkout form. Defaults to IN. */
+  country?: string;
   state?: string;
   coupon?: string;
 }
@@ -39,11 +41,21 @@ export async function POST(req: NextRequest) {
   const name = (body.name ?? "").trim();
   const phone = (body.phone ?? "").replace(/\s|-/g, "").trim();
   const email = (body.email ?? "").trim();
+  const country = (body.country ?? "IN").trim().toUpperCase() || "IN";
   const state = (body.state ?? "").trim();
 
-  if (!name || !phone || !email || !state) {
+  if (!name || !phone || !email) {
     return NextResponse.json(
       { error: "Please fill in all billing details." },
+      { status: 400 },
+    );
+  }
+  // State is required for India only — it is the GST place of supply.
+  // Demanding it of an overseas buyer would either block the sale or
+  // put an Indian state on a record that has nothing to do with one.
+  if (country === "IN" && !state) {
+    return NextResponse.json(
+      { error: "Please select your state." },
       { status: 400 },
     );
   }
@@ -76,6 +88,7 @@ export async function POST(req: NextRequest) {
       name,
       phone,
       email,
+      country,
       state,
     });
   }
@@ -86,7 +99,7 @@ export async function POST(req: NextRequest) {
       db,
       payload.uid,
       payload.tid,
-      { name, phone, email, state },
+      { name, phone, email, country, state },
       (body.coupon ?? "").trim().toUpperCase() || null,
     );
   }
@@ -172,6 +185,7 @@ export async function POST(req: NextRequest) {
         billing_name: name,
         billing_phone: phone,
         billing_email: email,
+        billing_country: country,
         billing_state: state,
       },
     });
@@ -197,6 +211,8 @@ interface Billing {
   name: string;
   phone: string;
   email: string;
+  /** ISO-3166 alpha-2. Empty state is expected for anything but IN. */
+  country: string;
   state: string;
 }
 
@@ -285,6 +301,7 @@ async function createWorkshopOrder(
         billing_name: billing.name,
         billing_phone: billing.phone,
         billing_email: billing.email,
+        billing_country: billing.country,
         billing_state: billing.state,
       },
     });
@@ -518,6 +535,7 @@ async function createCourseOrder(
         billing_name: billing.name,
         billing_phone: billing.phone,
         billing_email: billing.email,
+        billing_country: billing.country,
         billing_state: billing.state,
       },
     });
