@@ -30,6 +30,7 @@ import {
   uploadVideoToBunny,
 } from "@/lib/bunny-upload-client";
 import type { Audio, LessonType, Video } from "@/lib/types";
+import { AudioFormatNotice } from "@/components/content/audio-format-notice";
 
 type MediaMode = "existing" | "upload";
 
@@ -321,10 +322,11 @@ export function AddLessonDialog({
                 <>
                   <Input
                     type="file"
-                    accept="audio/*"
+                    accept="audio/*,.mp3,.m4a"
                     disabled={busy}
                     onChange={(e) => setMediaFile(e.target.files?.[0] ?? null)}
                   />
+                  <AudioFormatNotice file={mediaFile} />
                   <p className="text-xs text-muted-foreground">
                     Uploaded from your device, saved to storage, and published
                     automatically as {coursePremium ? "premium" : "free"}{" "}

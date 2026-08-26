@@ -125,13 +125,28 @@ Deno.serve(async (req) => {
     }
   }
 
-  // Prefer an HLS rendition, but fall back to a single-file MP3 (the
-  // MVP upload path produces audio_mp3).
+  // Prefer whichever rendition seeks best, since a listener dragging the
+  // progress bar is what separates these in practice:
+  //
+  //   audio_hls — segmented and indexed. Best of all, and the only one
+  //               that adapts to a poor connection. Nothing produces it
+  //               today; the upload path stores a single file.
+  //   audio_m4a — MP4 container, so it carries a sample table. Seeks
+  //               exactly on both platforms.
+  //   audio_mp3 — no index. A variable-bitrate MP3 without a Xing header
+  //               scrubs badly on iOS, which AVPlayer will not paper
+  //               over the way ExoPlayer does on Android.
+  //
+  // The order below is therefore a playback-quality decision, not a
+  // formality. If a track ever has more than one rendition, the listener
+  // should get the one that responds when they scrub.
+  const PREFERENCE = ["audio_hls", "audio_m4a", "audio_mp3"];
+
   const { data: assets, error: assetError } = await supabase
     .from("content_assets")
     .select("r2_path, asset_type")
     .eq("content_id", audioId)
-    .in("asset_type", ["audio_hls", "audio_mp3"])
+    .in("asset_type", PREFERENCE)
     .eq("status", "ready")
     .returns<Array<AssetRow & { asset_type: string }>>();
 
@@ -139,7 +154,9 @@ Deno.serve(async (req) => {
     return jsonResponse({ error: "No playable rendition for this audio" }, 404);
   }
 
-  const asset = assets.find((a) => a.asset_type === "audio_hls") ?? assets[0];
+  const asset =
+    PREFERENCE.map((type) => assets.find((a) => a.asset_type === type))
+      .find((a) => a !== undefined) ?? assets[0];
 
   const signedUrl = await presignGet(asset.r2_path, SIGNED_URL_TTL_SECONDS);
 
