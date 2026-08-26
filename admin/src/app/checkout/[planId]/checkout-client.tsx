@@ -7,6 +7,12 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { NativeOption, NativeSelect } from "@/components/ui/native-select";
 import { appLinks } from "@/lib/legal";
+import {
+  COUNTRIES,
+  DEFAULT_COUNTRY,
+  countryByCode,
+  toE164,
+} from "@/lib/countries";
 
 // This component collects billing details, then hands off to Razorpay's
 // own hosted checkout and shows a friendly "we've got it" message
@@ -100,9 +106,13 @@ export function CheckoutClient({
   const [scriptReady, setScriptReady] = useState(false);
 
   const [name, setName] = useState(defaultName);
+  const [country, setCountry] = useState(DEFAULT_COUNTRY);
   const [phone, setPhone] = useState("");
   const [email, setEmail] = useState(defaultEmail);
   const [state, setState] = useState("");
+
+  const dial = countryByCode(country)?.dial ?? "+91";
+  const isIndia = country === "IN";
 
   const [couponInput, setCouponInput] = useState("");
   const [couponBusy, setCouponBusy] = useState(false);
@@ -142,13 +152,25 @@ export function CheckoutClient({
 
   function validate(): string | null {
     if (!name.trim()) return "Please enter your name.";
-    if (!/^\+?[0-9]{10,15}$/.test(phone.replace(/\s|-/g, ""))) {
+    // Validated on the national part only. The dial code comes from the
+    // dropdown, so it is never something the user can get wrong, and
+    // including it here would make the length rule depend on which
+    // country was picked.
+    const local = phone.replace(/\D/g, "").replace(/^0+/, "");
+    if (local.length < 6 || local.length > 14) {
       return "Please enter a valid phone number.";
+    }
+    if (isIndia && local.length !== 10) {
+      return "Please enter a 10-digit Indian mobile number.";
     }
     if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email.trim())) {
       return "Please enter a valid email address.";
     }
-    if (!state) return "Please select your state.";
+    // Only India. The field exists for GST place-of-supply, which has
+    // no meaning for a buyer outside the country — and asking a
+    // Californian to pick "Maharashtra" would put a wrong answer into
+    // the tax record rather than no answer.
+    if (isIndia && !state) return "Please select your state.";
     return null;
   }
 
@@ -195,9 +217,13 @@ export function CheckoutClient({
         body: JSON.stringify({
           token,
           name,
-          phone,
+          // E.164. n8n strips non-digits and prepends 91 only to a bare
+          // ten-digit number, so this survives intact for India and
+          // keeps its own code for everywhere else.
+          phone: toE164(dial, phone),
           email,
-          state,
+          country,
+          state: isIndia ? state : "",
           coupon: applied?.code,
         }),
       });
@@ -371,19 +397,51 @@ export function CheckoutClient({
         </div>
 
         <div>
-          <Label htmlFor="co-phone">Phone</Label>
-          <Input
-            id="co-phone"
-            type="tel"
-            inputMode="tel"
-            value={phone}
-            onChange={(e) => setPhone(e.target.value)}
-            placeholder="10-digit mobile number"
-            autoComplete="tel"
+          <Label htmlFor="co-country">Country</Label>
+          <NativeSelect
+            id="co-country"
+            value={country}
+            onChange={(e) => {
+              setCountry(e.target.value);
+              // The state list is Indian. Leaving a previous selection
+              // behind after switching away would submit "Karnataka"
+              // for a buyer in Dubai.
+              if (e.target.value !== "IN") setState("");
+            }}
             disabled={busy}
-          />
+          >
+            {COUNTRIES.map((c) => (
+              <NativeOption key={c.code} value={c.code}>
+                {c.name} ({c.dial})
+              </NativeOption>
+            ))}
+          </NativeSelect>
+        </div>
+
+        <div>
+          <Label htmlFor="co-phone">Phone</Label>
+          {/* The dial code is shown, not typed. It comes from the country
+              above, so it cannot disagree with it, and the user is not
+              left guessing whether to include it. */}
+          <div className="flex items-stretch gap-2">
+            <span className="flex shrink-0 items-center rounded-md border border-input bg-muted px-3 text-sm tabular-nums text-muted-foreground">
+              {dial}
+            </span>
+            <Input
+              id="co-phone"
+              type="tel"
+              inputMode="tel"
+              className="flex-1"
+              value={phone}
+              onChange={(e) => setPhone(e.target.value)}
+              placeholder={isIndia ? "10-digit mobile number" : "Mobile number"}
+              autoComplete="tel-national"
+              disabled={busy}
+            />
+          </div>
           <p className="mt-1 text-xs text-muted-foreground">
             We&apos;ll send your confirmation on WhatsApp to this number.
+            {!isIndia && " Enter it without the country code."}
           </p>
         </div>
 
@@ -401,22 +459,28 @@ export function CheckoutClient({
           />
         </div>
 
-        <div>
-          <Label htmlFor="co-state">State</Label>
-          <NativeSelect
-            id="co-state"
-            value={state}
-            onChange={(e) => setState(e.target.value)}
-            disabled={busy}
-          >
-            <NativeOption value="">Select your state</NativeOption>
-            {INDIAN_STATES.map((s) => (
-              <NativeOption key={s} value={s}>
-                {s}
-              </NativeOption>
-            ))}
-          </NativeSelect>
-        </div>
+        {/* India only. The field is here for GST place-of-supply; it
+            has no meaning for a buyer elsewhere, and a required
+            dropdown of Indian states in front of an overseas customer
+            is a dead end rather than a question. */}
+        {isIndia && (
+          <div>
+            <Label htmlFor="co-state">State</Label>
+            <NativeSelect
+              id="co-state"
+              value={state}
+              onChange={(e) => setState(e.target.value)}
+              disabled={busy}
+            >
+              <NativeOption value="">Select your state</NativeOption>
+              {INDIAN_STATES.map((s) => (
+                <NativeOption key={s} value={s}>
+                  {s}
+                </NativeOption>
+              ))}
+            </NativeSelect>
+          </div>
+        )}
       </div>
 
       <Button

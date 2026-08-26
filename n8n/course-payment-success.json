@@ -57,7 +57,7 @@
             {
               "id": "f1000000-0000-4000-8000-000000000001",
               "name": "waNumber",
-              "value": "={{ ($json.body.phone || '').replace(/\\D/g, '').replace(/^(?!91)(\\d{10})$/, '91$1') }}",
+              "value": "={{ (($json.body.phone || '').trim().startsWith('+') ? ($json.body.phone || '').replace(/\\D/g, '') : ($json.body.phone || '').replace(/\\D/g, '').replace(/^(?!91)(\\d{10})$/, '91$1')) }}",
               "type": "string"
             },
             {
@@ -237,7 +237,7 @@
               "id": "f2000000-0000-4000-8000-000000000001",
               "name": "waNumber",
               "type": "string",
-              "value": "={{ ($json.body.phone || '').replace(/\\D/g, '').replace(/^(?!91)(\\d{10})$/, '91$1') }}"
+              "value": "={{ (($json.body.phone || '').trim().startsWith('+') ? ($json.body.phone || '').replace(/\\D/g, '') : ($json.body.phone || '').replace(/\\D/g, '').replace(/^(?!91)(\\d{10})$/, '91$1')) }}"
             },
             {
               "id": "f2000000-0000-4000-8000-000000000002",
