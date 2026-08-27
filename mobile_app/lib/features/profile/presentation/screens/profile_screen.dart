@@ -1,10 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../../../app/theme/app_theme.dart';
 import '../../../../app/widgets/remote_image.dart';
+import '../../../../core/config/app_config.dart';
 import '../../../../core/config/purchase_config.dart';
+import '../../../../core/config/support_config.dart';
 import '../../../../core/device/device_info_service.dart';
 import '../../../../core/errors/auth_failure.dart';
 import '../../../access/application/access_providers.dart';
@@ -811,6 +814,48 @@ class _SettingsSheetState extends ConsumerState<_SettingsSheet> {
           //
           // Last in the sheet and behind a divider — findable, not
           // adjacent to Logout, which somebody taps in a hurry.
+          // ── Support ──
+          // Above the destructive actions, deliberately. Somebody who
+          // opens Settings because something is wrong should find a way
+          // to ask before they find the button that deletes everything.
+          const _SheetSectionLabel('Support'),
+          const SizedBox(height: 10),
+
+          _SheetTile(
+            icon: Icons.mail_outline_rounded,
+            iconColor: _kAccent,
+            title: 'Email support',
+            onTap: () => _openSupportEmail(context),
+          ),
+          const SizedBox(height: 12),
+
+          _SheetTile(
+            icon: Icons.chat_bubble_outline_rounded,
+            iconColor: AppTheme.sageDark,
+            title: 'WhatsApp us',
+            onTap: () => _openWhatsApp(context),
+          ),
+          const SizedBox(height: 12),
+
+          _SheetTile(
+            icon: Icons.call_outlined,
+            iconColor: AppTheme.clay,
+            title: 'Call ${SupportConfig.phoneDisplay}',
+            onTap: () => _openDialer(context),
+          ),
+          const SizedBox(height: 8),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 4),
+            child: Text(
+              SupportConfig.hours,
+              style: const TextStyle(
+                color: _kSub,
+                fontSize: 12,
+              ),
+            ),
+          ),
+          const SizedBox(height: 22),
+
           _SheetTile(
             icon: Icons.delete_forever_outlined,
             iconColor: AppTheme.danger,
@@ -908,6 +953,109 @@ class _SettingsSheetState extends ConsumerState<_SettingsSheet> {
       );
     }
   }
+}
+
+/// A quiet heading inside the settings sheet.
+///
+/// The sheet had no groupings — every row was the same weight, so
+/// "Logout" and "Delete my account" read as equally routine. With support
+/// added there are now three kinds of thing in one list, and the label is
+/// what stops a member scanning for help from landing on the delete
+/// button first.
+class _SheetSectionLabel extends StatelessWidget {
+  const _SheetSectionLabel(this.text);
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(left: 4),
+      child: Text(
+        text.toUpperCase(),
+        style: const TextStyle(
+          color: _kSub,
+          fontSize: 11,
+          fontWeight: FontWeight.w600,
+          letterSpacing: 0.66,
+        ),
+      ),
+    );
+  }
+}
+
+/// Opens [uri], or tells the user what to do if nothing can.
+///
+/// `launchUrl` returning false, and it throwing, are the same situation
+/// from the member's side: nothing happened. What matters is that they
+/// are not left tapping a dead row — so both paths surface the address or
+/// number itself, which is the thing they were trying to get to anyway.
+///
+/// A device with no mail client, no WhatsApp or no SIM is not unusual —
+/// a tablet is all three at once.
+Future<void> _launchOrExplain(
+  BuildContext context,
+  Uri uri,
+  String fallback,
+) async {
+  var ok = false;
+  try {
+    ok = await launchUrl(uri, mode: LaunchMode.externalApplication);
+  } catch (_) {
+    ok = false;
+  }
+  if (ok || !context.mounted) return;
+
+  ScaffoldMessenger.of(context).showSnackBar(
+    SnackBar(content: Text(fallback)),
+  );
+}
+
+/// Opens a pre-addressed support email.
+///
+/// The subject carries the app name so a reply thread is identifiable at
+/// a glance, and the body leaves a line for the account email. Support
+/// cannot look anybody up without it, and asking for it here saves the
+/// round trip that otherwise starts every conversation.
+Future<void> _openSupportEmail(BuildContext context) async {
+  // Built with parse + encodeComponent rather than Uri(query:). The
+  // named constructor encodes the query string it is handed, so a value
+  // that has already been escaped comes out double-encoded — the body
+  // arrives in the mail client as literal "%0A%0A---" instead of line
+  // breaks. Encoding each value once, by hand, is the version that
+  // survives.
+  const subject = '${AppConfig.appName} support';
+  const body = '\n\n---\n'
+      'So we can find your account, please leave this line in:\n'
+      'Account email: ';
+
+  final uri = Uri.parse(
+    'mailto:${SupportConfig.email}'
+    '?subject=${Uri.encodeComponent(subject)}'
+    '&body=${Uri.encodeComponent(body)}',
+  );
+  await _launchOrExplain(
+    context,
+    uri,
+    'Email us at ${SupportConfig.email}',
+  );
+}
+
+Future<void> _openWhatsApp(BuildContext context) async {
+  // wa.me wants the number without the leading plus.
+  final digits = SupportConfig.phoneE164.replaceAll(RegExp(r'[^0-9]'), '');
+  await _launchOrExplain(
+    context,
+    Uri.parse('https://wa.me/$digits'),
+    'WhatsApp us on ${SupportConfig.phoneDisplay}',
+  );
+}
+
+Future<void> _openDialer(BuildContext context) async {
+  await _launchOrExplain(
+    context,
+    Uri(scheme: 'tel', path: SupportConfig.phoneE164),
+    'Call us on ${SupportConfig.phoneDisplay}',
+  );
 }
 
 class _SheetTile extends StatelessWidget {

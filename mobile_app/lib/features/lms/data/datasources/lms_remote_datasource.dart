@@ -87,6 +87,60 @@ class LmsRemoteDataSource {
     };
   }
 
+  /// Stamps `last_accessed_at` for a lesson the user has just opened.
+  ///
+  /// Note what is NOT in the payload: `completed`. PostgREST's upsert
+  /// updates only the columns it is given, so omitting it leaves an
+  /// already-completed lesson completed. Sending `false` here would
+  /// un-complete a lesson every time somebody re-opened it, quietly
+  /// walking their course progress backwards.
+  ///
+  /// Until this existed, `last_accessed_at` was written by exactly one
+  /// caller — [markLessonCompleted] — so the column recorded when a
+  /// lesson was *finished*, never when it was opened. Anything asking
+  /// "where was I" would have been answered only for people who had
+  /// already finished, which is the opposite of who is asking.
+  ///
+  /// Best-effort by design: the caller does not await it, and a failure
+  /// must never stand between somebody and the lesson they just tapped.
+  Future<void> recordLessonAccess(String lessonId) async {
+    final userId = _client.auth.currentUser?.id;
+    if (userId == null) return;
+
+    await _client.from('lesson_progress').upsert(
+      {
+        'user_id': userId,
+        'lesson_id': lessonId,
+        'last_accessed_at': DateTime.now().toUtc().toIso8601String(),
+      },
+      onConflict: 'user_id,lesson_id',
+    );
+  }
+
+  /// The single most recently opened lesson, with its course attached.
+  ///
+  /// One row, ordered on the index that already exists for it —
+  /// `idx_lesson_progress_user (user_id, last_accessed_at desc)`. The
+  /// joins are inner: a lesson whose module or course has since been
+  /// deleted cannot be resumed, so it should not be offered.
+  Future<Map<String, dynamic>?> getLastAccessedLesson() async {
+    final userId = _client.auth.currentUser?.id;
+    if (userId == null) return null;
+
+    return await _client
+        .from('lesson_progress')
+        .select(
+          'lesson_id, progress_seconds, completed, last_accessed_at, '
+          'lessons!inner(id, title, lesson_type, '
+          'course_modules!inner(course_id, '
+          'courses!inner(id, title, cover_image_url, status)))',
+        )
+        .eq('user_id', userId)
+        .order('last_accessed_at', ascending: false)
+        .limit(1)
+        .maybeSingle();
+  }
+
   /// lesson_progress has a plain unique (user_id, lesson_id), so unlike
   /// watch_history this needs no RPC — a normal upsert can target it.
   Future<void> markLessonCompleted(String lessonId) async {

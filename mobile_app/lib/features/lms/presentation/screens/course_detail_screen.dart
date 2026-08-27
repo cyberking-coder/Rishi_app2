@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
@@ -95,6 +96,15 @@ class _CourseDetailScreenState extends ConsumerState<CourseDetailScreen>
       return;
     }
 
+    // Stamp "you were here" before branching on type. This is the single
+    // point every lesson passes through, and putting it here rather than
+    // in each branch is what stops the three of them drifting apart.
+    //
+    // Deliberately not awaited and deliberately silent: it feeds the
+    // resume card on Home, and a card being a little stale is not worth
+    // a moment's delay between a tap and the lesson opening.
+    unawaited(_recordAccess(lesson));
+
     switch (lesson.type) {
       case LessonType.text:
         context.push('/lesson-text/${lesson.id}', extra: lesson);
@@ -141,6 +151,18 @@ class _CourseDetailScreenState extends ConsumerState<CourseDetailScreen>
   }
 
   /// Best-effort: a progress write failing should never surface as an
+  /// Records that this lesson was opened, and refreshes the resume card
+  /// so Home reflects it on the way back.
+  Future<void> _recordAccess(Lesson lesson) async {
+    try {
+      await ref.read(lmsRepositoryProvider).recordLessonAccess(lesson.id);
+      if (!mounted) return;
+      ref.invalidate(continueCourseProvider);
+    } catch (e) {
+      debugPrint('recordLessonAccess: $e');
+    }
+  }
+
   /// error over content that opened fine.
   Future<void> _markComplete(Lesson lesson) async {
     if (lesson.completed) return;

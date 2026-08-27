@@ -187,6 +187,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
           ref.invalidate(categoriesProvider);
           ref.invalidate(coursesProvider);
           ref.invalidate(continueListeningProvider);
+          ref.invalidate(continueCourseProvider);
           ref.invalidate(youtubeVideosProvider);
         },
         child: ListView(
@@ -223,6 +224,13 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
               onTap: (c) => context.push('/category/${c.id}', extra: c.name),
             ),
             const SizedBox(height: 24),
+
+            // Where you were in a course, above Featured. It draws
+            // nothing at all until there is somewhere to go back to, so
+            // for a new account this costs no vertical space — which is
+            // why it can sit this high without pushing the catalogue
+            // down for people who have not started anything yet.
+            const _ContinueCourseCard(),
 
             // Audio leads: it's the app's core content and was previously
             // below the courses row, far enough down that it went unseen.
@@ -506,6 +514,122 @@ class _SectionTitle extends StatelessWidget {
 }
 
 // ── Continue listening ───────────────────────────────────────────────
+
+/// "Where you were" for courses, above Featured.
+///
+/// Deliberately a single card rather than a row. There is exactly one
+/// answer to "where was I", and a horizontally-scrolling list of near
+/// misses would be a worse answer than the right one on its own.
+///
+/// It renders nothing until there is somewhere to return to, so a new
+/// account sees no gap where this would be — the reason it can sit above
+/// Featured without pushing the catalogue down for people who have not
+/// started anything yet.
+class _ContinueCourseCard extends ConsumerWidget {
+  const _ContinueCourseCard();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final async = ref.watch(continueCourseProvider);
+
+    return async.maybeWhen(
+      // No reserved height on the loading path, and none on error. Every
+      // other row on this screen reserves its true height because it
+      // always draws something; this one usually draws nothing, so a
+      // placeholder would be a gap that appears and then closes — the
+      // exact scroll-shift that F-9 was about.
+      orElse: () => const SizedBox.shrink(),
+      data: (item) {
+        if (item == null) return const SizedBox.shrink();
+
+        return Padding(
+          padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
+          child: GestureDetector(
+            // Opens the course, not the lesson directly. The lesson
+            // routes take a fully-built Lesson as `extra`, and
+            // reconstructing one here from a progress row would mean
+            // inventing the media fields the player needs. The course
+            // screen puts them one tap from where they stopped and
+            // cannot be handed a half-built object.
+            onTap: () => context.push(
+              '/course/${item.courseId}',
+              extra: item.courseTitle,
+            ),
+            child: Container(
+              padding: const EdgeInsets.all(12),
+              decoration: AppTheme.glassSurface(),
+              child: Row(children: [
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(11),
+                  child: SizedBox(
+                    // Rectangular, matching the course cards. A course
+                    // cover is landscape artwork; squaring it here would
+                    // crop the same image two different ways on one
+                    // screen.
+                    width: 84,
+                    height: 52,
+                    child: RemoteImage(
+                      url: item.courseCoverImageUrl,
+                      fallback: const _ArtFallback(),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        item.completed ? 'JUST FINISHED' : 'CONTINUE',
+                        style: const TextStyle(
+                          fontFamily: AppTheme.text,
+                          fontSize: 11,
+                          letterSpacing: 0.66,
+                          fontWeight: FontWeight.w600,
+                          color: AppTheme.sageDark,
+                        ),
+                      ),
+                      const SizedBox(height: 1),
+                      Text(
+                        item.lessonTitle,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          fontFamily: AppTheme.text,
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
+                          letterSpacing: -0.16,
+                          color: AppTheme.textPrimary,
+                        ),
+                      ),
+                      const SizedBox(height: 3),
+                      // The course name, because the lesson title alone
+                      // ("Day 3") is not enough to know what you would
+                      // be going back to.
+                      Text(
+                        item.courseTitle,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          fontFamily: AppTheme.text,
+                          fontSize: 12,
+                          color: AppTheme.textSecondary,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 8),
+                const Icon(Icons.chevron_right_rounded,
+                    color: AppTheme.textSecondary),
+              ]),
+            ),
+          ),
+        );
+      },
+    );
+  }
+}
 
 class _ContinueCard extends ConsumerWidget {
   const _ContinueCard();

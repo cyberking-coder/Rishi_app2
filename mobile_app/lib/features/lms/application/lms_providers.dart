@@ -5,6 +5,7 @@ import '../data/datasources/lms_remote_datasource.dart';
 import '../data/datasources/certificate_remote_datasource.dart';
 import '../data/datasources/video_remote_datasource.dart';
 import '../data/repositories/lms_repository_impl.dart';
+import '../domain/entities/continue_course_item.dart';
 import '../domain/entities/course_summary.dart';
 import '../domain/entities/lesson.dart';
 import '../domain/entities/certificate.dart';
@@ -36,6 +37,20 @@ final coursesProvider = FutureProvider.autoDispose<List<CourseSummary>>(
     return ref.watch(lmsRepositoryProvider).getCourses();
   },
 );
+
+/// Where the user last was in a course. Drives the resume card at the
+/// top of Home.
+///
+/// keepAlive for the same reason coursesProvider has it: Home is a plain
+/// ListView, so scrolling past this card unmounts it, and without the
+/// hold it would refetch every time it came back into view. It is
+/// invalidated on pull-to-refresh and whenever a lesson is opened, which
+/// are the two moments its answer can have changed.
+final continueCourseProvider =
+    FutureProvider.autoDispose<ContinueCourseItem?>((ref) {
+  ref.keepAlive();
+  return ref.watch(lmsRepositoryProvider).getContinueCourse();
+});
 
 final courseDetailProvider =
     FutureProvider.autoDispose.family<CourseDetail, String>(
