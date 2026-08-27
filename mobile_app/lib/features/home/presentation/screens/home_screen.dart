@@ -68,6 +68,15 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     // the whole of the "my downloads vanish" report.
     if (access.hasLapsed && !_purged) {
       _purged = true;
+      // Loud on purpose. This deletes every offline file the account
+      // holds, it is driven by one boolean derived from server data, and
+      // when it fired wrongly it was completely silent — the downloads
+      // were simply gone, with nothing anywhere to say why or by whose
+      // decision. If this line is in the log, the purge is the cause.
+      debugPrint(
+        'HomeScreen: access has lapsed (expiresAt=${access.expiresAt}, '
+        'role=${access.role}) — purging ALL offline downloads.',
+      );
       ref.read(downloadRepositoryProvider).purgeAll();
       return;
     }
