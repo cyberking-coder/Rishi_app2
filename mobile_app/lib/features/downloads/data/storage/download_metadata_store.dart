@@ -2,9 +2,45 @@ import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
 
+import 'package:flutter/foundation.dart';
 import 'package:path_provider/path_provider.dart';
 
 import '../../domain/entities/download_task.dart';
+
+/// How a manifest read ended.
+///
+/// The distinction that matters is [absent] versus [corrupt]. Both yield
+/// an empty list, but only one of them is normal — and conflating them is
+/// what let a parse failure look exactly like a new install.
+enum ManifestOutcome {
+  /// No manifest on disk. Expected for anyone who has never downloaded.
+  absent,
+
+  /// Read and parsed. [ManifestLoad.tasks] is authoritative, empty or not.
+  loaded,
+
+  /// Present but unreadable. The old contents are NOT known, so nothing
+  /// may be written over them until the user acts.
+  corrupt,
+}
+
+@immutable
+class ManifestLoad {
+  final ManifestOutcome outcome;
+  final List<DownloadTask> tasks;
+  final Map<String, Uint8List> ivs;
+
+  const ManifestLoad({
+    required this.outcome,
+    required this.tasks,
+    required this.ivs,
+  });
+
+  /// True when the on-disk state is known — the only condition under
+  /// which overwriting it is safe.
+  bool get isAuthoritative =>
+      outcome == ManifestOutcome.absent || outcome == ManifestOutcome.loaded;
+}
 
 /// Persists the download manifest (task metadata + non-secret IVs) to a
 /// JSON file in the app sandbox. Secret key material is NOT stored here —
@@ -22,10 +58,14 @@ class DownloadMetadataStore {
     return _file!;
   }
 
-  Future<({List<DownloadTask> tasks, Map<String, Uint8List> ivs})> load() async {
+  Future<ManifestLoad> load() async {
     final file = await _manifest();
     if (!await file.exists()) {
-      return (tasks: <DownloadTask>[], ivs: <String, Uint8List>{});
+      return const ManifestLoad(
+        outcome: ManifestOutcome.absent,
+        tasks: [],
+        ivs: {},
+      );
     }
 
     try {
@@ -36,10 +76,38 @@ class DownloadMetadataStore {
       final ivs = (json['ivs'] as Map<String, dynamic>).map(
         (k, v) => MapEntry(k, base64Decode(v as String)),
       );
-      return (tasks: tasks, ivs: ivs);
-    } catch (_) {
-      // Corrupt manifest — start clean rather than crash the app.
-      return (tasks: <DownloadTask>[], ivs: <String, Uint8List>{});
+      return ManifestLoad(
+        outcome: ManifestOutcome.loaded,
+        tasks: tasks,
+        ivs: ivs,
+      );
+    } catch (e, st) {
+      // This used to be `catch (_)` returning an empty list, on the
+      // reasoning that starting clean beats crashing. Starting clean is
+      // still right — but discarding the exception meant a manifest that
+      // failed to parse was indistinguishable from a user who had never
+      // downloaded anything, on screen AND in the logs. A whole class of
+      // "my downloads vanished" report had nowhere to be diagnosed from.
+      //
+      // The failure is now named, and the file that caused it is kept.
+      debugPrint('DownloadMetadataStore.load: manifest unreadable: $e\n$st');
+      await _quarantine(file);
+      return const ManifestLoad(
+        outcome: ManifestOutcome.corrupt,
+        tasks: [],
+        ivs: {},
+      );
+    }
+  }
+
+  /// Moves an unreadable manifest aside instead of leaving it to be
+  /// overwritten. It is the only evidence of what went wrong, it is a few
+  /// kilobytes, and a single fixed name means these cannot accumulate.
+  Future<void> _quarantine(File file) async {
+    try {
+      await file.rename('${file.path}.corrupt');
+    } catch (e) {
+      debugPrint('DownloadMetadataStore: could not quarantine manifest: $e');
     }
   }
 

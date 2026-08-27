@@ -24,13 +24,20 @@ class _ProxyEntry {
 class LocalDecryptingProxy {
   HttpServer? _server;
   final Map<String, _ProxyEntry> _entries = {};
-  late final String _sessionToken;
+
+  /// Not `late final`. It was, and that made a failed [start] permanent:
+  /// assigning a `late final` twice throws, so any retry after a failed
+  /// bind died on the assignment rather than on the thing that actually
+  /// went wrong. Now the token is minted once and survives a retry.
+  String? _sessionToken;
 
   static const _chunkSize = 64 * 1024;
 
+  /// Binds the loopback server. Safe to call repeatedly: a no-op once
+  /// running, and a genuine retry if a previous attempt failed.
   Future<void> start() async {
     if (_server != null) return;
-    _sessionToken = _randomToken();
+    _sessionToken ??= _randomToken();
     // Bind to loopback only — unreachable from outside the device.
     _server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
     _server!.listen(_handle);
@@ -38,10 +45,21 @@ class LocalDecryptingProxy {
 
   /// Registers a decrypted view of [file] and returns the URL to play.
   /// The path embeds the per-session token; the id identifies the entry.
-  Uri register(String id, File file, DownloadCipherKey key, String mimeType) {
+  ///
+  /// Starts the server if it isn't running. Playback is the one moment
+  /// the proxy is genuinely needed, so a bind that failed at launch gets
+  /// another attempt here rather than making every offline file
+  /// unplayable for the rest of the session.
+  Future<Uri> register(
+    String id,
+    File file,
+    DownloadCipherKey key,
+    String mimeType,
+  ) async {
+    await start();
     _entries[id] = _ProxyEntry(file, key, mimeType);
     final port = _server!.port;
-    return Uri.parse('http://127.0.0.1:$port/$_sessionToken/$id');
+    return Uri.parse('http://127.0.0.1:$port/${_sessionToken!}/$id');
   }
 
   void unregister(String id) => _entries.remove(id);

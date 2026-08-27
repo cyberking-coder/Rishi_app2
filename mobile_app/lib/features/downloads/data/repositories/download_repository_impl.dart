@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:io';
 import 'dart:typed_data';
 
+import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 
 import '../../domain/entities/download_content_type.dart';
@@ -66,10 +67,27 @@ class DownloadRepositoryImpl implements DownloadRepository {
   @override
   List<DownloadTask> get tasks => _sortedTasks();
 
+  /// Whether the on-disk manifest has been read successfully.
+  ///
+  /// Until it has, this object does not know what the user owns, and
+  /// [_persist] must not write. See the comment there — this flag is the
+  /// whole defence against a failed startup silently destroying somebody's
+  /// downloads.
+  bool _manifestKnown = false;
+
   @override
   Future<void> restore() async {
-    await _proxy.start();
+    // ── Order matters, and it used to be the other way round ──────────
+    // `await _proxy.start()` came first. If binding the loopback socket
+    // threw, restore() aborted before ever reading the manifest, main.dart
+    // caught the exception and only debugPrint'd it, and the app came up
+    // showing an empty Downloads screen while every file and the manifest
+    // itself sat intact on disk. Reading the manifest is the part that
+    // must not be prevented by anything else, so it goes first and the
+    // network comes second.
     final loaded = await _metadata.load();
+    _manifestKnown = loaded.isAuthoritative;
+
     for (final task in loaded.tasks) {
       // Anything left mid-flight when the app died is resumable.
       final reconciled = task.status == DownloadStatus.downloading ||
@@ -80,6 +98,24 @@ class DownloadRepositoryImpl implements DownloadRepository {
     }
     _ivs.addAll(loaded.ivs);
     _emit();
+
+    if (!_manifestKnown) {
+      debugPrint(
+        'DownloadRepository: manifest unreadable — the download list will '
+        'show empty and will NOT be overwritten. The previous manifest is '
+        'kept at manifest.json.corrupt.',
+      );
+    }
+
+    // Second, and allowed to fail. The proxy only matters at playback,
+    // and register() starts it on demand, so a failure here costs nothing
+    // at launch and is retried the moment somebody presses play.
+    try {
+      await _proxy.start();
+    } catch (e, st) {
+      debugPrint('DownloadRepository: local playback proxy failed to '
+          'start, will retry on playback: $e\n$st');
+    }
   }
 
   @override
@@ -181,7 +217,9 @@ class DownloadRepositoryImpl implements DownloadRepository {
       throw StateError('Encryption key missing for offline file');
     }
     final file = await _storage.encryptedFile(task.id);
-    return _proxy.register(
+    // register() starts the proxy if it isn't running, so an offline file
+    // stays playable even when the bind failed at launch.
+    return await _proxy.register(
       task.id,
       file,
       cipherKey,
@@ -358,7 +396,7 @@ class DownloadRepositoryImpl implements DownloadRepository {
       status: DownloadStatus.failed,
       errorMessage: message,
     );
-    _persist();
+    unawaited(_persist());
     _emit();
   }
 
@@ -372,7 +410,28 @@ class DownloadRepositoryImpl implements DownloadRepository {
     if (!_controller.isClosed) _controller.add(_sortedTasks());
   }
 
-  Future<void> _persist() => _metadata.save(_sortedTasks(), _ivs);
+  /// Writes the manifest — but only when we know what we are replacing.
+  ///
+  /// This guard exists because the failure it prevents is silent and
+  /// irreversible. If restore() could not read the manifest, `_tasks` is
+  /// empty while the real manifest is still on disk. The very next
+  /// enqueue() would serialise that empty-plus-one state over the top,
+  /// destroying every previous entry and orphaning its .enc file on disk
+  /// forever — bytes nothing references and no screen can reach.
+  ///
+  /// So a startup failure costs the user a temporarily empty list, which
+  /// the next successful launch restores, instead of costing them their
+  /// library permanently one download later.
+  Future<void> _persist() async {
+    if (!_manifestKnown) {
+      debugPrint(
+        'DownloadRepository: refusing to write the manifest — it was never '
+        'read successfully this session, and writing would destroy it.',
+      );
+      return;
+    }
+    await _metadata.save(_sortedTasks(), _ivs);
+  }
 
   @override
   Future<void> dispose() async {
