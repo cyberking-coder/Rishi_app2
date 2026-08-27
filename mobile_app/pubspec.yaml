@@ -40,7 +40,7 @@ publish_to: "none"
 # That means a local Android upload has to clear the highest versionCode
 # CI has ever pushed, not merely the last one written down here — check
 # Play Console -> App bundle explorer before trusting +16.
-version: 2.1.2+16
+version: 2.1.2+17
 
 environment:
   sdk: ">=3.3.0 <4.0.0"
