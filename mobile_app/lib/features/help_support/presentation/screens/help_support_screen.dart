@@ -242,12 +242,12 @@ class _HelpSupportScreenState extends ConsumerState<HelpSupportScreen> {
             // duplicating means there is one copy to keep current.
             _LegalLinks(
               onPrivacy: () => _open(
-                Uri.parse('${CheckoutConfig.baseUrl}/privacy'),
-                'Visit ${CheckoutConfig.baseUrl}/privacy',
+                Uri.parse('$checkoutBaseUrl/privacy'),
+                'Visit $checkoutBaseUrl/privacy',
               ),
               onTerms: () => _open(
-                Uri.parse('${CheckoutConfig.baseUrl}/terms'),
-                'Visit ${CheckoutConfig.baseUrl}/terms',
+                Uri.parse('$checkoutBaseUrl/terms'),
+                'Visit $checkoutBaseUrl/terms',
               ),
             ),
           ],
