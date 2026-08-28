@@ -1,3 +1,4 @@
+import '../../domain/entities/continue_course_item.dart';
 import '../../domain/entities/course_summary.dart';
 import '../../domain/entities/lesson.dart';
 import '../../domain/repositories/lms_repository.dart';
@@ -78,4 +79,15 @@ class LmsRepositoryImpl implements LmsRepository {
   @override
   Future<void> markLessonCompleted(String lessonId) =>
       _remote.markLessonCompleted(lessonId);
+
+  @override
+  Future<void> recordLessonAccess(String lessonId) =>
+      _remote.recordLessonAccess(lessonId);
+
+  @override
+  Future<ContinueCourseItem?> getContinueCourse() async {
+    final row = await _remote.getLastAccessedLesson();
+    if (row == null) return null;
+    return ContinueCourseItem.fromRow(row);
+  }
 }

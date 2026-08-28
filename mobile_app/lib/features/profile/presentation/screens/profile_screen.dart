@@ -811,6 +811,38 @@ class _SettingsSheetState extends ConsumerState<_SettingsSheet> {
           //
           // Last in the sheet and behind a divider — findable, not
           // adjacent to Logout, which somebody taps in a hurry.
+          // ── Support ──
+          // Above the destructive actions, deliberately. Somebody who
+          // opens Settings because something is wrong should find a way
+          // to ask before they find the button that deletes everything.
+          //
+          // One row, not three. The email, WhatsApp and call options
+          // moved into the Help & Support screen, where they sit below
+          // the answers — most people arriving here want the answer, not
+          // a conversation, and offering three ways to start one before
+          // showing any of the answers gets that backwards.
+          const _SheetSectionLabel('Support'),
+          const SizedBox(height: 10),
+
+          _SheetTile(
+            icon: Icons.help_outline_rounded,
+            iconColor: _kAccent,
+            title: 'Help & Support',
+            onTap: () {
+              Navigator.pop(context);
+              context.push('/help-support');
+            },
+          ),
+          const SizedBox(height: 8),
+          const Padding(
+            padding: EdgeInsets.symmetric(horizontal: 4),
+            child: Text(
+              'Answers, report a problem, or contact us.',
+              style: TextStyle(color: _kSub, fontSize: 12),
+            ),
+          ),
+          const SizedBox(height: 22),
+
           _SheetTile(
             icon: Icons.delete_forever_outlined,
             iconColor: AppTheme.danger,
@@ -907,6 +939,34 @@ class _SettingsSheetState extends ConsumerState<_SettingsSheet> {
         ),
       );
     }
+  }
+}
+
+/// A quiet heading inside the settings sheet.
+///
+/// The sheet had no groupings — every row was the same weight, so
+/// "Logout" and "Delete my account" read as equally routine. With support
+/// added there are now three kinds of thing in one list, and the label is
+/// what stops a member scanning for help from landing on the delete
+/// button first.
+class _SheetSectionLabel extends StatelessWidget {
+  const _SheetSectionLabel(this.text);
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(left: 4),
+      child: Text(
+        text.toUpperCase(),
+        style: const TextStyle(
+          color: _kSub,
+          fontSize: 11,
+          fontWeight: FontWeight.w600,
+          letterSpacing: 0.66,
+        ),
+      ),
+    );
   }
 }
 

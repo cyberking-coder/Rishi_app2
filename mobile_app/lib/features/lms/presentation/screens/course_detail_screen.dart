@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
@@ -11,9 +12,8 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../../../app/theme/app_theme.dart';
 import '../../../../app/widgets/remote_image.dart';
 import '../../../../core/config/purchase_config.dart';
-import '../../../audio/application/audio_providers.dart';
-import '../../../audio/domain/entities/audio_track.dart';
 import '../../application/lms_providers.dart';
+import '../lesson_launcher.dart';
 import '../../domain/entities/lesson.dart';
 import '../widgets/course_purchase_sheet.dart';
 
@@ -86,70 +86,24 @@ class _CourseDetailScreenState extends ConsumerState<CourseDetailScreen>
       return;
     }
 
-    if (!lesson.isPlayable) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text("This $kPartWord's content isn't available right now."),
-        ),
-      );
-      return;
-    }
-
-    switch (lesson.type) {
-      case LessonType.text:
-        context.push('/lesson-text/${lesson.id}', extra: lesson);
-        // Reading is the whole interaction for a text lesson, so opening
-        // it counts as completing it.
-        await _markComplete(lesson);
-        return;
-
-      case LessonType.video:
-        // Unlike a text lesson, opening the player proves nothing — the
-        // stream can still fail. The player reports back whether it
-        // actually played, and only then does this count as complete.
-        final played = await context.push<bool>(
-          '/lesson-video/${lesson.id}',
-          extra: lesson,
-        );
-        if (played == true) await _markComplete(lesson);
-        return;
-
-      case LessonType.audio:
-        if (_starting) return;
-        _starting = true;
-        try {
-          // Branches into the existing playback pipeline. Note the id
-          // passed is the AUDIO's id, not the lesson's — that's what
-          // issue-audio-license is keyed on.
-          await ref.read(audioHandlerProvider).playSingleTrack(AudioTrack(
-                id: lesson.audioId!,
-                title: lesson.audioTitle ?? lesson.title,
-                artist: lesson.audioArtist,
-                coverArtUrl: lesson.audioCoverArtUrl,
-                durationSeconds: lesson.audioDurationSeconds,
-              ));
-          if (mounted) context.push('/now-playing');
-          await _markComplete(lesson);
-        } catch (e) {
-          if (!mounted) return;
-          ScaffoldMessenger.of(context)
-              .showSnackBar(SnackBar(content: Text(e.toString())));
-        } finally {
-          _starting = false;
-        }
-    }
-  }
-
-  /// Best-effort: a progress write failing should never surface as an
-  /// error over content that opened fine.
-  Future<void> _markComplete(Lesson lesson) async {
-    if (lesson.completed) return;
+    // Everything past the lock check lives in launchLesson, shared with
+    // the resume card on Home. Ownership is decided here, because this
+    // screen is the one that knows it; how a lesson plays is decided
+    // there, because two copies of that would drift.
+    if (_starting) return;
+    _starting = true;
     try {
-      await ref.read(lmsRepositoryProvider).markLessonCompleted(lesson.id);
-      ref.invalidate(courseDetailProvider(widget.courseId));
-      ref.invalidate(coursesProvider);
-    } catch (_) {
-      // ignored
+      await launchLesson(
+        context,
+        ref,
+        lesson,
+        onProgressChanged: () {
+          ref.invalidate(courseDetailProvider(widget.courseId));
+          ref.invalidate(coursesProvider);
+        },
+      );
+    } finally {
+      _starting = false;
     }
   }
 

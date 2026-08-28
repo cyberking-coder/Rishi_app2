@@ -277,9 +277,15 @@ class CourseCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            SizedBox(
-              height: 176,
-              width: double.infinity,
+            // A ratio, not a fixed height. At 176pt tall the cover was a
+            // different shape on every handset — roughly 1.9:1 on a small
+            // phone and 2.2:1 on a large one — so the same artwork was
+            // cropped differently depending on who was looking at it, and
+            // nothing could be composed to survive both. 16:9 is the
+            // shape cover art is actually made in, and it holds
+            // everywhere.
+            AspectRatio(
+              aspectRatio: 16 / 9,
               child: _CourseCover(url: course.coverImageUrl),
             ),
             Padding(

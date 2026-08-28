@@ -65,8 +65,24 @@ class AccessState {
   ///
   /// A null [expiresAt] is never lapsed: it means either no window was
   /// ever granted, or one was granted with no end date.
+  ///
+  /// The [hasAccess] guard is not redundant, and leaving it out is how
+  /// this destroyed an admin's downloads on every single launch.
+  /// [tier] returns [UserTier.admin] for a staff role *whatever* the
+  /// dates say — quite deliberately, since staff access does not come
+  /// from a purchased window. But a staff account can still carry a
+  /// stale past `access_expires_at` from a trial or an old grant, and
+  /// without this guard such an account was `hasAccess == true` and
+  /// `hasLapsed == true` at the same time. Two answers to one question,
+  /// and the destructive one won.
+  ///
+  /// The rule to hold on to: nothing may be deleted from an account that
+  /// currently has access. Whatever the dates say, if the app is letting
+  /// somebody play content, it must not be erasing their copies of it.
   bool get hasLapsed =>
-      expiresAt != null && !expiresAt!.isAfter(DateTime.now());
+      !hasAccess &&
+      expiresAt != null &&
+      !expiresAt!.isAfter(DateTime.now());
 
   /// Whole days left in the access window (0 once expired). Null == no limit.
   int? get daysLeft {
