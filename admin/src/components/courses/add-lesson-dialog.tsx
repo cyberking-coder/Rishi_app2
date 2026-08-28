@@ -27,10 +27,12 @@ import {
 } from "@/app/actions/content";
 import {
   UploadCancelledError,
+  formatUploadProgress,
   uploadVideoToBunny,
 } from "@/lib/bunny-upload-client";
 import type { Audio, LessonType, Video } from "@/lib/types";
 import { AudioFormatNotice } from "@/components/content/audio-format-notice";
+import { VideoSizeNotice } from "@/components/content/video-size-notice";
 
 type MediaMode = "existing" | "upload";
 
@@ -161,7 +163,7 @@ export function AddLessonDialog({
       mediaFile,
       title.trim(),
       creds,
-      (pct) => setProgress(`Uploading to Bunny… ${pct}%`),
+      (p) => setProgress(formatUploadProgress(p)),
       abortRef.current.signal,
     );
 
@@ -391,6 +393,7 @@ export function AddLessonDialog({
                     disabled={busy}
                     onChange={(e) => setMediaFile(e.target.files?.[0] ?? null)}
                   />
+                  <VideoSizeNotice file={mediaFile} />
                   <p className="text-xs text-muted-foreground">
                     Uploads straight to Bunny Stream from your browser, then
                     Bunny encodes it — it&apos;ll show as &quot;Encoding&quot;

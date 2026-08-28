@@ -14,6 +14,7 @@ import {
 } from "@/app/actions/content";
 import {
   UploadCancelledError,
+  formatUploadProgress,
   uploadVideoToBunny,
 } from "@/lib/bunny-upload-client";
 import { Button } from "@/components/ui/button";
@@ -31,6 +32,7 @@ import {
 } from "@/components/ui/dialog";
 import type { ContentKind } from "@/lib/types";
 import { AudioFormatNotice } from "./audio-format-notice";
+import { VideoSizeNotice } from "./video-size-notice";
 
 export function UploadContentDialog({ kind }: { kind: ContentKind }) {
   const router = useRouter();
@@ -125,7 +127,7 @@ export function UploadContentDialog({ kind }: { kind: ContentKind }) {
           file,
           title.trim(),
           creds,
-          (pct) => setProgress(`Uploading to Bunny… ${pct}%`),
+          (p) => setProgress(formatUploadProgress(p)),
           abortRef.current.signal,
         );
 
@@ -270,6 +272,7 @@ export function UploadContentDialog({ kind }: { kind: ContentKind }) {
               onChange={(e) => setFile(e.target.files?.[0] ?? null)}
             />
             {kind === "audio" && <AudioFormatNotice file={file} />}
+            {kind === "video" && <VideoSizeNotice file={file} />}
           </div>
           <div className="space-y-2">
             <Label htmlFor="uc-cover">Cover image (optional)</Label>
