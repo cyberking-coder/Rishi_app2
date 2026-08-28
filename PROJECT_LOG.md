@@ -984,6 +984,84 @@ Worth recording, because "no finding" is only useful if you know where it was lo
 - **`BuildContext` across async gaps**: five candidates flagged by pattern, all five confirmed false positives on inspection.
 - **The 12 `RemoteImage` call sites** are type-correct at every one.
 
+## 14. Apple denied the reader-app entitlement — 27 August 2026
+
+> After evaluating your request, we've found that your app does not
+> qualify as a reader app. Since only reader apps are eligible to use the
+> External Link Account entitlement, your request has been denied.
+>
+> Associated app IDs: com.anuragrishi.knowthyself
+> — Apple Developer Relations, 27 August 2026
+
+### What it does not mean
+
+The listing is not at risk and nothing was revoked. 2.1.1 is approved and
+live. Developer Relations is not App Review, no build changed that day,
+and the letter makes no finding of non-compliance.
+
+### What it does mean
+
+It is Apple's own written record that they do not consider this a reader
+app — and Guideline 3.1.3(a), the reader-app exemption, is the basis on
+which an app can withhold in-app purchase for content bought elsewhere.
+
+The approval therefore rests on a narrower fact than "we are a reader
+app": the binary contains no purchase mechanism at all. That passed
+review, but it is a weaker footing, and the 3.1.1 rejection of 12 August
+shows the argument has already been run once.
+
+### Why they said no
+
+It is not the store description. That copy was written against 3.1.3(a)
+in August and is already scrubbed of "course", "lesson" and
+"certificate"; there is no wording left to blame.
+
+The likelier reading is that Apple treats "audio" in the reader-app list
+as a catalogue product — music, audiobooks, podcasts — and a guided
+meditation membership in Health & Fitness as a subscription service.
+Calm and Headspace both use in-app purchase. There is probably no
+description that would have changed this answer, which is worth knowing
+before anybody spends a week rewording one.
+
+### What was changed in response
+
+Nothing about the model. One thing in the app, because 2.2.0 was days
+from submission:
+
+**The Help & Support membership category is withheld on iOS.** Its
+articles included "contact us with the email address you paid with",
+which describes an external purchase flow, in a screen a reviewer will
+certainly open, in a build submitted after this letter. Before the letter
+it was ordinary support copy; after it, it is the first thing to change.
+
+The rule is on the CATEGORY, in `Faq.isAllowedOnThisPlatform`, so an
+admin writing the next membership article cannot forget it.
+`faqs.hide_on_ios` (migration `20260827000002`) covers anything else
+article by article — the same mechanism, and same reasoning, as
+`app_popups.hide_on_ios`. The contact form also stops offering
+"Membership & payments" as a category on iOS; a billing question still
+reaches support under "Something else", in the member's own words rather
+than a label the app supplied. Android is unaffected throughout.
+
+### The decision that is still open
+
+iPhone users currently cannot buy anything, anywhere the app can mention.
+That is the cost of the present arrangement, and it is now unlikely to
+change by way of the entitlement.
+
+- **Stay as-is.** 100% of web revenue, approved once, no iOS channel at
+  all. The risk is a future reviewer applying 3.1.1 with this letter on
+  file.
+- **Adopt in-app purchase on iOS.** 15–30% commission, removes this
+  entire category of risk permanently, and opens a channel that is
+  currently closed rather than merely taxed.
+- **Reapply.** Unlikely to land differently while the app's nature is
+  unchanged.
+
+No decision was taken on 27 August. This section exists so it is not
+re-derived from scratch when it is.
+
+
 ## 13. Dependency upgrade plan — 27 August 2026
 
 Latest versions read from the pub.dev API on 27 August 2026. Nothing in

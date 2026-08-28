@@ -25,7 +25,7 @@ class HelpRemoteDataSource {
   Future<List<Faq>> getFaqs() async {
     final rows = await _client
         .from('faqs')
-        .select('id, category, question, answer, keywords')
+        .select('id, category, question, answer, keywords, hide_on_ios')
         .eq('is_published', true)
         .order('category')
         .order('sort_order');

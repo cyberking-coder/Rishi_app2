@@ -1,3 +1,5 @@
+import '../../../../core/config/purchase_config.dart';
+
 /// Everything Help & Support reads or writes.
 ///
 /// One file rather than five, because these are small, they change
@@ -33,13 +35,42 @@ class Faq {
   final String answer;
   final String? keywords;
 
+  /// Set by whoever wrote the article. See the migration
+  /// 20260827000002_faqs_hide_on_ios.sql for why this exists.
+  final bool hideOnIos;
+
   const Faq({
     required this.id,
     required this.category,
     required this.question,
     required this.answer,
     this.keywords,
+    this.hideOnIos = false,
   });
+
+  /// Whether this article may be shown on the current platform.
+  ///
+  /// Two rules, and the first is the one that matters.
+  ///
+  /// The whole membership category is withheld on iOS. On 27 August 2026
+  /// Apple denied the External Link Account Entitlement, stating that
+  /// this app does not qualify as a reader app — so Apple's own written
+  /// position is that the 3.1.3(a) exemption does not apply here. An
+  /// article explaining what to do when a payment made on the web has
+  /// not unlocked access describes an external purchase flow, and that
+  /// is exactly what a build submitted after such a letter should not
+  /// put in front of a reviewer.
+  ///
+  /// It is a rule about the CATEGORY rather than about a row, because a
+  /// row-by-row rule is one an admin writing the next membership article
+  /// can forget. [hideOnIos] then covers anything else, article by
+  /// article, for cases no category rule anticipates.
+  ///
+  /// Android is unaffected by both: it shows everything.
+  bool get isAllowedOnThisPlatform {
+    if (kPurchaseUiEnabled) return true; // not iOS — nothing is withheld
+    return category != HelpCategory.membership && !hideOnIos;
+  }
 
   factory Faq.fromMap(Map<String, dynamic> map) => Faq(
         id: map['id'] as String? ?? '',
@@ -47,6 +78,7 @@ class Faq {
         question: map['question'] as String? ?? '',
         answer: map['answer'] as String? ?? '',
         keywords: map['keywords'] as String?,
+        hideOnIos: map['hide_on_ios'] as bool? ?? false,
       );
 
   /// Whether this FAQ matches [query].

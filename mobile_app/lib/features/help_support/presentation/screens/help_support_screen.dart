@@ -5,6 +5,7 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../../../../app/theme/app_theme.dart';
 import '../../../../core/config/checkout_config.dart';
+import '../../../../core/config/purchase_config.dart';
 import '../../../../core/config/support_config.dart';
 import '../../application/help_providers.dart';
 import '../../domain/entities/help_entities.dart';
@@ -69,6 +70,7 @@ class _HelpSupportScreenState extends ConsumerState<HelpSupportScreen> {
 
   List<Faq> _visible(List<Faq> all) {
     final filtered = all
+        .where((f) => f.isAllowedOnThisPlatform)
         .where((f) => _category == null || f.category == _category)
         .where((f) => f.matches(_query))
         .toList();
@@ -166,7 +168,12 @@ class _HelpSupportScreenState extends ConsumerState<HelpSupportScreen> {
                   );
                 }
 
+                // Counted over the same filtered set the list is drawn
+                // from — otherwise "View all 3 more" would offer articles
+                // this platform withholds, and tapping it would show
+                // fewer than it promised.
                 final hidden = all
+                        .where((f) => f.isAllowedOnThisPlatform)
                         .where((f) =>
                             _category == null || f.category == _category)
                         .where((f) => f.matches(_query))
@@ -324,13 +331,21 @@ class _CategoryGrid extends StatelessWidget {
   final HelpCategory? selected;
   final ValueChanged<HelpCategory> onSelect;
 
-  static const _items = [
+  static const _all = [
     (HelpCategory.content, Icons.menu_book_outlined, 'Content\n& playback'),
     (HelpCategory.account, Icons.person_outline_rounded, 'Account\n& login'),
     (HelpCategory.membership, Icons.card_membership_outlined,
         'Membership\n& payments'),
     (HelpCategory.technical, Icons.phone_iphone_rounded, 'Technical\nissues'),
   ];
+
+  /// The membership tile is not drawn on iOS. Its articles are withheld
+  /// there (see Faq.isAllowedOnThisPlatform), and a tile that filters to
+  /// an empty list is worse than no tile — it reads as a fault, and it
+  /// puts the word "payments" on screen for no benefit.
+  static List<(HelpCategory, IconData, String)> get _items => _all
+      .where((i) => kPurchaseUiEnabled || i.$1 != HelpCategory.membership)
+      .toList();
 
   @override
   Widget build(BuildContext context) {

@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../../app/theme/app_theme.dart';
+import '../../../../core/config/purchase_config.dart';
 import '../../application/help_providers.dart';
 import '../../domain/entities/help_entities.dart';
 import 'help_support_screen.dart' show ContactArgs;
@@ -26,8 +27,21 @@ class ContactSupportScreen extends ConsumerStatefulWidget {
 class _ContactSupportScreenState extends ConsumerState<ContactSupportScreen> {
   final _subject = TextEditingController();
   final _message = TextEditingController();
-  late HelpCategory _category =
-      widget.args?.category ?? HelpCategory.other;
+  /// Falls back to `other` when the preset category is one this platform
+  /// does not offer. Unreachable today — the only way to arrive with
+  /// `membership` preset is from a membership article, which iOS does not
+  /// show — but a selected chip that is not in the list would render as
+  /// nothing selected, and that is a confusing way to find out.
+  late HelpCategory _category = _initialCategory();
+
+  HelpCategory _initialCategory() {
+    final preset = widget.args?.category;
+    if (preset == null) return HelpCategory.other;
+    if (!kPurchaseUiEnabled && preset == HelpCategory.membership) {
+      return HelpCategory.other;
+    }
+    return preset;
+  }
   bool _sending = false;
 
   bool get _isProblem => widget.args?.problemReport ?? false;
@@ -245,6 +259,19 @@ class _CategoryPicker extends StatelessWidget {
     HelpCategory.other: 'Something else',
   };
 
+  /// Membership is not offered as a category on iOS, for the same reason
+  /// its help articles are not shown there — see
+  /// Faq.isAllowedOnThisPlatform.
+  ///
+  /// Nobody loses a route: a billing question still reaches support under
+  /// "Something else", with the member's own words rather than a label
+  /// the app supplied. What is removed is the app naming payments.
+  static Map<HelpCategory, String> get _visibleLabels => {
+        for (final e in _labels.entries)
+          if (kPurchaseUiEnabled || e.key != HelpCategory.membership)
+            e.key: e.value,
+      };
+
   @override
   Widget build(BuildContext context) {
     // Chips rather than a dropdown. Five options fit on two lines, and a
@@ -254,7 +281,7 @@ class _CategoryPicker extends StatelessWidget {
       spacing: 8,
       runSpacing: 8,
       children: [
-        for (final entry in _labels.entries)
+        for (final entry in _visibleLabels.entries)
           ChoiceChip(
             label: Text(entry.value),
             selected: value == entry.key,
