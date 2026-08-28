@@ -131,7 +131,15 @@ class LmsRemoteDataSource {
         .from('lesson_progress')
         .select(
           'lesson_id, progress_seconds, completed, last_accessed_at, '
-          'lessons!inner(id, title, lesson_type, '
+          // The lesson is selected in exactly the shape Lesson.fromMap
+          // expects — the same nested select getModules uses — so the
+          // resume card can hand a real Lesson to the player rather than
+          // a half-built one. That is what lets it resume the lesson
+          // instead of dropping the user on the course page.
+          'lessons!inner(id, title, description, lesson_type, body_markdown, '
+          'lesson_resources(id, title, resource_type, url, position), '
+          'audios(id, title, artist, cover_art_url, duration_seconds), '
+          'videos(id, title), '
           'course_modules!inner(course_id, '
           'courses!inner(id, title, cover_image_url, status)))',
         )

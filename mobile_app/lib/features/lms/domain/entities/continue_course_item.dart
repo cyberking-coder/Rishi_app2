@@ -8,9 +8,12 @@ import 'lesson.dart';
 /// wants is "where was I", and that question is only answerable with the
 /// course's title and artwork alongside the lesson's own.
 class ContinueCourseItem {
-  final String lessonId;
-  final String lessonTitle;
-  final LessonType lessonType;
+  /// The full lesson, built the same way the curriculum builds it, so
+  /// it can be handed straight to [launchLesson]. Carrying a real Lesson
+  /// rather than an id is what lets the resume card open the lesson
+  /// itself — the player needs the media fields, and an id alone would
+  /// mean a second round trip or a fabricated object.
+  final Lesson lesson;
 
   final String courseId;
   final String courseTitle;
@@ -30,9 +33,7 @@ class ContinueCourseItem {
   final DateTime lastAccessedAt;
 
   const ContinueCourseItem({
-    required this.lessonId,
-    required this.lessonTitle,
-    required this.lessonType,
+    required this.lesson,
     required this.courseId,
     required this.courseTitle,
     required this.courseCoverImageUrl,
@@ -40,6 +41,9 @@ class ContinueCourseItem {
     required this.completed,
     required this.lastAccessedAt,
   });
+
+  String get lessonId => lesson.id;
+  String get lessonTitle => lesson.title;
 
   /// Builds from the nested PostgREST shape produced by
   /// [LmsRemoteDataSource.getLastAccessedLesson], or null when any of the
@@ -61,20 +65,21 @@ class ContinueCourseItem {
     if (course is! Map) return null;
 
     final courseId = course['id'] as String?;
-    final lessonId = row['lesson_id'] as String?;
-    if (courseId == null || lessonId == null) return null;
+    if (courseId == null) return null;
 
+    final completed = row['completed'] as bool? ?? false;
     final accessed = row['last_accessed_at'] as String?;
 
     return ContinueCourseItem(
-      lessonId: lessonId,
-      lessonTitle: lesson['title'] as String? ?? 'Lesson',
-      lessonType: lessonTypeFromString(lesson['lesson_type'] as String?),
+      lesson: Lesson.fromMap(
+        Map<String, dynamic>.from(lesson),
+        completed: completed,
+      ),
       courseId: courseId,
       courseTitle: course['title'] as String? ?? 'Course',
       courseCoverImageUrl: course['cover_image_url'] as String?,
       progressSeconds: (row['progress_seconds'] as num?)?.toInt() ?? 0,
-      completed: row['completed'] as bool? ?? false,
+      completed: completed,
       lastAccessedAt:
           accessed == null ? DateTime.now() : DateTime.parse(accessed).toLocal(),
     );

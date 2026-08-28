@@ -19,6 +19,7 @@ import '../../domain/entities/audio_summary.dart';
 import '../../domain/entities/category_summary.dart';
 import '../../domain/entities/continue_listening_item.dart';
 import '../../../lms/application/lms_providers.dart';
+import '../../../lms/presentation/lesson_launcher.dart';
 import '../../../lms/domain/entities/course_summary.dart';
 import '../../../watch/application/watch_providers.dart';
 import '../../../watch/presentation/widgets/youtube_card.dart';
@@ -545,16 +546,12 @@ class _ContinueCourseCard extends ConsumerWidget {
         return Padding(
           padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
           child: GestureDetector(
-            // Opens the course, not the lesson directly. The lesson
-            // routes take a fully-built Lesson as `extra`, and
-            // reconstructing one here from a progress row would mean
-            // inventing the media fields the player needs. The course
-            // screen puts them one tap from where they stopped and
-            // cannot be handed a half-built object.
-            onTap: () => context.push(
-              '/course/${item.courseId}',
-              extra: item.courseTitle,
-            ),
+            // Straight back into the lesson. The card carries a real
+            // Lesson — selected in the same shape the curriculum uses —
+            // so launchLesson can play it without a second round trip,
+            // and without either screen having its own idea of how a
+            // lesson opens.
+            onTap: () => launchLesson(context, ref, item.lesson),
             child: Container(
               padding: const EdgeInsets.all(12),
               decoration: AppTheme.glassSurface(),
