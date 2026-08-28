@@ -1043,6 +1043,65 @@ article by article — the same mechanism, and same reasoning, as
 reaches support under "Something else", in the member's own words rather
 than a label the app supplied. Android is unaffected throughout.
 
+### Could the entitlement be won on a second attempt?
+
+Two facts frame this before any effort is spent.
+
+**The earlier refusal was administrative; this one was not.** An earlier
+request was refused for "an invalid app name or bundle ID" — almost
+certainly the app-name mismatch noted in `docs/store-listing.md`. This
+request got past that check and was denied on substance. There is no
+second bite available from fixing paperwork.
+
+**The prize is one link.** The External Link Account Entitlement permits a
+single link out to the website for account creation and management. It
+does not permit prices in the app, a buy button, a purchase flow, or
+promoting an offer; the link must open in the default browser behind a
+system disclosure sheet; and the app must still carry no in-app purchase.
+The whole gain over today is being able to show "Manage your account on
+the web" where currently nothing may be shown. That is not a sales
+channel, and it should be weighed as what it is before anything is
+changed to obtain it.
+
+#### What actually works against the app
+
+1. **The promotional text leads with the AI guide** — "New: ask the guide
+   anything, in English, Hindi or Marathi — by voice or by typing." An
+   assistant as the headline feature is not a content library, and it is
+   among the first things an evaluator reads.
+2. **The guide is prominent in the app**, on Home, above the catalogue.
+   Eligibility turns on the listed content types being the *primary*
+   functionality.
+3. **The category is Health & Fitness**, and Apple's settled position is
+   that a meditation membership is a subscription service rather than a
+   catalogue. Calm and Headspace both use in-app purchase.
+
+Points 1 and 2 are addressable. Point 3 is not addressable by wording,
+and it is the one most likely deciding the outcome.
+
+#### A path, if it is ever pursued
+
+1. Gate the guide off on iOS — a one-line change behind the same pattern
+   as `kPurchaseUiEnabled` / `kEducationFramingEnabled`.
+2. Rewrite the promotional text and subtitle to lead with spoken audio
+   and video, with no mention of an assistant.
+3. Consider a category away from Health & Fitness.
+4. Reapply, framing the app as a spoken-audio and video library whose
+   content is acquired on the web.
+
+Estimated at roughly a third to get through, done well — because point 3
+may be fatal on its own.
+
+**The recommendation is not to pursue it.** It means removing the app's
+most distinctive feature from iOS, the one its own promotional text calls
+the headline, in exchange for permission to display a single link.
+
+**What is nearly free, and should come first:** reply to the denial
+asking which specific criterion the app failed. Apple sometimes answers,
+and the answer would say whether point 3 is fatal before anything is
+spent on points 1 and 2. A draft reply is in
+`docs/apple-entitlement-reply.md`.
+
 ### The decision that is still open
 
 iPhone users currently cannot buy anything, anywhere the app can mention.
