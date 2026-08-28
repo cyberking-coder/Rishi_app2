@@ -16,6 +16,12 @@ import '../../features/home/presentation/screens/browse_screen.dart';
 import '../../features/lms/domain/entities/lesson.dart';
 import '../../features/lms/presentation/screens/course_detail_screen.dart';
 import '../../features/lms/presentation/screens/courses_screen.dart';
+import '../../features/help_support/domain/entities/help_entities.dart';
+import '../../features/help_support/presentation/screens/contact_support_screen.dart';
+import '../../features/help_support/presentation/screens/feedback_screen.dart';
+import '../../features/help_support/presentation/screens/help_support_screen.dart';
+import '../../features/help_support/presentation/screens/support_requests_screen.dart';
+import '../../features/help_support/presentation/screens/support_ticket_screen.dart';
 import '../../features/lms/presentation/screens/payment_success_screen.dart';
 import '../../features/lms/presentation/screens/text_lesson_screen.dart';
 import '../../features/lms/presentation/screens/video_lesson_screen.dart';
@@ -113,6 +119,40 @@ final goRouterProvider = Provider<GoRouter>((ref) {
         path: '/lesson-text/:id',
         builder: (_, state) =>
             TextLessonScreen(lesson: state.extra as Lesson),
+      ),
+      // ── Help & Support ──
+      // Not wrapped in AppShell. Help is a drill-down from Settings, and
+      // several of these screens have a keyboard open — a bottom nav
+      // under one leaves the composer fighting for the last 60 pixels.
+      GoRoute(
+        path: '/help-support',
+        builder: (_, __) => const HelpSupportScreen(),
+      ),
+      GoRoute(
+        path: '/help-support/contact',
+        // `extra` is optional here, unlike the lesson routes: this screen
+        // is reachable both from a category (which preselects one) and
+        // from the plain Contact button (which does not).
+        builder: (_, state) =>
+            ContactSupportScreen(args: state.extra as ContactArgs?),
+      ),
+      GoRoute(
+        path: '/help-support/feedback',
+        builder: (_, __) => const FeedbackScreen(),
+      ),
+      GoRoute(
+        path: '/help-support/requests',
+        builder: (_, __) => const SupportRequestsScreen(),
+      ),
+      GoRoute(
+        path: '/help-support/requests/:id',
+        // The ticket is passed when arriving from the list so the header
+        // renders at once, but the id is the source of truth — a cold
+        // deep link has no extra, and the screen handles that.
+        builder: (_, state) => SupportTicketScreen(
+          ticketId: state.pathParameters['id']!,
+          ticket: state.extra as SupportTicket?,
+        ),
       ),
       GoRoute(path: '/watch', builder: (_, __) => const WatchScreen()),
       // Not wrapped in AppShell: the guide is a drill-down from Home,
