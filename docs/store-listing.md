@@ -1,4 +1,4 @@
-# Store listing copy — Know Thyself 2.1.2
+# Store listing copy — Know Thyself 2.2.0
 
 Everything the two stores ask for, in the order they ask for it. Replaces
 the 1.x `play-store-listing.md`, which still described a dark-violet
@@ -12,7 +12,7 @@ marked, so an edit does not silently overflow and get truncated mid-word.
 - **Apple ID (numeric):** `6786403340`
 - **SKU:** `knowthyself001`
 - **Android package:** `com.knowthyself.app`
-- **Version:** 2.1.2 (build 16 locally; CI assigns its own)
+- **Version:** 2.2.0 (build 18 locally; CI assigns its own)
 
 ---
 
@@ -152,27 +152,52 @@ meditation,mindfulness,calm,sleep,relax,spiritual,anxiety,breathe,guided,peace,h
 
 ### What's New in This Version (4000 max)
 
-Written after the release settled, not before it. The first draft of this
-said "2.1.2 is a restyle and nothing else", which stopped being true when
-the scroll fix and the greeting change landed. A release note describing
-the release you planned rather than the one you shipped is the same
-mistake as padding it.
+Written after the release settled, not before it. The first draft of the
+2.1.2 note said "a restyle and nothing else", which stopped being true
+when the scroll fix and the greeting change landed. A release note
+describing the release you planned rather than the one you shipped is the
+same mistake as padding it.
+
+**2.1.2 was never built or submitted.** The last version anybody actually
+has is 2.1.1, so this note covers everything since then — the restyle
+that was prepped as 2.1.2 as well as what 2.2.0 adds. Shipping the 2.2.0
+features under a note that assumed 2.1.2 had landed would leave the
+restyle unannounced to every user who is about to see it.
+
+New things first, then the look, then the smaller changes. Somebody
+skimming reads two lines.
 
 Everything below is visible on first launch. That is the test for whether
 a release note is honest — a reviewer opening the build should be able to
 see each line without hunting for it.
 
 ```
+• Help & Support, in Settings. Search the answers to common questions, or
+  open a request and follow the conversation in the app until it is resolved.
+• Home picks up where you left off in a course — one tap back into the
+  lesson you were in.
+• Downloaded audio now shows its artwork, with fifteen-second skip both ways
+  and a progress bar that follows your finger properly.
 • A new look throughout. Softer surfaces, clearer type, and a calmer palette
   that keeps the artwork rather than the interface in the foreground.
-• Home greets you by name, with whatever you were last listening to — and
-  how long is left of it — in reach straight away.
+• Home greets you by name, with whatever you were last listening to — and how
+  long is left of it — in reach straight away.
 • Smoother scrolling, and covers that load faster and use far less memory.
 • Episode lists say where you are up to in words rather than in colour, so a
   glance is enough.
 • Downloads explains itself when it is empty, instead of leaving you on a
   blank screen.
 ```
+
+Deliberately absent: the M4A upload path, the pop-up platform rules and
+the checkout country selector. The first two are invisible to a member,
+and the third is on the web — an iOS release note pointing at a web
+checkout is precisely what Guideline 3.1.3(a) is about.
+
+Also absent: the download-purge fix. It is a real fix, but it only
+affected accounts carrying a stale expiry date — in practice staff
+accounts — so "downloads no longer disappear" would claim a fix for a
+problem almost nobody reading the note had.
 > Deliberately not mentioned: the pop-up platform rules and the checkout
 > country selector. The first is invisible to users, and the second is on
 > the website rather than in the app — an iOS release note pointing at a
@@ -309,17 +334,19 @@ Know Thyself
 Guided meditation, courses and a companion to ask. Find peace within.
 ```
 
-### Release notes — 2.1.2 (build 16) (500 max)
+### Release notes — 2.2.0 (build 18) (500 max)
 
-> Unlike 2.1.1, this release is worth shipping to Play. 2.1.1 gave Android
-> users nothing and took two features away; the restyle reaches every
-> platform equally, so for once Play and the App Store get the same release
-> for the same reason.
+423 characters. Play truncates silently at 500 per language, so the four
+weakest lines from the Apple note are cut rather than every line being
+shortened into something clipped.
 
 ```
-• A new look throughout — softer surfaces, clearer type, and a calmer palette that keeps the artwork rather than the interface in the foreground.
-• The home screen opens on the day and a greeting, with whatever you were last listening to, and how long is left of it, in reach straight away.
-• Episode lists now say where you are up to in words rather than in colour.
+• Help & Support: search the answers, or open a request and follow it in the app.
+• Home picks up where you left off in a course — one tap back into the lesson.
+• Downloaded audio shows its artwork, with 15-second skip both ways.
+• A new look throughout: softer surfaces, clearer type, a calmer palette.
+• Home greets you by name, with what you were last playing in reach.
+• Smoother scrolling, and covers that load faster.
 ```
 > Play caps release notes at 500 characters per language and truncates
 > silently rather than warning.
@@ -409,14 +436,43 @@ declarations apply.
 ## 5. Before pressing submit
 
 > **2.1.1 is approved. This checklist now protects an approval rather than
-> chasing one.** The bar for 2.1.2 is lower in one way and higher in
+> chasing one.** The bar for 2.2.0 is lower in one way and higher in
 > another: lower because the reader-app argument has already been accepted,
 > higher because a regression now costs a live listing rather than a
 > pending one. The iOS-only items near the bottom are the ones that matter
-> — everything the approval rests on is enforced by two runtime flags that
-> a restyle could plausibly have broken.
+> — everything the approval rests on is enforced by two runtime flags.
+>
+> **2.2.0 carries a heavier claim than 2.1.2 would have.** 2.1.2 could tell
+> App Review that only the paint had changed since the approved build. This
+> one adds a whole screen with four new tables behind it, so the Help &
+> Support items below are not optional — a reviewer will open it, and the
+> Membership section is the part that has to read as explanation rather
+> than as a sales route.
 
-### New for 2.1.2
+### New for 2.2.0
+
+- [ ] **Apply migration `20260827000001_help_and_support.sql` before
+      building.** Help & Support compiles without it and then fails on
+      every query, which looks like a broken feature rather than a missing
+      table.
+- [ ] **Open Help & Support on iOS and read the Membership & Payments
+      answers as a reviewer would.** They are seeded rows in a database, so
+      they can be edited after review without a build — which is exactly
+      why they are worth checking before it. None may name a price or point
+      at a checkout.
+- [ ] **Submit one support request end to end**: create it, see it in My
+      requests, open it, reply. Four tables and a column grant sit behind
+      that path and none of it has run.
+- [ ] Check the **resume card on Home** opens the lesson itself, and that
+      it draws nothing at all on an account that has never opened one.
+- [ ] Check the **offline player**: artwork, both skip buttons, and drag
+      the progress bar slowly backwards. The scrubber was rewritten and the
+      backward direction is the one that was reported as broken.
+- [ ] **Download something, force-quit fully, reopen.** The purge fix and
+      the manifest work both only show up on a cold start, and this is the
+      bug that took three attempts.
+
+### Carried over from 2.1.2
 
 - [ ] **Run `flutter analyze` and fix everything it reports.** No part of
       the restyle has been compiled by anyone. It was written without a
@@ -425,8 +481,11 @@ declarations apply.
 - [ ] **Run the build on a real device before submitting**, not just the
       simulator. Layout is the part that cannot be checked by reading, and
       the restyle changed padding and type size on every screen.
+- [ ] Check the **course covers** on the Courses tab. They moved from a
+      fixed height to 16:9, so the crop is different on every handset from
+      what was seen before.
 - [ ] Check the **Downloads empty state on iOS** reads "Browse videos".
-      That button is new in 2.1.2 and only appears when there are no
+      That button is new since 2.1.1 and only appears when there are no
       downloads, which makes it the easiest education-framing leak in the
       release to miss.
 - [ ] Check a **long display name** on Home and a **long plan name** on
