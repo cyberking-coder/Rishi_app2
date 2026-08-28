@@ -381,6 +381,14 @@ class ProfileScreen extends ConsumerWidget {
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(30)),
       ),
+      // Without this the sheet is capped at nine sixteenths of the screen
+      // and its contents are simply clipped. The sheet itself scrolls, so
+      // the cap below is about how much of the screen it may take, not
+      // about what fits.
+      isScrollControlled: true,
+      constraints: BoxConstraints(
+        maxHeight: MediaQuery.of(context).size.height * 0.85,
+      ),
       builder: (_) => _SettingsSheet(ref: ref),
     );
   }
@@ -717,139 +725,159 @@ class _SettingsSheetState extends ConsumerState<_SettingsSheet> {
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(24, 20, 24, 32),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // drag handle
-          Center(
-            child: Container(
-              width: 40,
-              height: 4,
-              decoration: BoxDecoration(
-                color: AppTheme.border,
-                borderRadius: BorderRadius.circular(2),
-              ),
+    // Scrollable, and it has to be.
+    //
+    // This was a plain Column in a default modal sheet. A default sheet
+    // is capped at nine sixteenths of the screen height and does not
+    // scroll, which was fine while there were two rows in it. Adding the
+    // Support section pushed "Delete my account" past the bottom edge,
+    // where it could not be reached at all — the sheet simply ended, with
+    // nothing to indicate anything was below it.
+    //
+    // Deleting an account is the one thing in here somebody may have a
+    // legal right to do, and the App Store review notes point at it by
+    // name. It must never be the row that falls off the end.
+    //
+    // SafeArea keeps the last row clear of the gesture bar rather than
+    // underneath it.
+    return SafeArea(
+      top: false,
+      child: SingleChildScrollView(
+        child: Padding(
+            padding: const EdgeInsets.fromLTRB(24, 20, 24, 32),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // drag handle
+                Center(
+                  child: Container(
+                    width: 40,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: AppTheme.border,
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 20),
+                const Text('Settings',
+                    style: TextStyle(
+                        color: _kText, fontSize: 20, fontWeight: FontWeight.w700)),
+                const SizedBox(height: 20),
+
+                // ── Logout ──
+                _SheetTile(
+                  icon: Icons.logout,
+                  iconColor: AppTheme.clay,
+                  title: 'Logout',
+                  onTap: () async {
+                    Navigator.pop(context);
+                    await ref.read(authControllerProvider.notifier).logout();
+                    if (context.mounted) context.go('/login');
+                  },
+                ),
+                const SizedBox(height: 12),
+
+                // ── Device Info ──
+                _SheetTile(
+                  icon: Icons.phone_android,
+                  iconColor: _kAccent,
+                  title: 'Device Info',
+                  onTap: () async {
+                    if (_deviceInfo == null) {
+                      // Capture the messenger before the await to avoid using
+                      // BuildContext across the async gap.
+                      final messenger = ScaffoldMessenger.of(context);
+                      try {
+                        final svc = ref.read(deviceInfoServiceProvider);
+                        final profile = await svc.getDeviceProfile();
+                        if (!mounted) return;
+                        setState(() {
+                          _deviceInfo =
+                              'Name: ${profile.name}\nPlatform: ${profile.platform}\nFingerprint: ${profile.fingerprint}';
+                          _showDeviceInfo = true;
+                        });
+                      } catch (_) {
+                        messenger.showSnackBar(
+                          const SnackBar(
+                              content: Text('Could not load device info.')),
+                        );
+                      }
+                    } else {
+                      setState(() => _showDeviceInfo = !_showDeviceInfo);
+                    }
+                  },
+                ),
+                if (_showDeviceInfo && _deviceInfo != null) ...[
+                  const SizedBox(height: 8),
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      gradient: AppTheme.clayFill(AppTheme.surfaceCream),
+                      borderRadius: BorderRadius.circular(10),
+              boxShadow: AppTheme.cardShadow,
+            ),
+                    child: Text(_deviceInfo!,
+                        style:
+                            const TextStyle(color: _kSub, fontSize: 12, height: 1.6)),
+                  ),
+                ],
+
+                const SizedBox(height: 20),
+                const Divider(color: AppTheme.border),
+                const SizedBox(height: 12),
+
+                // ── Delete account ──
+                // Required by App Store Guideline 5.1.1(v): an app that creates
+                // accounts must let somebody delete theirs from inside it.
+                // Directing them to an email address does not satisfy the rule,
+                // and it is the wrong answer for the person as well.
+                //
+                // Last in the sheet and behind a divider — findable, not
+                // adjacent to Logout, which somebody taps in a hurry.
+                // ── Support ──
+                // Above the destructive actions, deliberately. Somebody who
+                // opens Settings because something is wrong should find a way
+                // to ask before they find the button that deletes everything.
+                //
+                // One row, not three. The email, WhatsApp and call options
+                // moved into the Help & Support screen, where they sit below
+                // the answers — most people arriving here want the answer, not
+                // a conversation, and offering three ways to start one before
+                // showing any of the answers gets that backwards.
+                const _SheetSectionLabel('Support'),
+                const SizedBox(height: 10),
+
+                _SheetTile(
+                  icon: Icons.help_outline_rounded,
+                  iconColor: _kAccent,
+                  title: 'Help & Support',
+                  onTap: () {
+                    Navigator.pop(context);
+                    context.push('/help-support');
+                  },
+                ),
+                const SizedBox(height: 8),
+                const Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 4),
+                  child: Text(
+                    'Answers, report a problem, or contact us.',
+                    style: TextStyle(color: _kSub, fontSize: 12),
+                  ),
+                ),
+                const SizedBox(height: 22),
+
+                _SheetTile(
+                  icon: Icons.delete_forever_outlined,
+                  iconColor: AppTheme.danger,
+                  title: 'Delete my account',
+                  onTap: _confirmDelete,
+                ),
+              ],
             ),
           ),
-          const SizedBox(height: 20),
-          const Text('Settings',
-              style: TextStyle(
-                  color: _kText, fontSize: 20, fontWeight: FontWeight.w700)),
-          const SizedBox(height: 20),
-
-          // ── Logout ──
-          _SheetTile(
-            icon: Icons.logout,
-            iconColor: AppTheme.clay,
-            title: 'Logout',
-            onTap: () async {
-              Navigator.pop(context);
-              await ref.read(authControllerProvider.notifier).logout();
-              if (context.mounted) context.go('/login');
-            },
-          ),
-          const SizedBox(height: 12),
-
-          // ── Device Info ──
-          _SheetTile(
-            icon: Icons.phone_android,
-            iconColor: _kAccent,
-            title: 'Device Info',
-            onTap: () async {
-              if (_deviceInfo == null) {
-                // Capture the messenger before the await to avoid using
-                // BuildContext across the async gap.
-                final messenger = ScaffoldMessenger.of(context);
-                try {
-                  final svc = ref.read(deviceInfoServiceProvider);
-                  final profile = await svc.getDeviceProfile();
-                  if (!mounted) return;
-                  setState(() {
-                    _deviceInfo =
-                        'Name: ${profile.name}\nPlatform: ${profile.platform}\nFingerprint: ${profile.fingerprint}';
-                    _showDeviceInfo = true;
-                  });
-                } catch (_) {
-                  messenger.showSnackBar(
-                    const SnackBar(
-                        content: Text('Could not load device info.')),
-                  );
-                }
-              } else {
-                setState(() => _showDeviceInfo = !_showDeviceInfo);
-              }
-            },
-          ),
-          if (_showDeviceInfo && _deviceInfo != null) ...[
-            const SizedBox(height: 8),
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                gradient: AppTheme.clayFill(AppTheme.surfaceCream),
-                borderRadius: BorderRadius.circular(10),
-        boxShadow: AppTheme.cardShadow,
-      ),
-              child: Text(_deviceInfo!,
-                  style:
-                      const TextStyle(color: _kSub, fontSize: 12, height: 1.6)),
-            ),
-          ],
-
-          const SizedBox(height: 20),
-          const Divider(color: AppTheme.border),
-          const SizedBox(height: 12),
-
-          // ── Delete account ──
-          // Required by App Store Guideline 5.1.1(v): an app that creates
-          // accounts must let somebody delete theirs from inside it.
-          // Directing them to an email address does not satisfy the rule,
-          // and it is the wrong answer for the person as well.
-          //
-          // Last in the sheet and behind a divider — findable, not
-          // adjacent to Logout, which somebody taps in a hurry.
-          // ── Support ──
-          // Above the destructive actions, deliberately. Somebody who
-          // opens Settings because something is wrong should find a way
-          // to ask before they find the button that deletes everything.
-          //
-          // One row, not three. The email, WhatsApp and call options
-          // moved into the Help & Support screen, where they sit below
-          // the answers — most people arriving here want the answer, not
-          // a conversation, and offering three ways to start one before
-          // showing any of the answers gets that backwards.
-          const _SheetSectionLabel('Support'),
-          const SizedBox(height: 10),
-
-          _SheetTile(
-            icon: Icons.help_outline_rounded,
-            iconColor: _kAccent,
-            title: 'Help & Support',
-            onTap: () {
-              Navigator.pop(context);
-              context.push('/help-support');
-            },
-          ),
-          const SizedBox(height: 8),
-          const Padding(
-            padding: EdgeInsets.symmetric(horizontal: 4),
-            child: Text(
-              'Answers, report a problem, or contact us.',
-              style: TextStyle(color: _kSub, fontSize: 12),
-            ),
-          ),
-          const SizedBox(height: 22),
-
-          _SheetTile(
-            icon: Icons.delete_forever_outlined,
-            iconColor: AppTheme.danger,
-            title: 'Delete my account',
-            onTap: _confirmDelete,
-          ),
-        ],
       ),
     );
   }
