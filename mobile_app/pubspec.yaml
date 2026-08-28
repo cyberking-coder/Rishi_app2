@@ -57,7 +57,12 @@ publish_to: "none"
 # from it via local.properties, and Info.plist passes it through as
 # $(FLUTTER_BUILD_NUMBER)/$(FLUTTER_BUILD_NAME). Keep AppConfig.appVersion
 # in step — support tickets report it.
-version: 2.2.0+18
+#
+# +19 replaces +18, which was never uploaded anywhere. +18 shipped a
+# settings sheet whose "Delete my account" row sat past the bottom edge
+# of a sheet that could not scroll — unreachable, and the row the App
+# Store review notes name as reachable in two taps. Nothing else changed.
+version: 2.2.0+19
 
 environment:
   sdk: ">=3.3.0 <4.0.0"
