@@ -19,6 +19,11 @@ work could change the answer:
   service rather than a content catalogue, nothing short of changing what
   the product is will move it, and no further effort should be spent.
 
+The stake is higher than it first looked: the entitlement's link lands on
+our own website, which sells, so it is the only route by which an iPhone
+user could reach a checkout. See the correction in Section 14 of
+`PROJECT_LOG.md`.
+
 Arguing the point invites a restatement of the decision. Asking a narrow,
 answerable question invites a specific reason. See Section 14 of
 `PROJECT_LOG.md` for the full reasoning.

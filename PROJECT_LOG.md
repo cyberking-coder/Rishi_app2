@@ -1053,15 +1053,24 @@ certainly the app-name mismatch noted in `docs/store-listing.md`. This
 request got past that check and was denied on substance. There is no
 second bite available from fixing paperwork.
 
-**The prize is one link.** The External Link Account Entitlement permits a
-single link out to the website for account creation and management. It
-does not permit prices in the app, a buy button, a purchase flow, or
-promoting an offer; the link must open in the default browser behind a
-system disclosure sheet; and the app must still carry no in-app purchase.
-The whole gain over today is being able to show "Manage your account on
-the web" where currently nothing may be shown. That is not a sales
-channel, and it should be weighed as what it is before anything is
-changed to obtain it.
+**The prize is one link — and the link does reach a checkout.**
+
+> **Correction, same day.** An earlier version of this section said the
+> entitlement "is not a sales channel". That was wrong and it understated
+> the value badly enough to have skewed the decision.
+
+The entitlement permits a single link out to the website for account
+creation and management. What it forbids is the ADVERTISING of the
+purchase inside the app: no prices, no buy button, no "Subscribe now", no
+promotion or offer copy. The link itself must be neutral — "Manage your
+account" — and it opens in the default browser behind a system disclosure
+sheet, with still no in-app purchase anywhere.
+
+But it lands on our own website, and our website sells. That is precisely
+how Spotify uses it. So the accurate description is a real purchase route
+that may not be advertised — not a cosmetic link. Against a present state
+where iPhone users cannot be pointed anywhere at all, that is a
+substantial gain rather than a token one.
 
 #### What actually works against the app
 
@@ -1076,8 +1085,20 @@ changed to obtain it.
    that a meditation membership is a subscription service rather than a
    catalogue. Calm and Headspace both use in-app purchase.
 
-Points 1 and 2 are addressable. Point 3 is not addressable by wording,
-and it is the one most likely deciding the outcome.
+Points 1 and 2 are addressable. Point 3 is not addressable by wording.
+
+#### Why Netflix and Spotify qualify
+
+Worth stating, because it is the clearest way to see the gap. Netflix is
+a video catalogue in Entertainment: you open it, browse titles, play
+them. No assistant, no programme, no progress framework, no wellness
+framing — the content *is* the app. Spotify is the same shape for audio.
+Both carry no in-app purchase at all.
+
+The difference is therefore not the content type. Know Thyself is audio
+and video too. The difference is that this app currently presents as a
+membership to a practice, headlined by an assistant, rather than as
+access to a library.
 
 #### A path, if it is ever pursued
 
@@ -1089,12 +1110,31 @@ and it is the one most likely deciding the outcome.
 4. Reapply, framing the app as a spoken-audio and video library whose
    content is acquired on the web.
 
-Estimated at roughly a third to get through, done well — because point 3
-may be fatal on its own.
+**Revised odds, better than first written.** An earlier draft of this
+section put it at roughly a third. That was too pessimistic. The
+guideline's actual test is that the primary functionality is audio or
+video and that there is no in-app purchase; with the assistant gated off
+iOS, the app meets that on the face of the text — spoken audio and video
+series, content acquired elsewhere, no IAP anywhere. Category is a signal
+Apple weighs, not a rule in the guideline. A well-prepared reapplication
+is meaningfully better than a third.
 
-**The recommendation is not to pursue it.** It means removing the app's
-most distinctive feature from iOS, the one its own promotional text calls
-the headline, in exchange for permission to display a single link.
+**The recommendation is no longer "do not pursue".** With the purchase
+route understood correctly, this is a genuine trade rather than a bad
+one: the app's most distinctive feature, on one platform only, in
+exchange for the only route by which an iPhone user can reach a checkout.
+
+Two things to hold on to while deciding it:
+
+* **Gating the guide costs iOS only.** Android keeps it, behind the same
+  platform flag pattern already in the codebase. The cost is one
+  platform, not the product.
+* **The FAQs are not a substitute for the guide.** They do different
+  jobs. The guide answers "what should I play tonight" and "how do I sit
+  with a restless mind" — discovery and companionship. Help & Support
+  answers "how do I reset my password". Removing the guide leaves a real
+  gap that the help articles do not fill, and the trade should be made
+  with that understood rather than assumed away.
 
 **What is nearly free, and should come first:** reply to the denial
 asking which specific criterion the app failed. Apple sometimes answers,
