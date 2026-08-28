@@ -984,6 +984,98 @@ Worth recording, because "no finding" is only useful if you know where it was lo
 - **`BuildContext` across async gaps**: five candidates flagged by pattern, all five confirmed false positives on inspection.
 - **The 12 `RemoteImage` call sites** are type-correct at every one.
 
+## 13. Dependency upgrade plan — 27 August 2026
+
+Latest versions read from the pub.dev API on 27 August 2026. Nothing in
+`pubspec.yaml` was changed; this section exists so the decision does not
+have to be re-derived later.
+
+### Tier 1 — already permitted, costs one command
+
+These are inside the existing caret constraints, so `flutter pub upgrade`
+takes them with no pubspec edit, no API change and nothing to migrate.
+Commit the refreshed `pubspec.lock` afterwards.
+
+| package | constraint | latest |
+|---|---|---|
+| supabase_flutter | ^2.5.6 | 2.17.2 |
+| video_player | ^2.9.1 | 2.14.0 |
+| chewie | ^1.8.5 | 1.15.0 |
+| http | ^1.2.2 | 1.6.0 |
+| audio_service | ^0.18.15 | 0.18.19 |
+| speech_to_text | ^7.0.0 | 7.4.0 |
+| url_launcher | ^6.3.0 | 6.3.2 |
+| path_provider | ^2.1.4 | 2.1.6 |
+| crypto | ^3.0.3 | 3.0.7 |
+| open_filex | ^4.5.0 | 4.7.0 |
+
+Twelve minor versions of Supabase alone. This tier is worth doing on its
+own, after a release rather than during one.
+
+### Tier 2 — majors that touch nothing stateful
+
+Contained API changes, no effect on identity, encryption or stored state.
+
+| package | constraint | latest |
+|---|---|---|
+| share_plus | ^10.0.2 | 13.3.0 |
+| pointycastle | ^3.9.1 | 4.0.0 |
+| rxdart | ^0.27.7 | 0.28.0 |
+| flutter_lints (dev) | ^4.0.0 | 6.0.0 |
+| flutter_launcher_icons (dev) | ^0.13.1 | 0.14.4 |
+
+`pointycastle` is used by the download cipher, so despite being in this
+tier it wants a decrypt test against a file encrypted by the OLD version
+— not just a fresh download.
+
+### Tier 3 — majors that need a real migration
+
+| package | constraint | latest | why |
+|---|---|---|---|
+| flutter_secure_storage | ^9.2.2 | 11.0.0 | holds per-file download AES keys |
+| device_info_plus | ^10.1.0 | 13.2.0 | feeds the device fingerprint |
+| flutter_riverpod | ^2.5.1 | 3.4.2 | ~30 providers, keepAlive, overrides |
+| google_sign_in | ^6.2.1 | 7.2.0 | v7 is a full API rewrite |
+| flutter_local_notifications | ^17.2.3 | 22.3.0 | five majors |
+| go_router | ^14.2.0 | 18.0.0 | four majors |
+| just_audio | ^0.9.40 | 0.10.6 | 0.x: minor number, breaking changes |
+| firebase_core / firebase_messaging | ^3.6.0 / ^15.1.3 | 4.14.0 / 16.6.0 | must move together |
+| sign_in_with_apple | ^6.1.4 | 8.2.0 | |
+
+**The two that deserve naming.** `flutter_secure_storage` stores the
+per-file AES keys for offline downloads, and `device_info_plus` produces
+the fingerprint device-binding is keyed on. If either changes how it
+stores or derives values across a major version, an existing install can
+silently lose the ability to decrypt its own downloads, or re-register as
+a new device. Neither failure appears on a fresh install — only on a
+handset that upgraded — so the test that matters is: download a file on
+the OLD build, upgrade in place, and play it. A clean `flutter run` on a
+wiped device proves nothing about this.
+
+That is the same failure class as the August downloads bug, which took
+three attempts to find precisely because it was invisible from a fresh
+state.
+
+### Gating fact
+
+`environment: sdk: ">=3.3.0 <4.0.0"`. Riverpod 3 and go_router 18 need a
+higher Dart floor than that, so Tier 3 includes an SDK bump — and what is
+reachable at all depends on the installed Flutter version. Check
+`flutter --version` before planning Tier 3.
+
+### Recommended sequence
+
+1. Ship 2.2.0.
+2. Tier 1, on its own branch, with a full build and a device pass.
+3. Tier 2, same.
+4. Tier 3 as its own release, one package group at a time, with the
+   upgrade-in-place download test above run against each of
+   secure_storage, device_info_plus and pointycastle.
+
+What makes this worth sequencing rather than doing in one pass: with
+twenty majors moving together, the next failure has no obvious cause.
+
+
 ---
 
-*Last updated: 25 August 2026, the day the App Store approved 2.1.1 as a reader app. That session also produced the purple-glass restyle, the image-decode and upload-resize work, and the full codebase audit in Section 12 — which found a critical entitlement hole that had been open since June. Before that: the App Store 3.1.1 rejection on 12 August — the iOS reader-app build and the public storefront it forced. Before that: live sessions, push notifications and the fan-out scaling work (2 August); Phases 3b, 4 and 5 landed in one extended session earlier still. See the bug-fix chronology at the end of Section 7 for what broke along the way and why.*
+*Last updated: 27 August 2026 — 2.2.0: Help & Support, the course resume card, offline-player artwork and skip controls, the download-purge fix (hasLapsed vs hasAccess), and the dependency plan in Section 13. Before that, 25 August 2026, the day the App Store approved 2.1.1 as a reader app. That session also produced the purple-glass restyle, the image-decode and upload-resize work, and the full codebase audit in Section 12 — which found a critical entitlement hole that had been open since June. Before that: the App Store 3.1.1 rejection on 12 August — the iOS reader-app build and the public storefront it forced. Before that: live sessions, push notifications and the fan-out scaling work (2 August); Phases 3b, 4 and 5 landed in one extended session earlier still. See the bug-fix chronology at the end of Section 7 for what broke along the way and why.*
