@@ -201,8 +201,8 @@ see each line without hunting for it.
 ```
 • Help & Support, in Settings. Search the answers to common questions, or
   open a request and follow the conversation in the app until it is resolved.
-• Home picks up where you left off in a course — one tap back into the
-  lesson you were in.
+• Home picks up where you left off in a series — one tap back into the
+  episode you were in.
 • Downloaded audio now shows its artwork, with fifteen-second skip both ways
   and a progress bar that follows your finger properly.
 • A new look throughout. Softer surfaces, clearer type, and a calmer palette
@@ -214,7 +214,16 @@ see each line without hunting for it.
   glance is enough.
 • Downloads explains itself when it is empty, instead of leaving you on a
   blank screen.
+• The in-app guide is not part of this version on iPhone.
 ```
+
+That last line is a judgement call and can be cut. Including it is the
+honest option: somebody who used the guide will open this build and find
+it gone, and a release note that lists eight additions while silently
+dropping a feature is the kind of omission people notice. It is stated
+flatly, with no explanation — the reason is regulatory and belongs
+nowhere near a store listing. It appears on Apple only; Android keeps the
+guide and its notes should not mention any of this.
 
 Deliberately absent: the M4A upload path, the pop-up platform rules and
 the checkout country selector. The first two are invisible to a member,
