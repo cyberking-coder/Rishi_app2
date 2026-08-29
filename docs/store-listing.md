@@ -69,7 +69,7 @@ Meditation & Inner Stillness
 > primary functionality.
 
 ```
-New: pick up any course exactly where you left off, artwork and skip controls on downloads, and help you can reach from inside the app.
+New: pick up any series exactly where you left off, artwork and skip controls on your downloads, and help you can reach from inside the app.
 ```
 
 ### Description (4000 max)
@@ -98,14 +98,27 @@ New: pick up any course exactly where you left off, artwork and skip controls on
 >
 > **Play keeps it.** Android still has the guide in full, and Android is
 > not claiming anything under 3.1.3(a).
+>
+> **The opening line names the library deliberately.** "A library of
+> guided meditations, talks and video series" uses the words the reader-app
+> definition itself uses — audio and video, as a catalogue. The previous
+> opening described a feeling; this one describes what the app is, which
+> is the question the entitlement turns on.
+>
+> **Still no "course", "lesson" or "certificate".** The first draft of the
+> 2.2.0 promotional text said "pick up any course", which is exactly the
+> word this file warns against three paragraphs up — it invites a reviewer
+> to file the app under education, the one category the exception does not
+> cover. It says "series", which is what the description has always
+> called them.
 
 ```
 Know Thyself — Find Peace Within
 
-A quiet place to return to, guided by Anurag Rishi. Whether you are looking for
-calm after a long day, deeper focus, rest that actually restores, or simply a
-few honest minutes with yourself, Know Thyself gives you something worth
-listening to.
+A library of guided meditations, talks and video series from Anurag Rishi.
+Whether you are looking for calm after a long day, deeper focus, rest that
+actually restores, or simply a few honest minutes with yourself, there is
+something here worth listening to.
 
 GUIDED MEDITATIONS AND TALKS
 
@@ -259,20 +272,43 @@ control. If the account is signed in elsewhere, signing in releases the
 previous session; if a device error appears, signing in again clears it.
 
 HOW TO REACH EACH FEATURE
-  • Ask the guide — Home tab, the "Ask the guide" row under the search
-    bar. The microphone is at the right of the message box. It needs the
-    microphone permission and a network connection.
+  • Guided meditations and talks — Home tab. Tap any item to play.
   • Video series — Videos tab. The demo account has access to all of them.
   • Offline playback — the download control on any item, then Downloads.
+    Downloaded items play with the device in airplane mode.
+  • Help & Support — Profile tab → Settings → Help & Support. Answers,
+    a contact form, and any requests the account has opened.
   • Account deletion — Profile tab → Settings → Delete account. This
     deletes the account immediately and cannot be undone, so please use a
     throwaway signup rather than the demo account if you want to test it.
-
-MICROPHONE
-Requested only when the user taps the microphone in the guide, for
-dictation. Speech recognition runs on the device through the system
-recogniser; no audio is recorded to a file or transmitted by the app.
 ```
+
+> **The "Ask the guide" line was removed in 2.2.0, and had to be.** The
+> guide is withheld on iOS in that build, so review notes telling a
+> reviewer where to find it would have sent them looking for something
+> that is not there — which reads as a broken app rather than an absent
+> feature. Review notes that do not match the binary are worse than no
+> notes at all.
+>
+> **The MICROPHONE paragraph went with it**, because the iOS build no
+> longer asks for the microphone — the only thing that used it was the
+> guide's dictation.
+>
+> **The Info.plist strings are a separate question, and not an obvious
+> one.** `NSMicrophoneUsageDescription` and
+> `NSSpeechRecognitionUsageDescription` are still there, and both name
+> "the guide". Deleting them looks tidy and may be wrong: `speech_to_text`
+> is still a dependency, so the microphone and speech frameworks are still
+> linked into the binary, and Apple's static analysis can require a
+> purpose string for a linked API whether or not the app calls it —
+> removing them risks an ITMS rejection for a *missing* string, which is a
+> worse failure than an unused one.
+>
+> The safe order is: leave them for this submission, and if review asks,
+> answer that the feature is Android-only in this version. If the guide
+> stays off iOS permanently, the clean fix is to drop `speech_to_text`
+> from the iOS build rather than to strip the strings while the framework
+> is still linked.
 
 ### Sign in with Apple
 Required, and implemented — the app offers Google Sign-In, which triggers
