@@ -57,8 +57,19 @@ Meditation & Inner Stillness
 ```
 
 ### Promotional text (170 max — editable without a new build)
+
+> **Rewritten for 2.2.0, and it had to be.** The previous text led with
+> "ask the guide anything". The guide is withheld on iOS from this build
+> (see `kGuideEnabled`), so that copy described a feature a reviewer
+> cannot find — Guideline 2.3, and a fresh rejection on top of whatever
+> else was being answered.
+>
+> It now leads with audio and video, which is also the case the
+> entitlement request has to make: that the listed content types are the
+> primary functionality.
+
 ```
-New: ask the guide anything, in English, Hindi or Marathi — by voice or by typing. Plus guided video series from Anurag Rishi, and offline listening wherever you are.
+New: pick up any course exactly where you left off, artwork and skip controls on downloads, and help you can reach from inside the app.
 ```
 
 ### Description (4000 max)
@@ -76,6 +87,17 @@ New: ask the guide anything, in English, Hindi or Marathi — by voice or by typ
 > them was removed from this copy too — a description promising something a
 > reviewer cannot find is Guideline 2.3, and it would be a fresh rejection on
 > top of the one being answered.
+>
+> **The "ASK THE GUIDE" section went the same way in 2.2.0.** The guide is
+> withheld on iOS from that build (`kGuideEnabled`), for the reason in
+> Section 14 of the log: Apple denied the reader-app entitlement, and an
+> assistant headlining the app is the clearest reason an evaluator would
+> decide the primary functionality is something other than audio and
+> video. Copy that still advertised it would be inaccurate AND would
+> argue against the next entitlement request.
+>
+> **Play keeps it.** Android still has the guide in full, and Android is
+> not claiming anything under 3.1.3(a).
 
 ```
 Know Thyself — Find Peace Within
@@ -83,15 +105,7 @@ Know Thyself — Find Peace Within
 A quiet place to return to, guided by Anurag Rishi. Whether you are looking for
 calm after a long day, deeper focus, rest that actually restores, or simply a
 few honest minutes with yourself, Know Thyself gives you something worth
-listening to and someone to ask.
-
-ASK THE GUIDE
-
-A companion that knows the whole library and where you are in it. Ask it how to
-sit with a restless mind, what to play tonight, or what a teaching meant — in
-English, Hindi or Marathi, typed or spoken aloud. Tap the microphone and talk
-normally; it listens, understands and answers. Dictation uses your phone's own
-speech recognition, so nothing you say is recorded or uploaded by us.
+listening to.
 
 GUIDED MEDITATIONS AND TALKS
 

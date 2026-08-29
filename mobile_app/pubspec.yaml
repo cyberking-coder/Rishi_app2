@@ -62,7 +62,13 @@ publish_to: "none"
 # settings sheet whose "Delete my account" row sat past the bottom edge
 # of a sheet that could not scroll — unreachable, and the row the App
 # Store review notes name as reachable in two taps. Nothing else changed.
-version: 2.2.0+19
+#
+# +20 withholds the guide on iOS (kGuideEnabled), in support of a second
+# External Link Account Entitlement request — see Section 14. Android is
+# unchanged and keeps the guide in full. Note that codemagic.yaml passes
+# --build-number=$BUILD_NUMBER, so a CI build carries its own number and
+# this one governs local builds only.
+version: 2.2.0+20
 
 environment:
   sdk: ">=3.3.0 <4.0.0"

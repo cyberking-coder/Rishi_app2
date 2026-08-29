@@ -209,8 +209,15 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
             // Directly under search, and worded as a question rather than
             // labelled "Chat". Nobody opens a meditation app looking for
             // a chatbot; they open it not knowing how long to sit for.
-            _GuideBar(onTap: () => context.push('/chat')),
-            const SizedBox(height: 22),
+            //
+            // Withheld on iOS — see kGuideEnabled. The spacing goes with
+            // it, so the row above closes up rather than leaving a gap
+            // where something used to be.
+            if (kGuideEnabled) ...[
+              _GuideBar(onTap: () => context.push('/chat')),
+              const SizedBox(height: 22),
+            ] else
+              const SizedBox(height: 10),
 
             const _ContinueCard(),
 

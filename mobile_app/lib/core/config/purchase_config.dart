@@ -51,6 +51,36 @@ final bool kPurchaseUiEnabled = defaultTargetPlatform != TargetPlatform.iOS;
 final bool kEducationFramingEnabled =
     defaultTargetPlatform != TargetPlatform.iOS;
 
+/// Whether the in-app guide is offered.
+///
+/// Off on iOS, and this one is about eligibility rather than about
+/// purchases.
+///
+/// On 27 August 2026 Apple denied the External Link Account Entitlement,
+/// stating that this app "does not qualify as a reader app". A reader app
+/// is one whose PRIMARY functionality is one of the listed content types
+/// — magazines, newspapers, books, audio, music, video. The guide is an
+/// assistant: it is the app's most distinctive feature, it sits above the
+/// catalogue on Home, and the App Store promotional text leads with it.
+/// It is the clearest reason an evaluator would conclude the primary
+/// functionality is something other than a library of audio and video.
+///
+/// Netflix and Spotify qualify because opening them puts you in a
+/// catalogue and nothing else. With this off, the iOS build is the same
+/// shape: audio, video series, downloads, and where you were.
+///
+/// Gating rather than deleting, on one platform only. Android keeps the
+/// guide in full — nothing about Android is affected by any of this — and
+/// if the entitlement is granted, or the position changes, flipping this
+/// back restores the feature with nothing to migrate and no server change.
+///
+/// [kPurchaseUiEnabled] is deliberately NOT reused for this. The two
+/// happen to have the same value today, but they answer different
+/// questions: that one is "may this build show a price", this one is "does
+/// this build look like a reader app". Conflating them would mean a future
+/// change to either silently moving the other.
+final bool kGuideEnabled = defaultTargetPlatform != TargetPlatform.iOS;
+
 /// What one item inside a course is called, in the singular.
 ///
 /// "Lesson" is the word that makes a list of videos a curriculum.
