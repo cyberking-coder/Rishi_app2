@@ -1,0 +1,40 @@
+# Supabase CLI project config.
+#
+# project_id is the project ref. It is NOT a secret — it is already public
+# in the Supabase URL, the anon-key domain (see mobile_app app_config.dart)
+# and every function URL — so this file is safe to commit, and committing it
+# is the whole point: it makes the verify_jwt settings below survive a
+# `supabase functions deploy`, which otherwise silently resets them.
+project_id = "gzcanqovqirarnculqjq"
+
+# ── Edge function JWT enforcement ────────────────────────────────────────
+#
+# Supabase defaults every function to "Verify JWT = ON" and RE-APPLIES that
+# default on every deploy. For a function called by an external server that
+# has no Supabase user session, ON means the request is rejected with 401
+# before a single line of the function runs — which reads to the caller as a
+# repeated delivery failure, and after ~24 hours Razorpay auto-disables the
+# webhook. This block is the durable fix: `supabase functions deploy` reads
+# it and keeps the setting, so the toggle can no longer drift back on.
+#
+# NOTE: this only governs deploys made through the Supabase CLI. If a
+# function is ever deployed by pasting into the Dashboard editor instead,
+# the toggle must be set by hand in Dashboard → Edge Functions → <function>
+# → Details → "Enforce JWT verification".
+
+# Razorpay's servers POST here with an X-Razorpay-Signature header, NOT a
+# Supabase JWT. Auth is the HMAC signature check inside the function itself
+# (verifyRazorpayWebhookSignature), so JWT verification must be OFF or every
+# delivery 401s before the signature is ever checked.
+[functions.razorpay-webhook]
+verify_jwt = false
+
+# These two are invoked by the n8n scheduler with the service-role key in the
+# Authorization header, and each re-checks the service_role claim itself.
+# JWT verification stays ON — the OPPOSITE of the webhook, and easy to get
+# backwards out of habit.
+[functions.send-session-reminders]
+verify_jwt = true
+
+[functions.send-content-notifications]
+verify_jwt = true
