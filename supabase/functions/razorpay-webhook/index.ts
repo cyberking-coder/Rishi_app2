@@ -172,23 +172,56 @@ async function processEvent(
   // are the authoritative source - Checkout.js never re-passes notes when
   // opening the payment modal, so payment.notes below is only a fallback
   // in case Razorpay does mirror them (kept for defense in depth).
-  let notes: Record<string, string>;
-  try {
-    notes = await fetchRazorpayOrderNotes(payment.order_id);
-    console.log("[razorpay-webhook] fetched order notes", {
-      orderId: payment.order_id,
-      keys: Object.keys(notes),
-    });
-  } catch (e) {
-    console.error("[razorpay-webhook] order fetch failed, falling back to payment.notes:", e);
+  let notes: Record<string, string> = {};
+  if (payment.order_id) {
+    try {
+      notes = await fetchRazorpayOrderNotes(payment.order_id);
+      console.log("[razorpay-webhook] fetched order notes", {
+        orderId: payment.order_id,
+        keys: Object.keys(notes),
+      });
+    } catch (e) {
+      console.error("[razorpay-webhook] order fetch failed, falling back to payment.notes:", e);
+      notes = payment.notes ?? {};
+    }
+  } else {
+    // No order_id at all. Every purchase THIS app creates goes through the
+    // Orders API (admin create-order), so an order-less payment cannot have
+    // originated here — there is nothing to fetch. Use whatever notes the
+    // payment itself carries, only so the ignore-log below can show what it
+    // was. (Previously this called fetchRazorpayOrderNotes(null), which
+    // logged a spurious "Could not fetch Razorpay order null: 400".)
     notes = payment.notes ?? {};
   }
   if (
     !notes.user_id ||
     (!notes.plan_id && !notes.course_id && !notes.live_session_id)
   ) {
-    console.log("[razorpay-webhook] order notes incomplete, trying payment.notes");
-    notes = payment.notes ?? {};
+    // Last resort before deciding it isn't ours: the payment's own notes.
+    const paymentNotes = payment.notes ?? {};
+    if (paymentNotes.user_id) notes = paymentNotes;
+  }
+
+  // Is this payment even ours? A Razorpay webhook is ACCOUNT-WIDE — it fires
+  // for every payment on the account, including ones from Payment Pages,
+  // Payment Links and Payment Buttons that have nothing to do with this app.
+  // Theirs carry a lead-capture form (first_name, city, utm_*, session) and
+  // no user_id; those flows do their own fulfilment and we must not touch
+  // them. Acknowledge with 200 and ignore — NEVER 400. A 400 tells Razorpay
+  // the endpoint is broken, so it retries the same payment forever and then
+  // DISABLES the webhook entirely, which stops real app payments unlocking
+  // too. That auto-disable is exactly what took the live webhook down.
+  const hasTarget = !!(notes.plan_id || notes.course_id || notes.live_session_id);
+  if (!notes.user_id || !hasTarget) {
+    console.warn(
+      "[razorpay-webhook] payment is not from this app — acknowledging and ignoring",
+      {
+        paymentId: payment.id,
+        orderId: payment.order_id ?? null,
+        noteKeys: Object.keys(notes),
+      },
+    );
+    return jsonResponse({ ok: true, ignored: "not_an_app_payment" });
   }
 
   // A seat at a paid live session carries live_session_id. It grants no
