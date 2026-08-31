@@ -68,7 +68,17 @@ publish_to: "none"
 # unchanged and keeps the guide in full. Note that codemagic.yaml passes
 # --build-number=$BUILD_NUMBER, so a CI build carries its own number and
 # this one governs local builds only.
-version: 2.2.0+20
+#
+# 2.2.1+21 is a bug-fix release: the Razorpay webhook now ignores
+# account-wide payments that aren't from the app (a foreign Payment Page
+# payment was 400ing and got the live webhook auto-disabled); audio streams
+# are served with a real audio Content-Type so iOS stops rejecting them with
+# -11828; offline downloads play on iOS again (NSAllowsLocalNetworking lets
+# AVPlayer reach the loopback decrypting proxy, which ATS was blocking with
+# -1004); and a track no longer re-buffers on load ("opens twice"). A patch
+# bump, not a minor: nothing was added, these are fixes to shipped behaviour.
+# Keep AppConfig.appVersion in step — support tickets report it.
+version: 2.2.1+21
 
 environment:
   sdk: ">=3.3.0 <4.0.0"

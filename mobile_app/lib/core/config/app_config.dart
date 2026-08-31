@@ -30,7 +30,7 @@ class AppConfig {
   /// compiled in here would be wrong on every CI build. If a ticket needs
   /// to be pinned to an exact build, the OS version and device in the
   /// same payload plus the ticket's timestamp will narrow it.
-  static const appVersion = '2.2.0';
+  static const appVersion = '2.2.1';
 
   static const audioChannelId = 'com.knowthyself.app.audio.channel';
   static const audioChannelName = 'Meditation Audio';
