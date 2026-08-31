@@ -30,5 +30,26 @@
 	<array>
 		<string>Default</string>
 	</array>
+
+	<!-- External Link Account Entitlement, granted by Apple Developer
+	     Relations on 3 September 2026 for com.anuragrishi.knowthyself
+	     (it reverses the 27 August denial). It permits a SINGLE neutral
+	     link out to our website for account creation and management — no
+	     price, no buy button, no promotion in the app.
+
+	     Same two out-of-code steps as Sign in with Apple above, or the
+	     link fails at runtime / review:
+	       1. Enable "External Link Account" on the App ID in the Apple
+	          Developer portal, then let the provisioning profile
+	          regenerate (Codemagic fetches a fresh one per build).
+	       2. The Xcode target must reference this entitlements file
+	          (already true for Sign in with Apple).
+
+	     The destination URL lives in Info.plist under SKExternalLinkAccount
+	     and MUST match externalAccountUrl in
+	     lib/core/config/purchase_config.dart, or App Review's
+	     binary-vs-plist check rejects it. -->
+	<key>com.apple.developer.storekit.external-link.account</key>
+	<true/>
 </dict>
 </plist>

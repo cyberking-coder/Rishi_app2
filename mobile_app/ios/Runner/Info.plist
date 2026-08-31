@@ -106,6 +106,18 @@
 		<key>NSAllowsLocalNetworking</key>
 		<true/>
 	</dict>
+	<!-- External Link Account Entitlement (granted 3 September 2026). The
+	     single neutral link the app may show to our website for account
+	     creation/management. Apple requires an https absolute URL with NO
+	     query parameters; '*' is the required default for all regions. This
+	     string MUST equal externalAccountUrl in
+	     lib/core/config/purchase_config.dart and the URL in the shipped
+	     binary, or App Review rejects the mismatch. -->
+	<key>SKExternalLinkAccount</key>
+	<dict>
+		<key>*</key>
+		<string>https://pay.anuragrishi.com/store</string>
+	</dict>
 	<!-- Google Sign-In (Phase 1). Create an iOS OAuth client for
 	     com.anuragrishi.knowthyself at
 	     https://console.cloud.google.com/apis/credentials, then replace

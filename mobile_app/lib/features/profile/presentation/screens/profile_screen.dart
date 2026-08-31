@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../../../app/theme/app_theme.dart';
 import '../../../../app/widgets/remote_image.dart';
@@ -825,6 +826,34 @@ class _SettingsSheetState extends ConsumerState<_SettingsSheet> {
                   ),
                 ],
 
+                // ── Account (external link) ──
+                // iOS only, under the External Link Account Entitlement Apple
+                // granted on 3 September 2026. A single neutral link to the
+                // website for creating or managing an account — the only
+                // in-app route by which an iPhone member can reach a checkout,
+                // since the in-app purchase UI is gated off under 3.1.3(a).
+                // Android/web keep the full in-app flow, so this is hidden
+                // there. The tap shows the required disclosure first.
+                if (kExternalAccountLinkEnabled) ...[
+                  const SizedBox(height: 20),
+                  const _SheetSectionLabel('Account'),
+                  const SizedBox(height: 10),
+                  _SheetTile(
+                    icon: Icons.person_outline_rounded,
+                    iconColor: _kAccent,
+                    title: 'Manage your account',
+                    onTap: _openExternalAccount,
+                  ),
+                  const SizedBox(height: 8),
+                  const Padding(
+                    padding: EdgeInsets.symmetric(horizontal: 4),
+                    child: Text(
+                      'Create or manage your account on our website.',
+                      style: TextStyle(color: _kSub, fontSize: 12),
+                    ),
+                  ),
+                ],
+
                 const SizedBox(height: 20),
                 const Divider(color: AppTheme.border),
                 const SizedBox(height: 12),
@@ -880,6 +909,58 @@ class _SettingsSheetState extends ConsumerState<_SettingsSheet> {
           ),
       ),
     );
+  }
+
+  /// Opens the single external account-management link permitted by the
+  /// External Link Account Entitlement, behind the disclosure Apple requires.
+  ///
+  /// The disclosure is not optional and its wording matters: it must tell the
+  /// person they are leaving the app for an external website and that the App
+  /// Store is not responsible for what happens there. The link itself is
+  /// neutral — it names no price and promotes no purchase — because the
+  /// entitlement forbids advertising the sale inside the app.
+  Future<void> _openExternalAccount() async {
+    final messenger = ScaffoldMessenger.of(context);
+    final proceed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: _kSurface,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(AppTheme.radiusCard),
+        ),
+        title: const Text('Manage your account on the web',
+            style: TextStyle(
+                color: _kText, fontSize: 19, fontWeight: FontWeight.w700)),
+        content: const Text(
+          'This opens our website in your browser, where you can create or '
+          'manage your account. You are leaving the app, and the App Store '
+          'is not responsible for the privacy or security of anything you do '
+          'on the web.',
+          style: TextStyle(color: _kSub, fontSize: 14, height: 1.5),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancel', style: TextStyle(color: _kSub)),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Continue', style: TextStyle(color: _kAccent)),
+          ),
+        ],
+      ),
+    );
+    if (proceed != true) return;
+
+    final ok = await launchUrl(
+      Uri.parse(externalAccountUrl),
+      mode: LaunchMode.externalApplication,
+    );
+    if (!ok) {
+      messenger.showSnackBar(
+        const SnackBar(content: Text('Could not open the website.')),
+      );
+    }
   }
 
   Future<void> _confirmDelete() async {

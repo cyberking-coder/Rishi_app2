@@ -81,6 +81,37 @@ final bool kEducationFramingEnabled =
 /// change to either silently moving the other.
 final bool kGuideEnabled = defaultTargetPlatform != TargetPlatform.iOS;
 
+/// Whether the iOS build shows the single external link to the website for
+/// account creation and management.
+///
+/// True on iOS ONLY. On 3 September 2026 Apple granted the External Link
+/// Account Entitlement for com.anuragrishi.knowthyself, reversing the 27
+/// August denial documented above under [kGuideEnabled]. That entitlement
+/// permits exactly ONE neutral link out to our own website for creating or
+/// managing an account — no price, no buy button, no "Subscribe", no
+/// promotion. It is the only in-app route by which an iPhone member can
+/// reach a checkout, which until now did not exist at all (the in-app
+/// checkout is gated off by [kPurchaseUiEnabled]).
+///
+/// Android and web are unaffected and keep the full in-app purchase flow, so
+/// the link is not shown there — it would be a strictly worse path than the
+/// one they already have.
+///
+/// [externalAccountUrl] MUST match SKExternalLinkAccount in Info.plist and
+/// the entitlement com.apple.developer.storekit.external-link.account in
+/// Runner.entitlements, or App Review's binary-vs-plist check fails the link.
+final bool kExternalAccountLinkEnabled =
+    defaultTargetPlatform == TargetPlatform.iOS;
+
+/// The external account-management URL surfaced under the entitlement.
+///
+/// MUST be byte-identical to the '*' value in Info.plist's
+/// SKExternalLinkAccount. Apple requires an https absolute URL with NO query
+/// parameters and 1000 or fewer ASCII characters; the store page satisfies
+/// all three. It is the same host Razorpay has approved, so a buyer who
+/// continues to a purchase there does not hit an unverified-website wall.
+const String externalAccountUrl = 'https://pay.anuragrishi.com/store';
+
 /// What one item inside a course is called, in the singular.
 ///
 /// "Lesson" is the word that makes a list of videos a curriculum.
