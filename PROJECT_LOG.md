@@ -1255,4 +1255,158 @@ twenty majors moving together, the next failure has no obvious cause.
 
 ---
 
-*Last updated: 27 August 2026 — 2.2.0: Help & Support, the course resume card, offline-player artwork and skip controls, the download-purge fix (hasLapsed vs hasAccess), and the dependency plan in Section 13. Before that, 25 August 2026, the day the App Store approved 2.1.1 as a reader app. That session also produced the purple-glass restyle, the image-decode and upload-resize work, and the full codebase audit in Section 12 — which found a critical entitlement hole that had been open since June. Before that: the App Store 3.1.1 rejection on 12 August — the iOS reader-app build and the public storefront it forced. Before that: live sessions, push notifications and the fan-out scaling work (2 August); Phases 3b, 4 and 5 landed in one extended session earlier still. See the bug-fix chronology at the end of Section 7 for what broke along the way and why.*
+## 15. Production-incident + iOS entitlement session — 31 August 2026
+
+Version **2.2.1+21**. This session was mostly live-fire: things that were
+already shipped broke in production, plus two features and the reversal of
+the 27 August entitlement denial (Section 14). Every change is on
+`claude/funny-keller-sbua4r`.
+
+### The Razorpay webhook was auto-disabled — and it was NOT a config fault
+
+Razorpay disabled the **live** webhook after 24 hours of failed deliveries.
+The first two hypotheses were the documented landmines (Verify JWT resetting
+to ON; a live-vs-test secret mismatch), and a `supabase/config.toml` was
+added to hold `verify_jwt = false` durably across CLI deploys — worth having
+regardless. But the function logs told a different story: the webhook was
+reached, the signature was valid, and it was **400ing at the application
+layer**. `payment.order_id` was `null` and the notes were a lead-capture
+form (`first_name`, `city`, `utm_*`, `session`).
+
+**A Razorpay webhook is account-wide.** It fires for every payment on the
+account, including ones from a **Payment Page / Payment Link** that has
+nothing to do with the app. The handler assumed every event was an app order
+with `user_id`/`plan_id` notes, so it returned 400 for these — and Razorpay
+reads 400 as "endpoint broken", retries forever, and eventually disables the
+whole webhook, which took real app payments down with it. Fix: a payment that
+carries no `user_id` + recognised target note is acknowledged with **200 and
+ignored** (the same way unhandled event types already were), never 400.
+`fetchRazorpayOrderNotes` is also skipped when `order_id` is null (it was
+logging a spurious "order null: 400"). **Open question left for the owner:**
+those ignored payments are real money on the same Razorpay account from some
+Payment Page — confirm that Page has its own fulfilment, or wire it up.
+
+### iOS-only playback failures, both about how bytes are labelled/reached
+
+- **`-11828` (AVErrorFileFormatNotRecognized) on streamed audio.** Played on
+  Android, failed on iOS. Cause: the admin upload stored objects as
+  `application/octet-stream` whenever the browser reported no MIME type
+  (common for `.mp3`/`.m4a`). Android's ExoPlayer sniffs bytes; iOS AVPlayer
+  trusts the Content-Type and refuses a non-audio one. Fixed at BOTH ends:
+  `issue-audio-license` now signs the playback URL with an S3
+  `response-content-type` override by rendition type (`audio_mp3`→`audio/mpeg`,
+  `audio_m4a`→`audio/mp4`) via a new optional arg on `presignGet` — which
+  repairs **already-uploaded** audios with no re-upload — and
+  `presignContentUpload` now derives the stored Content-Type from the file
+  extension, returning it so the client PUTs the matching header (or R2 rejects
+  the signature).
+- **`-1004` (cannot connect to server) on offline downloads.** The offline
+  player streams decrypted bytes from a loopback HTTP server on `127.0.0.1`,
+  and `Info.plist` had `NSAllowsArbitraryLoads=false` with no localhost
+  exception, so iOS ATS blocked AVPlayer from reaching it. Added
+  `NSAllowsLocalNetworking=true` — Apple's sanctioned localhost exception,
+  no loosening for real hosts. Android was fine via its network-security
+  config. Offline playback had simply never worked on iOS.
+- **Audio "opening twice".** `_playIndex` set the source and then issued a
+  separate `seek(Duration.zero)`; on iOS that redundant post-load seek
+  re-buffered the freshly-loaded item. The start position is now passed as
+  `initialPosition` to `setAudioSource`, so the track loads exactly once.
+
+### R2 CORS — the upload "network error"
+
+Bulk symptom "upload failed (network error)" was CORS: the browser uploads
+straight to R2 and the bucket's allowed-origins list didn't cover the origin
+in use (typically a Vercel preview URL). Resolved in the Cloudflare dashboard
+by adding the admin origins plus `https://*.vercel.app`. No code — recorded
+because it will recur on a new admin domain.
+
+### Admin: Help & Support console, and bulk audio upload
+
+The support tables and the mobile ticket flow existed (migration
+`20260827000001`) but the dashboard could not see or answer tickets. Added a
+**Help & Support** page (list + a conversation dialog that reads the full
+thread including internal staff notes, posts a reply or a private internal
+note, and sets status; a public reply moves an open ticket to in_progress),
+all through service-role server actions guarded by `requireAdmin()` with the
+reply's `sender_id` set to the acting admin. Also added **bulk audio upload**
+("Upload multiple") — many files at once, titles from filenames, shared
+Premium/Language, sequential with per-file progress and isolated retryable
+failures. Reuses the single-upload actions, so it gets the Content-Type fix
+above for free.
+
+### Apple GRANTED the External Link Account Entitlement (reverses Section 14)
+
+On **3 September 2026** Apple assigned the External Link Account Entitlement
+to the account for `com.anuragrishi.knowthyself` — the exact outcome
+Section 14 rated "meaningfully better than a third". It permits **one neutral
+link** out to the website for account creation/management: no price, no buy
+button, no promotion in the app. This is the only in-app route by which an
+iPhone member can reach a checkout, which did not exist while
+`kPurchaseUiEnabled` gates the in-app purchase UI off under 3.1.3(a).
+
+Implemented as: entitlement `com.apple.developer.storekit.external-link.account`
+in `Runner.entitlements`; `SKExternalLinkAccount` in `Info.plist` with `*` →
+`https://pay.anuragrishi.com/store` (https, absolute, no query params, must
+match the binary); a new `kExternalAccountLinkEnabled` (iOS-only) +
+`externalAccountUrl` in `purchase_config.dart` kept byte-identical to the
+plist; and an iOS-only **"Manage your account"** row in Profile → Settings
+that shows the required leaving-the-app disclosure, then opens the URL in the
+external browser via `url_launcher`. Chose the `SKExternalLinkAccount` plist +
+self-disclosure + external open (works iOS 15+, no native Swift) over the
+newer StoreKit `ExternalLinkAccount.open()` API; if a reviewer ever insists on
+the system sheet, a small native bridge would be added. Out-of-code: the
+"External Link Account" capability was enabled on the App ID (it lives among
+the capabilities, NOT "StoreKit External Purchases or Offers", which is a
+different program) and the provisioning profile regenerates via Codemagic.
+
+`kGuideEnabled = false` on iOS was left as-is, but its rationale (hiding the
+guide *to win* this entitlement) no longer applies now that it is granted —
+re-enabling the iOS guide is a live option, deliberately deferred.
+
+### The Google-identity gap the entitlement exposed
+
+The External Link Account link sends iOS buyers to `/store`, but the web
+storefront's sign-in was **email + password only**. An iPhone member who
+created their account with **Google in the app has no password**, so they
+could not sign in to buy — and "Create account" fails too, since Supabase
+rejects the duplicate email. Every Google user was locked out of purchasing.
+
+Added **"Continue with Google"** to `/store/signin` (Supabase web OAuth), an
+`/auth/callback` route that exchanges the code and sets the session cookie,
+and a `middleware.ts` allowlist entry so the pre-auth callback isn't bounced
+to `/login`. Same Google account → same email → **same Supabase `user_id`**,
+so access bought on the web appears in the app; an in-flight purchase resumes
+after the round-trip. Requires config: `https://pay.anuragrishi.com/auth/callback`
+in Supabase Auth redirect URLs, and the Supabase auth callback in the Google
+web OAuth client's authorised redirect URIs (the app's ID-token flow never
+needed the latter, so it was missing).
+
+### Email deliverability — Supabase's built-in sender is a toy
+
+Supabase's built-in email is capped at a handful per day, which throttled
+signups to ~2/day. Fix is **custom SMTP via Resend** (domain `anuragrishi.com`
+verified with SPF/DKIM; sender `no-reply@anuragrishi.com`), plus raising
+Supabase's own **Auth → Rate Limits → Emails per hour**. Two follow-ons found
+while testing: the confirmation link went to `localhost` because the project
+**Site URL** was still the default — set it to `https://pay.anuragrishi.com/store`
+— and store signup now passes `emailRedirectTo` back to
+`/store/signin?confirmed=1` so the link lands on a "your email is confirmed,
+sign in" state (carrying any buy target) instead of a dead page. A branded
+confirmation template (deep-violet header, `#6d4aff` button, Supabase
+`{{ .ConfirmationURL }}`) was written for the Email Templates editor.
+
+### Operational reminders this session reinforced
+
+- **Deploys are three separate planes.** Edge-function fixes
+  (`razorpay-webhook`, `issue-audio-license`) need `supabase functions deploy`
+  and are governed by the Verify-JWT toggle; admin/store changes ride Vercel;
+  the ATS and double-open fixes are in the **app binary** and need a rebuild.
+  Pushing to git does none of these.
+- **The device-lock exemption is function logic, not a flag.**
+  `applereview@gmail.com` is exempt only if the `register_device` body in
+  migration `20260708000001` is actually live — verify with
+  `select prosrc like '%applereview@gmail.com%' from pg_proc where proname='register_device'`.
+
+---
+
+*Last updated: 31 August 2026 — 2.2.1: the account-wide Razorpay webhook fix (a live-disabled webhook), the iOS `-11828`/`-1004` playback fixes and the audio double-open, the admin Help & Support console and bulk audio upload, and — the headline — Apple GRANTING the External Link Account Entitlement (reversing the 27 August denial in Section 14), the iOS account link built for it, the Google-on-web sign-in that unblocked Google users from buying, and Resend custom SMTP for email. See Section 15. Before that, 27 August 2026 — 2.2.0: Help & Support, the course resume card, offline-player artwork and skip controls, the download-purge fix (hasLapsed vs hasAccess), and the dependency plan in Section 13. Before that, 25 August 2026, the day the App Store approved 2.1.1 as a reader app. That session also produced the purple-glass restyle, the image-decode and upload-resize work, and the full codebase audit in Section 12 — which found a critical entitlement hole that had been open since June. Before that: the App Store 3.1.1 rejection on 12 August — the iOS reader-app build and the public storefront it forced. Before that: live sessions, push notifications and the fan-out scaling work (2 August); Phases 3b, 4 and 5 landed in one extended session earlier still. See the bug-fix chronology at the end of Section 7 for what broke along the way and why.*
