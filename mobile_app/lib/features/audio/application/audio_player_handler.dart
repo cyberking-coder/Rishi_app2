@@ -118,11 +118,18 @@ class AudioPlayerHandler extends BaseAudioHandler
       if (uri == null) {
         throw StateError('Invalid playback URL');
       }
-      await _player.setAudioSource(AudioSource.uri(uri));
-      // Fresh taps start at 0:00; only an explicit resumeAt (Continue
-      // Listening) resumes at a saved position. This prevents a newly-tapped
-      // track from inheriting any other track's position.
-      await _player.seek(resumeAt ?? Duration.zero);
+      // Load once, positioned where it should start, by passing
+      // initialPosition to setAudioSource instead of loading and THEN
+      // seeking. The old code set the source and then issued a separate
+      // seek(0); on iOS that second seek made AVPlayer re-buffer the
+      // freshly-loaded item, which is the audible "opens twice". Fresh taps
+      // pass Duration.zero; only Continue Listening passes a saved resumeAt,
+      // so a newly-tapped track still never inherits another track's
+      // position.
+      await _player.setAudioSource(
+        AudioSource.uri(uri),
+        initialPosition: resumeAt ?? Duration.zero,
+      );
       // Deliberately NOT awaited. just_audio's play() completes when
       // playback ENDS — not when it starts — so awaiting it means "block
       // until the track finishes." Everything after this line, and every

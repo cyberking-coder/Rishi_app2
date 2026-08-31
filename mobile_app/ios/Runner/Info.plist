@@ -95,6 +95,16 @@
 	<dict>
 		<key>NSAllowsArbitraryLoads</key>
 		<false/>
+		<!-- Offline playback streams decrypted bytes from a loopback HTTP
+		     server on 127.0.0.1 (LocalDecryptingProxy) so no plaintext file
+		     ever touches disk. ATS blocks cleartext HTTP by default, which
+		     made iOS AVPlayer refuse that local connection with error -1004
+		     ("could not connect to the server") — offline downloads simply
+		     would not play on iOS. This key permits localhost/link-local
+		     connections ONLY; it does not loosen ATS for any real remote
+		     host, and is Apple's sanctioned exception for exactly this case. -->
+		<key>NSAllowsLocalNetworking</key>
+		<true/>
 	</dict>
 	<!-- Google Sign-In (Phase 1). Create an iOS OAuth client for
 	     com.anuragrishi.knowthyself at
