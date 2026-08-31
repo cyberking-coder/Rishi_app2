@@ -90,20 +90,47 @@ export async function presignBunnyVideoUpload(args: {
   }
 }
 
-/** Presigns a direct-to-R2 PUT URL for a content file. */
+/**
+ * The Content-Type an uploaded object should be STORED with, derived from
+ * its file extension rather than trusting the browser. Browsers report an
+ * empty type for .mp3/.m4a often enough that the old fallback,
+ * `application/octet-stream`, was being stored on real audio — which iOS
+ * AVPlayer then refuses to open (error -11828) while Android plays it fine.
+ * A stored audio/* type is served straight back on the playback URL, so
+ * getting it right here is what lets iOS open the file.
+ */
+function resolveAudioContentType(fileName: string, provided: string): string {
+  const ext = fileName.split(".").pop()?.toLowerCase();
+  if (ext === "mp3") return "audio/mpeg";
+  if (ext === "m4a" || ext === "m4b" || ext === "mp4") return "audio/mp4";
+  if (ext === "aac") return "audio/aac";
+  if (ext === "wav") return "audio/wav";
+  // A real audio/* the browser did report is trusted; otherwise octet-stream
+  // (an unknown container we shouldn't mislabel).
+  return provided.startsWith("audio/") ? provided : "application/octet-stream";
+}
+
+/** Presigns a direct-to-R2 PUT URL for a content file. Returns the exact
+ *  Content-Type the URL was signed with; the client MUST PUT with the same
+ *  value or R2 rejects the upload with SignatureDoesNotMatch. */
 export async function presignContentUpload(args: {
   kind: ContentKind;
   contentId: string;
   fileName: string;
   contentType: string;
 }): Promise<
-  { ok: true; uploadUrl: string; objectKey: string } | { ok: false; error: string }
+  | { ok: true; uploadUrl: string; objectKey: string; contentType: string }
+  | { ok: false; error: string }
 > {
   await requireAdmin();
   try {
     const objectKey = buildObjectKey(args.kind, args.contentId, args.fileName);
-    const { uploadUrl } = await presignUpload(objectKey, args.contentType);
-    return { ok: true, uploadUrl, objectKey };
+    const contentType =
+      args.kind === "audio"
+        ? resolveAudioContentType(args.fileName, args.contentType)
+        : args.contentType;
+    const { uploadUrl } = await presignUpload(objectKey, contentType);
+    return { ok: true, uploadUrl, objectKey, contentType };
   } catch (e) {
     return { ok: false, error: e instanceof Error ? e.message : "Presign failed" };
   }

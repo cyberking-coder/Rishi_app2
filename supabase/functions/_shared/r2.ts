@@ -26,16 +26,31 @@ function objectUrl(r2Path: string): string {
   return `https://${accountId}.r2.cloudflarestorage.com/${bucket}/${r2Path}`;
 }
 
-/** Presigned GET URL for streaming/downloading a private object. */
+/** Presigned GET URL for streaming/downloading a private object.
+ *
+ * `responseContentType`, when given, adds an S3 `response-content-type`
+ * override so R2 returns the object with THAT Content-Type header no matter
+ * what was stored on it at upload time. This is what makes iOS play the
+ * file: AVPlayer trusts the server's Content-Type and refuses a stream
+ * served as `application/octet-stream` with error -11828 ("cannot open"),
+ * whereas Android's ExoPlayer sniffs the bytes and plays it regardless.
+ * Our upload path stored octet-stream whenever the browser didn't report a
+ * MIME type, so forcing the right audio type here repairs already-uploaded
+ * audios without a re-upload. The param is folded into the signature (it is
+ * a query parameter and signQuery signs all of them), so R2 honours it. */
 export async function presignGet(
   r2Path: string,
   ttlSeconds = DEFAULT_DOWNLOAD_TTL_SECONDS,
+  responseContentType?: string,
 ): Promise<string> {
   // X-Amz-Expires must live in the query string for a presigned URL — this
   // mirrors the admin dashboard's proven-working upload signer. Passing it
   // as a header produces URLs that R2 rejects with SignatureDoesNotMatch.
   const url = new URL(objectUrl(r2Path));
   url.searchParams.set("X-Amz-Expires", String(ttlSeconds));
+  if (responseContentType) {
+    url.searchParams.set("response-content-type", responseContentType);
+  }
   const signed = await client().sign(
     new Request(url, { method: "GET" }),
     { aws: { signQuery: true } },

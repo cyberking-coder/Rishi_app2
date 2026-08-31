@@ -75,11 +75,14 @@ export function UploadContentDialog({ kind }: { kind: ContentKind }) {
     });
   }
 
-  async function uploadToR2(uploadUrl: string, f: File) {
+  async function uploadToR2(uploadUrl: string, f: File, contentType: string) {
     await new Promise<void>((resolve, reject) => {
       const xhr = new XMLHttpRequest();
       xhr.open("PUT", uploadUrl);
-      xhr.setRequestHeader("content-type", f.type || "application/octet-stream");
+      // Must be exactly what the presign was signed with, or R2 rejects the
+      // PUT with SignatureDoesNotMatch. The server derives this from the
+      // file extension so the stored object carries a real audio/* type.
+      xhr.setRequestHeader("content-type", contentType);
       xhr.upload.onprogress = (e) => {
         if (e.lengthComputable) {
           const pct = Math.round((e.loaded / e.total) * 100);
@@ -143,7 +146,7 @@ export function UploadContentDialog({ kind }: { kind: ContentKind }) {
         if (!presigned.ok) throw new Error(presigned.error);
 
         setProgress("Uploading to storage…");
-        await uploadToR2(presigned.uploadUrl, file);
+        await uploadToR2(presigned.uploadUrl, file, presigned.contentType);
 
         setProgress("Finalizing…");
         const attached = await attachUpload({

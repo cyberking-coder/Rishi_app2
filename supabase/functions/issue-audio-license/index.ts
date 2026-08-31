@@ -158,7 +158,24 @@ Deno.serve(async (req) => {
     PREFERENCE.map((type) => assets.find((a) => a.asset_type === type))
       .find((a) => a !== undefined) ?? assets[0];
 
-  const signedUrl = await presignGet(asset.r2_path, SIGNED_URL_TTL_SECONDS);
+  // Force the Content-Type the signed URL serves with, by rendition type.
+  // iOS AVPlayer refuses a stream whose Content-Type is not audio (the
+  // upload path stored `application/octet-stream` when the browser reported
+  // no MIME), failing with -11828 while Android plays the identical file.
+  // Overriding it here fixes playback for every audio already uploaded,
+  // with no re-upload.
+  const CONTENT_TYPE: Record<string, string> = {
+    audio_hls: "application/vnd.apple.mpegurl",
+    audio_m4a: "audio/mp4",
+    audio_mp3: "audio/mpeg",
+  };
+  const responseContentType = CONTENT_TYPE[asset.asset_type];
+
+  const signedUrl = await presignGet(
+    asset.r2_path,
+    SIGNED_URL_TTL_SECONDS,
+    responseContentType,
+  );
 
   const { data: history } = await supabase
     .from("watch_history")
