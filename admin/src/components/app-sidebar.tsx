@@ -8,6 +8,7 @@ import {
   Film,
   GraduationCap,
   LayoutDashboard,
+  LifeBuoy,
   LogOut,
   Music,
   Settings,
@@ -33,6 +34,7 @@ const NAV = [
   { href: "/plans", label: "Membership", icon: CreditCard },
   { href: "/coupons", label: "Coupons", icon: TicketPercent },
   { href: "/categories", label: "Categories", icon: Tags },
+  { href: "/support", label: "Help & Support", icon: LifeBuoy },
   { href: "/analytics", label: "Analytics", icon: BarChart3 },
   { href: "/settings", label: "Settings", icon: Settings },
 ];
