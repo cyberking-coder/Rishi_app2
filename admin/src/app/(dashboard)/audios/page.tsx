@@ -1,6 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { PageHeader } from "@/components/page-header";
 import { UploadContentDialog } from "@/components/content/upload-content-dialog";
+import { BulkUploadAudioDialog } from "@/components/content/bulk-upload-audio-dialog";
 import { ContentActions } from "@/components/content/content-actions";
 import { ContentStatusBadge } from "@/components/status-badge";
 import { Badge } from "@/components/ui/badge";
@@ -31,7 +32,12 @@ export default async function AudiosPage() {
       <PageHeader
         title="Audios"
         description="Upload, publish, and manage audio content."
-        action={<UploadContentDialog kind="audio" />}
+        action={
+          <div className="flex gap-2">
+            <BulkUploadAudioDialog />
+            <UploadContentDialog kind="audio" />
+          </div>
+        }
       />
 
       <Card>
