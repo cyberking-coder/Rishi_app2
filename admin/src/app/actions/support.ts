@@ -65,7 +65,7 @@ export async function getTicketThread(ticketId: string): Promise<
     >();
   if (error) return { ok: false, error: error.message };
 
-  const senderIds = [...new Set((rows ?? []).map((r) => r.sender_id))];
+  const senderIds = Array.from(new Set((rows ?? []).map((r) => r.sender_id)));
   const { data: profiles } = await db
     .from("profiles")
     .select("id, display_name")

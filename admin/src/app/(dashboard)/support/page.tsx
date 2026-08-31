@@ -61,7 +61,7 @@ export default async function SupportPage() {
     .returns<TicketRow[]>();
 
   const rows = tickets ?? [];
-  const userIds = [...new Set(rows.map((t) => t.user_id))];
+  const userIds = Array.from(new Set(rows.map((t) => t.user_id)));
   const { data: profiles } = await supabase
     .from("profiles")
     .select("id, display_name")
