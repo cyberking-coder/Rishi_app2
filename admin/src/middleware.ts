@@ -56,6 +56,12 @@ export async function middleware(request: NextRequest) {
   // login — which is what the bare domain already does, and the reason
   // this needed its own path rather than the root.
   const isPublicStoreRoute = request.nextUrl.pathname.startsWith("/store");
+  // The OAuth callback. A buyer signing in with Google is by definition not
+  // yet authenticated when the browser lands here with the code to exchange,
+  // so bouncing it to /login would break the sign-in it is trying to
+  // complete. It sets the session itself and then forwards to the store.
+  const isPublicAuthCallback =
+    request.nextUrl.pathname.startsWith("/auth/callback");
   // The policy pages. Public by obligation, not by preference: Google
   // Play, the App Store and Razorpay all fetch these anonymously to
   // check them, and so does anybody deciding whether to pay.
@@ -81,6 +87,7 @@ export async function middleware(request: NextRequest) {
     !isPublicCheckoutRoute &&
     !isPublicVerifyRoute &&
     !isPublicStoreRoute &&
+    !isPublicAuthCallback &&
     !isPublicPolicyRoute
   ) {
     const url = request.nextUrl.clone();

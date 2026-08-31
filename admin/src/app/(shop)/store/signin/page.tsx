@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Eye, EyeOff } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
@@ -82,6 +82,61 @@ function SignInForm() {
     const path = await mintCheckoutPath(target);
     router.push(path ?? "/store");
   }
+
+  /// Sign in with the same Google account used in the app.
+  ///
+  /// This is the fix for Google users: they created their account in the app
+  /// with Google and have NO password, so email+password sign-in here is
+  /// impossible for them. A web OAuth round-trip authenticates the same
+  /// Google account — same email, so Supabase resolves it to the SAME user —
+  /// and access bought here appears in the app.
+  ///
+  /// We come back via /auth/callback (which sets the session cookie), then to
+  /// `next`: the purchase resumes if one was in flight, otherwise the store.
+  async function signInWithGoogle() {
+    setBusy(true);
+    setError(null);
+    setNotice(null);
+    const supabase = createClient();
+
+    const buy = params.get("buy");
+    const resume =
+      target && buy
+        ? `/store/signin?buy=${encodeURIComponent(buy)}&resume=1`
+        : "/store";
+    const redirectTo = `${window.location.origin}/auth/callback?next=${encodeURIComponent(resume)}`;
+
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: "google",
+      options: { redirectTo },
+    });
+    if (error) {
+      setError(humanise(error.message));
+      setBusy(false);
+    }
+    // On success the browser navigates away to Google; nothing else to do.
+  }
+
+  // After the Google round-trip we land back here with ?resume=1 and a live
+  // session cookie. Continue the purchase (or go to the store) automatically.
+  // Also surface a friendly message if the callback reported a failure.
+  useEffect(() => {
+    if (params.get("error") === "oauth") {
+      setError("Google sign-in didn't complete. Please try again.");
+      return;
+    }
+    if (params.get("resume") !== "1") return;
+    let cancelled = false;
+    (async () => {
+      const supabase = createClient();
+      const { data } = await supabase.auth.getUser();
+      if (!cancelled && data.user) await continueOn();
+    })();
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -214,6 +269,24 @@ function SignInForm() {
 
       <Card className="mt-4">
         <CardContent className="p-5">
+          {/* Google first: the people who cannot sign in any other way — the
+              ones who used Google in the app and have no password — are
+              exactly who this page was failing. */}
+          <Button
+            type="button"
+            variant="outline"
+            className="w-full"
+            onClick={signInWithGoogle}
+            disabled={busy}
+          >
+            Continue with Google
+          </Button>
+          <div className="my-4 flex items-center gap-3 text-xs text-muted-foreground">
+            <span className="h-px flex-1 bg-border" />
+            or with email
+            <span className="h-px flex-1 bg-border" />
+          </div>
+
           <form onSubmit={submit} className="space-y-4">
             {mode === "signup" && (
               <div className="space-y-1.5">
