@@ -125,6 +125,12 @@ function SignInForm() {
       setError("Google sign-in didn't complete. Please try again.");
       return;
     }
+    // Arrived from an email-confirmation link. The email is now verified;
+    // they just need to sign in (the confirm link does not carry a session).
+    if (params.get("confirmed") === "1") {
+      setNotice("Your email is confirmed — sign in below to continue.");
+      return;
+    }
     if (params.get("resume") !== "1") return;
     let cancelled = false;
     (async () => {
@@ -151,10 +157,23 @@ function SignInForm() {
         const { data, error } = await supabase.auth.signUp({
           email,
           password,
-          // Same metadata key the mobile app sends, so a buyer who signs
-          // up here and one who signs up in the app end up with the same
-          // shaped profile.
-          options: name.trim() ? { data: { display_name: name.trim() } } : undefined,
+          options: {
+            // Where the confirmation link lands after Supabase verifies the
+            // email. Without this it falls back to the project's Site URL —
+            // which is why an unconfigured project sends people to
+            // localhost. Bringing them back to this page with ?confirmed=1
+            // shows a "you're confirmed, sign in" state instead of a dead
+            // page, and keeps the purchase on the same tab.
+            emailRedirectTo: `${window.location.origin}/store/signin?confirmed=1${
+              params.get("buy")
+                ? `&buy=${encodeURIComponent(params.get("buy")!)}`
+                : ""
+            }`,
+            // Same metadata key the mobile app sends, so a buyer who signs
+            // up here and one who signs up in the app end up with the same
+            // shaped profile.
+            ...(name.trim() ? { data: { display_name: name.trim() } } : {}),
+          },
         });
         if (error) throw error;
 
