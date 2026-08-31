@@ -233,8 +233,8 @@ function SignInForm() {
       </h1>
       <p className="mt-2 text-sm text-muted-foreground">
         {target
-          ? "Use the same email you will sign in with in the app — that is where your access appears."
-          : "Use the same email as the app, so everything stays on one account."}
+          ? "Sign in the same way you use the app — if you signed in with Google there, choose \"Continue with Google\" here. That keeps it one account, and your access appears in the app."
+          : "Sign in the same way you use the app — with Google if that's how you signed in there, otherwise the same email. That keeps everything on one account."}
       </p>
 
       {/* Both options, equally visible, above the form. As a text link
