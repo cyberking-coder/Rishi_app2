@@ -1451,9 +1451,29 @@ direct `context.push('/now-playing')` in Home, Browse, the mini player and the
 lesson launcher. It refuses to push when the player is already the current
 route or while a push is still in flight, so two entry points firing together
 can no longer stack two identical Now Playing screens. The deep-link path keeps
-`pushReplacement` — different intent. Version reached 2.2.2+25 across these
-download and player fixes.
+`pushReplacement` — different intent.
+
+**Downloads now survive a dropped connection.** A report of
+`ClientException: Connection closed while receiving data` — with the whole R2
+signed URL dumped on screen — turned out to be two faults. The download engine
+had no retry, so one connection blip on a long file (a 36-minute track over
+mobile) failed it outright; and the raw exception, signed URL included, was
+shown to the user. Fixed by extracting the single transfer into
+`_attemptTransfer` and giving `_run` a retry loop: up to four attempts, each
+re-resolving a fresh signed URL and resuming from the bytes already on disk via
+a Range request, with backoff between them — so a dropped connection or an
+expired 10-minute URL recovers instead of failing. A short read with no error
+(silent truncation) is checked against the known total and retried rather than
+saved as "complete"; only a genuinely permanent error (bad status, missing
+content) fails immediately. And no raw exception is surfaced anywhere now — the
+stored download error, the download button, and the play snackbars on
+Home/Browse all show a short friendly message. The signed-URL lifetime was left
+at 10 minutes on purpose: the retry re-mints one each attempt, so lengthening
+it (a mild security trade-off) is unnecessary.
+
+The version name was bumped to **2.3.1** across this run (from 2.2.2), build
+number climbing to **+27**.
 
 ---
 
-*Last updated: 8 September 2026 — 2.2.2: the offline-downloads investigation (the revoke purge was user-scoped, and the real cause was the access-lapsed purge deleting FREE downloads as well as premium — now `purgePremiumDownloads` keeps free content, plus migration 20260908000001 restores a re-registering device's downloads) and the `openNowPlaying` single-open guard against stacked player screens. Before that, 31 August 2026 — 2.2.1: the account-wide Razorpay webhook fix (a live-disabled webhook), the iOS `-11828`/`-1004` playback fixes and the audio double-open, the admin Help & Support console and bulk audio upload, and — the headline — Apple GRANTING the External Link Account Entitlement (reversing the 27 August denial in Section 14), the iOS account link built for it, the Google-on-web sign-in that unblocked Google users from buying, and Resend custom SMTP for email. See Section 15. Before that, 27 August 2026 — 2.2.0: Help & Support, the course resume card, offline-player artwork and skip controls, the download-purge fix (hasLapsed vs hasAccess), and the dependency plan in Section 13. Before that, 25 August 2026, the day the App Store approved 2.1.1 as a reader app. That session also produced the purple-glass restyle, the image-decode and upload-resize work, and the full codebase audit in Section 12 — which found a critical entitlement hole that had been open since June. Before that: the App Store 3.1.1 rejection on 12 August — the iOS reader-app build and the public storefront it forced. Before that: live sessions, push notifications and the fan-out scaling work (2 August); Phases 3b, 4 and 5 landed in one extended session earlier still. See the bug-fix chronology at the end of Section 7 for what broke along the way and why.*
+*Last updated: 8 September 2026 — 2.3.1: the offline-downloads work — the vanishing-downloads investigation (the revoke purge was user-scoped, and the real cause was the access-lapsed purge deleting FREE downloads as well as premium — now `purgePremiumDownloads` keeps free content, plus migration 20260908000001 restores a re-registering device's downloads), download retry/resume on a dropped connection with friendly errors instead of the raw signed URL, and the `openNowPlaying` single-open guard against stacked player screens. Before that, 31 August 2026 — 2.2.1: the account-wide Razorpay webhook fix (a live-disabled webhook), the iOS `-11828`/`-1004` playback fixes and the audio double-open, the admin Help & Support console and bulk audio upload, and — the headline — Apple GRANTING the External Link Account Entitlement (reversing the 27 August denial in Section 14), the iOS account link built for it, the Google-on-web sign-in that unblocked Google users from buying, and Resend custom SMTP for email. See Section 15. Before that, 27 August 2026 — 2.2.0: Help & Support, the course resume card, offline-player artwork and skip controls, the download-purge fix (hasLapsed vs hasAccess), and the dependency plan in Section 13. Before that, 25 August 2026, the day the App Store approved 2.1.1 as a reader app. That session also produced the purple-glass restyle, the image-decode and upload-resize work, and the full codebase audit in Section 12 — which found a critical entitlement hole that had been open since June. Before that: the App Store 3.1.1 rejection on 12 August — the iOS reader-app build and the public storefront it forced. Before that: live sessions, push notifications and the fan-out scaling work (2 August); Phases 3b, 4 and 5 landed in one extended session earlier still. See the bug-fix chronology at the end of Section 7 for what broke along the way and why.*
