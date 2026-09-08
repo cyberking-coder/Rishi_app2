@@ -101,9 +101,11 @@ publish_to: "none"
 # is still in flight, so Home, Browse, the mini player and the lesson launcher
 # can no longer stack two identical Now Playing screens.
 #
-# 2.3.1+26 is a version-NAME bump only (2.2.2 -> 2.3.1); no behaviour changed
-# with it. The build number keeps climbing (+25 -> +26) because a store never
-# accepts a reused or lower one. Keep AppConfig.appVersion in step.
+# 2.3.1+26/+27 briefly carried a version-NAME bump to 2.3.1, then the download
+# retry/resume work. The name is reverted to 2.2.2 at +28 because the App Store
+# Connect version entry is 2.2.2 (its earlier build was developer-rejected), and
+# a new build must match that entry's version string; only the build number has
+# to climb, which it does (+28 > +27). No behaviour changed with the revert.
 #
 # +27 makes downloads survive a dropped mobile connection. A transfer that
 # fails mid-stream ("Connection closed while receiving data") now retries up to
@@ -114,7 +116,7 @@ publish_to: "none"
 # error) is caught and retried too. And no raw exception (which carried the
 # whole signed URL) is ever shown: download and playback failures now display
 # a short, friendly message.
-version: 2.3.1+27
+version: 2.2.2+28
 
 environment:
   sdk: ">=3.3.0 <4.0.0"
