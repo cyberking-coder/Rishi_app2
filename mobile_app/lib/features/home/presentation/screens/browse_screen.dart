@@ -8,6 +8,7 @@ import '../../../access/application/access_providers.dart';
 import '../../../audio/application/audio_providers.dart';
 import '../../../audio/domain/entities/audio_track.dart';
 import '../../application/home_providers.dart';
+import '../../../audio/presentation/utils/audio_navigation.dart';
 import '../../domain/entities/audio_summary.dart';
 import '../widgets/premium_lock.dart';
 
@@ -54,7 +55,7 @@ class _BrowseScreenState extends ConsumerState<BrowseScreen> {
         coverArtUrl: a.coverArtUrl,
         durationSeconds: a.durationSeconds,
       ));
-      if (mounted) context.push('/now-playing');
+      if (mounted) openNowPlaying(context);
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(

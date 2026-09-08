@@ -22,6 +22,7 @@ import '../../../lms/application/lms_providers.dart';
 import '../../../lms/presentation/lesson_launcher.dart';
 import '../../../lms/domain/entities/course_summary.dart';
 import '../../../watch/application/watch_providers.dart';
+import '../../../audio/presentation/utils/audio_navigation.dart';
 import '../../../watch/presentation/widgets/youtube_card.dart';
 import '../widgets/premium_lock.dart';
 
@@ -127,7 +128,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
             coverArtUrl: audio.coverArtUrl,
             durationSeconds: audio.durationSeconds,
           ));
-      if (mounted) context.push('/now-playing');
+      if (mounted) openNowPlaying(context);
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context)
@@ -785,7 +786,7 @@ class _ContinueCard extends ConsumerWidget {
             // Continue Listening resumes where the user left off.
             resumeAt: Duration(seconds: item.progressSeconds),
           );
-      if (context.mounted) context.push('/now-playing');
+      if (context.mounted) openNowPlaying(context);
     } catch (e) {
       if (!context.mounted) return;
       ScaffoldMessenger.of(context)

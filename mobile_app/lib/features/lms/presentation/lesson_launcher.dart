@@ -9,6 +9,7 @@ import '../../audio/application/audio_providers.dart';
 import '../../audio/domain/entities/audio_track.dart';
 import '../application/lms_providers.dart';
 import '../domain/entities/lesson.dart';
+import '../../audio/presentation/utils/audio_navigation.dart';
 
 /// Opens a lesson — the single place that knows how each type is played.
 ///
@@ -91,7 +92,7 @@ Future<void> launchLesson(
               coverArtUrl: lesson.audioCoverArtUrl,
               durationSeconds: lesson.audioDurationSeconds,
             ));
-        if (context.mounted) context.push('/now-playing');
+        if (context.mounted) openNowPlaying(context);
         await markComplete();
       } catch (e) {
         if (!context.mounted) return;

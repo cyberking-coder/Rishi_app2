@@ -75,20 +75,6 @@ class DownloadRepositoryImpl implements DownloadRepository {
   /// downloads.
   bool _manifestKnown = false;
 
-  // On-device diagnostic state, surfaced by [debugSummary].
-  int _restoredCount = 0;
-  String _restoreOutcome = 'not-run';
-  String _lastPurge = 'none';
-
-  @override
-  Future<String> debugSummary() async {
-    final meta = await _metadata.debugInfo();
-    return 'restore: outcome=$_restoreOutcome loaded=$_restoredCount '
-        'manifestKnown=$_manifestKnown\n'
-        'live tasks=${_tasks.length}\n'
-        'last purge: $_lastPurge\n$meta';
-  }
-
   @override
   Future<void> restore() async {
     // ── Order matters, and it used to be the other way round ──────────
@@ -101,8 +87,6 @@ class DownloadRepositoryImpl implements DownloadRepository {
     // network comes second.
     final loaded = await _metadata.load();
     _manifestKnown = loaded.isAuthoritative;
-    _restoreOutcome = loaded.outcome.name;
-    _restoredCount = loaded.tasks.length;
 
     for (final task in loaded.tasks) {
       // Anything left mid-flight when the app died is resumable.
@@ -263,11 +247,10 @@ class DownloadRepositoryImpl implements DownloadRepository {
         audioIds: audioIds,
         videoIds: videoIds,
       );
-    } catch (e) {
+    } catch (_) {
       // Cannot tell which are premium (offline). Deleting now could wipe a
       // free download that never needed access — keep everything and try
       // again next launch.
-      _lastPurge = 'lapse purge skipped (could not classify): $e';
       return;
     }
 
@@ -275,8 +258,6 @@ class DownloadRepositoryImpl implements DownloadRepository {
         .where((t) => premium.contains(t.contentId))
         .map((t) => t.id)
         .toList();
-    _lastPurge =
-        'lapse: purged ${toDelete.length} premium, kept ${_tasks.length - toDelete.length} free';
     for (final id in toDelete) {
       await delete(id);
     }
@@ -291,24 +272,18 @@ class DownloadRepositoryImpl implements DownloadRepository {
     }
 
     // Then server-side revocations.
-    var revokedDeleted = 0;
     try {
       final revoked = await _resolver.revokedContentIds();
       final toPurge = _tasks.values
           .where((t) => revoked.contains(t.contentId))
           .map((t) => t.id)
           .toList();
-      revokedDeleted = toPurge.length;
       for (final id in toPurge) {
         await delete(id);
       }
-    } catch (e) {
+    } catch (_) {
       // Offline / transient — try again next launch.
-      _lastPurge = 'revoke check skipped/failed: $e';
-      return;
     }
-    _lastPurge =
-        'revoke+expiry: expired=${expired.length} revoked=$revokedDeleted';
   }
 
   @override
@@ -320,7 +295,6 @@ class DownloadRepositoryImpl implements DownloadRepository {
     // The state is dropped in memory first, then written once.
     final ids = _tasks.values.map((t) => t.id).toList();
     if (ids.isEmpty) return;
-    _lastPurge = 'purgeAll (access lapsed): ${ids.length} items';
 
     for (final id in ids) {
       _controls[id]?.cancelRequested = true;

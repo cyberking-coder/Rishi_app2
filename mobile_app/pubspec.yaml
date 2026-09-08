@@ -94,7 +94,13 @@ publish_to: "none"
 # The lapse purge now removes only premium downloads (looked up server-side)
 # and keeps free ones; logout still clears everything. Also drops the +23
 # on-device diagnostic once the cause was found in the logs.
-version: 2.2.2+24
+#
+# +25 removes the leftover on-device download diagnostic entirely, and routes
+# every in-app "open the player" through openNowPlaying() — one helper that
+# won't push /now-playing if it is already the current route or while a push
+# is still in flight, so Home, Browse, the mini player and the lesson launcher
+# can no longer stack two identical Now Playing screens.
+version: 2.2.2+25
 
 environment:
   sdk: ">=3.3.0 <4.0.0"

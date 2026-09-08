@@ -6,6 +6,7 @@ import 'package:go_router/go_router.dart';
 import '../../../../app/theme/app_theme.dart';
 import '../../../../app/widgets/remote_image.dart';
 import '../../application/audio_providers.dart';
+import '../utils/audio_navigation.dart';
 
 /// Persistent bottom bar shown whenever a track is loaded, regardless of
 /// which screen is on top -- this is what makes background playback feel
@@ -51,7 +52,7 @@ class MiniPlayer extends ConsumerWidget {
                     final progress = _progressFraction(duration, position);
 
                     return GestureDetector(
-                      onTap: () => context.push('/now-playing'),
+                      onTap: () => openNowPlaying(context),
                       child: Material(
                         color: AppTheme.sageDark,
                         child: Column(

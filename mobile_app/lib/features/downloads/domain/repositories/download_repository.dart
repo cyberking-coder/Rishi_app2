@@ -53,10 +53,5 @@ abstract class DownloadRepository {
   /// on the next launch.
   Future<void> purgePremiumDownloads();
 
-  /// Human-readable snapshot of the download storage state, shown on the
-  /// empty Downloads screen so a persistence/purge fault can be diagnosed on
-  /// the device without a computer.
-  Future<String> debugSummary();
-
   Future<void> dispose();
 }
