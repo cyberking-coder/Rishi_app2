@@ -99,12 +99,30 @@
 		     server on 127.0.0.1 (LocalDecryptingProxy) so no plaintext file
 		     ever touches disk. ATS blocks cleartext HTTP by default, which
 		     made iOS AVPlayer refuse that local connection with error -1004
-		     ("could not connect to the server") — offline downloads simply
-		     would not play on iOS. This key permits localhost/link-local
-		     connections ONLY; it does not loosen ATS for any real remote
-		     host, and is Apple's sanctioned exception for exactly this case. -->
+		     ("could not connect to the server"). NSAllowsLocalNetworking on
+		     its own proved not to be enough for AVPlayer against a raw
+		     127.0.0.1 URL, so both the loopback IP and localhost are also
+		     given an EXPLICIT cleartext exception below. These exceptions
+		     apply only to the on-device loopback; no real remote host is
+		     affected, and NSAllowsArbitraryLoads stays false so ATS is still
+		     enforced everywhere else. -->
 		<key>NSAllowsLocalNetworking</key>
 		<true/>
+		<key>NSExceptionDomains</key>
+		<dict>
+			<key>127.0.0.1</key>
+			<dict>
+				<key>NSExceptionAllowsInsecureHTTPLoads</key>
+				<true/>
+			</dict>
+			<key>localhost</key>
+			<dict>
+				<key>NSExceptionAllowsInsecureHTTPLoads</key>
+				<true/>
+				<key>NSIncludesSubdomains</key>
+				<true/>
+			</dict>
+		</dict>
 	</dict>
 	<!-- External Link Account Entitlement (granted 3 September 2026). The
 	     single neutral link the app may show to our website for account
