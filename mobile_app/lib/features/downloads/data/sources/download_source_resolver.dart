@@ -130,21 +130,57 @@ class DownloadSourceResolver {
     }
   }
 
-  /// Returns the set of contentIds whose server-side download row is
-  /// revoked/expired for the active device, so they can be purged locally.
+  /// Returns the set of contentIds whose download the CURRENT active device
+  /// should purge locally — i.e. revoked/expired server-side and NOT still
+  /// held as a valid ('ready') download by this device.
+  ///
+  /// This used to filter on `user_id` alone, which is what deleted people's
+  /// downloads on restart. A "Reset device" / "Reset All Devices" (routine
+  /// in this app, because of the one-device lock) sets that device's
+  /// download rows to 'revoked'. The user re-registers on the SAME phone and
+  /// their files are still on disk — but a user-scoped query returned the
+  /// revoked content and the launch purge wiped it, even though the device
+  /// was active again and the account still had access.
+  ///
+  /// Two guards fix that:
+  ///   1. If there is no active device (offline, or the window between a
+  ///      reset and the next login), return nothing and skip the purge
+  ///      entirely — deleting then would wipe a device that is simply not
+  ///      the currently-registered one, and next launch can try again.
+  ///   2. Never purge content this device still has a 'ready' row for. A
+  ///      revoked row left behind by an OLD device must not delete the copy
+  ///      this device legitimately re-downloaded.
   Future<Set<String>> revokedContentIds() async {
     final userId = _client.auth.currentUser?.id;
     if (userId == null) return {};
 
+    String activeDeviceId;
+    try {
+      activeDeviceId = await _getActiveDeviceId();
+    } catch (_) {
+      // No active device right now — do not delete anything.
+      return {};
+    }
+
     final rows = await _client
         .from('downloads')
-        .select('video_id, audio_id, download_status')
-        .eq('user_id', userId)
-        .inFilter('download_status', ['revoked', 'expired']);
+        .select('video_id, audio_id, device_id, download_status')
+        .eq('user_id', userId);
 
-    return {
-      for (final row in rows as List)
-        (row['video_id'] ?? row['audio_id']) as String,
-    };
+    final readyOnThisDevice = <String>{};
+    final revoked = <String>{};
+    for (final row in rows as List) {
+      final id = (row['video_id'] ?? row['audio_id']) as String?;
+      if (id == null) continue;
+      final status = row['download_status'] as String?;
+      if (status == 'ready' && row['device_id'] == activeDeviceId) {
+        readyOnThisDevice.add(id);
+      } else if (status == 'revoked' || status == 'expired') {
+        revoked.add(id);
+      }
+    }
+    // A copy the active device still holds a valid entitlement for is never
+    // purged, whatever a different device's row says.
+    return revoked.difference(readyOnThisDevice);
   }
 }
