@@ -78,7 +78,17 @@ publish_to: "none"
 # -1004); and a track no longer re-buffers on load ("opens twice"). A patch
 # bump, not a minor: nothing was added, these are fixes to shipped behaviour.
 # Keep AppConfig.appVersion in step — support tickets report it.
-version: 2.2.1+21
+#
+# 2.2.2+22 adds the iOS External Link Account link (entitlement granted
+# 3 Sep 2026): a single neutral "Manage your account" link on iOS, behind
+# kExternalAccountLinkEnabled, that opens pay.anuragrishi.com/store — the only
+# in-app route by which an iPhone member can reach a checkout. It also carries
+# the fix for offline downloads vanishing after a restart: the launch purge
+# was user-scoped and deleted files a routine device reset had marked revoked,
+# even on an account that still had access; the purge is now device-aware and
+# never deletes a copy the active device still holds (paired with migration
+# 20260908000001, which un-revokes a device's downloads when it re-registers).
+version: 2.2.2+22
 
 environment:
   sdk: ">=3.3.0 <4.0.0"
