@@ -56,10 +56,13 @@ class _BrowseScreenState extends ConsumerState<BrowseScreen> {
         durationSeconds: a.durationSeconds,
       ));
       if (mounted) openNowPlaying(context);
-    } catch (e) {
+    } catch (_) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(e.toString())),
+        const SnackBar(
+          content:
+              Text("Couldn't play this track. Check your connection and try again."),
+        ),
       );
     } finally {
       _starting = false;

@@ -64,9 +64,12 @@ class DownloadButton extends ConsumerWidget {
             messenger.showSnackBar(
               const SnackBar(content: Text('Download started')),
             );
-          } catch (e) {
+          } catch (_) {
+            // Never surface the raw exception (it carries the signed URL).
             messenger.showSnackBar(
-              SnackBar(content: Text('Could not start download: $e')),
+              const SnackBar(
+                content: Text('Could not start the download. Please try again.'),
+              ),
             );
           }
         },

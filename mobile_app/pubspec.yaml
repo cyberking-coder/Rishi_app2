@@ -104,7 +104,17 @@ publish_to: "none"
 # 2.3.1+26 is a version-NAME bump only (2.2.2 -> 2.3.1); no behaviour changed
 # with it. The build number keeps climbing (+25 -> +26) because a store never
 # accepts a reused or lower one. Keep AppConfig.appVersion in step.
-version: 2.3.1+26
+#
+# +27 makes downloads survive a dropped mobile connection. A transfer that
+# fails mid-stream ("Connection closed while receiving data") now retries up to
+# four times, each attempt fetching a fresh signed URL and resuming from the
+# bytes already on disk via a Range request — so a long file over a flaky
+# connection completes instead of failing on the first blip, and an expired
+# signed URL is simply re-minted. Silent truncation (a short read with no
+# error) is caught and retried too. And no raw exception (which carried the
+# whole signed URL) is ever shown: download and playback failures now display
+# a short, friendly message.
+version: 2.3.1+27
 
 environment:
   sdk: ">=3.3.0 <4.0.0"

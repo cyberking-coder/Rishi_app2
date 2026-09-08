@@ -22,6 +22,10 @@ class _DownloadControl {
   bool cancelRequested = false;
 }
 
+/// How a single transfer attempt ended. All three are terminal for [_run];
+/// a network failure is signalled by a throw, not a value.
+enum _AttemptResult { completed, paused, cancelled }
+
 /// The download engine. Streams bytes over HTTP with Range support,
 /// encrypts each chunk with AES-CTR before it ever hits disk, persists
 /// progress, and exposes everything as a reactive task list.
@@ -315,102 +319,177 @@ class DownloadRepositoryImpl implements DownloadRepository {
 
   // --- core engine ---------------------------------------------------------
 
+  /// Max transfer attempts before a download is marked failed. A dropped
+  /// mobile connection on a long file is the common case, not an exception,
+  /// and each retry resumes from the bytes already on disk via a Range
+  /// request rather than starting over.
+  static const _maxAttempts = 4;
+
   Future<void> _run(String id, DownloadCipherKey cipherKey) async {
     final control = _DownloadControl();
     _controls[id] = control;
 
-    var task = _tasks[id]!.copyWith(
+    _tasks[id] = _tasks[id]!.copyWith(
       status: DownloadStatus.downloading,
       clearError: true,
     );
-    _tasks[id] = task;
     _emit();
 
     try {
-      final url = await _resolver.resolve(task.contentId, task.contentType);
-      var received = task.receivedBytes;
-
-      final request = http.Request('GET', url);
-      if (received > 0) request.headers['range'] = 'bytes=$received-';
-      final response = await _httpClient.send(request);
-
-      // Server ignored our Range request → restart cleanly from zero.
-      if (received > 0 && response.statusCode == 200) {
-        received = 0;
-      }
-      if (response.statusCode != 200 && response.statusCode != 206) {
-        throw http.ClientException('Unexpected status ${response.statusCode}');
-      }
-
-      final total = _resolveTotal(response, received);
-      task = task.copyWith(totalBytes: total, receivedBytes: received);
-      _tasks[id] = task;
-
-      final file = await _storage.encryptedFile(id);
-      final raf = await file.open(
-        mode: received > 0 ? FileMode.append : FileMode.write,
-      );
-      if (received > 0) await raf.truncate(received);
-
-      final transformer = CtrTransformer.atOffset(cipherKey, received);
-      var lastEmit = received;
-      var lastPersist = received;
-
-      try {
-        await for (final chunk in response.stream) {
-          if (control.cancelRequested) {
-            await raf.close();
-            return; // delete() handles cleanup.
+      for (var attempt = 1; attempt <= _maxAttempts; attempt++) {
+        try {
+          // completed / paused / cancelled are all terminal; a network
+          // failure throws and is caught below.
+          await _attemptTransfer(id, cipherKey, control);
+          return;
+        } catch (e) {
+          // A user pause/cancel is not an error — it returns above. Anything
+          // thrown here is a transfer failure.
+          final canRetry = attempt < _maxAttempts && _isTransient(e);
+          if (control.cancelRequested || _tasks[id] == null) return;
+          if (!canRetry) {
+            _fail(id, _friendlyError(e));
+            return;
           }
-          if (control.pauseRequested) break;
-
-          final encrypted = transformer.process(Uint8List.fromList(chunk));
-          await raf.writeFrom(encrypted);
-          received += chunk.length;
-
-          task = task.copyWith(receivedBytes: received);
-          _tasks[id] = task;
-
-          if (received - lastEmit >= _emitEveryBytes) {
-            lastEmit = received;
-            _emit();
-          }
-          if (received - lastPersist >= _persistEveryBytes) {
-            lastPersist = received;
-            await _persist();
-          }
+          debugPrint(
+            'Download $id attempt $attempt failed ($e) — retrying from '
+            '${_tasks[id]?.receivedBytes ?? 0} bytes',
+          );
+          // Keep it visibly "downloading" and back off before resuming.
+          _tasks[id] = _tasks[id]!.copyWith(status: DownloadStatus.downloading);
+          _emit();
+          await Future<void>.delayed(Duration(seconds: 2 * attempt));
+          if (control.cancelRequested || _tasks[id] == null) return;
         }
-      } finally {
-        await raf.close();
       }
-
-      if (control.pauseRequested) {
-        task = task.copyWith(status: DownloadStatus.paused);
-        _tasks[id] = task;
-        await _persist();
-        _emit();
-        return;
-      }
-
-      // Stream ended on its own → finished.
-      task = task.copyWith(
-        status: DownloadStatus.completed,
-        totalBytes: task.totalBytes ?? received,
-        receivedBytes: received,
-      );
-      _tasks[id] = task;
-      await _persist();
-      _emit();
-
-      unawaited(_resolver.recordServerDownload(
-        contentId: task.contentId,
-        type: task.contentType,
-      ));
-    } catch (e) {
-      _fail(id, e.toString());
     } finally {
       _controls.remove(id);
     }
+  }
+
+  /// One transfer attempt. Resumes from the bytes already on disk. Returns
+  /// how it ended; throws on a network/transfer error so [_run] can retry.
+  Future<_AttemptResult> _attemptTransfer(
+    String id,
+    DownloadCipherKey cipherKey,
+    _DownloadControl control,
+  ) async {
+    var task = _tasks[id]!;
+    final url = await _resolver.resolve(task.contentId, task.contentType);
+    var received = task.receivedBytes;
+
+    final request = http.Request('GET', url);
+    if (received > 0) request.headers['range'] = 'bytes=$received-';
+    final response = await _httpClient.send(request);
+
+    // Server ignored our Range request → restart cleanly from zero.
+    if (received > 0 && response.statusCode == 200) {
+      received = 0;
+    }
+    if (response.statusCode != 200 && response.statusCode != 206) {
+      throw http.ClientException('Unexpected status ${response.statusCode}');
+    }
+
+    final total = _resolveTotal(response, received);
+    task = task.copyWith(totalBytes: total, receivedBytes: received);
+    _tasks[id] = task;
+
+    final file = await _storage.encryptedFile(id);
+    final raf = await file.open(
+      mode: received > 0 ? FileMode.append : FileMode.write,
+    );
+    if (received > 0) await raf.truncate(received);
+
+    final transformer = CtrTransformer.atOffset(cipherKey, received);
+    var lastEmit = received;
+    var lastPersist = received;
+
+    try {
+      await for (final chunk in response.stream) {
+        if (control.cancelRequested) {
+          await raf.close();
+          return _AttemptResult.cancelled; // delete() handles cleanup.
+        }
+        if (control.pauseRequested) break;
+
+        final encrypted = transformer.process(Uint8List.fromList(chunk));
+        await raf.writeFrom(encrypted);
+        received += chunk.length;
+
+        task = task.copyWith(receivedBytes: received);
+        _tasks[id] = task;
+
+        if (received - lastEmit >= _emitEveryBytes) {
+          lastEmit = received;
+          _emit();
+        }
+        if (received - lastPersist >= _persistEveryBytes) {
+          lastPersist = received;
+          await _persist();
+        }
+      }
+    } finally {
+      await raf.close();
+    }
+
+    if (control.pauseRequested) {
+      _tasks[id] = task.copyWith(status: DownloadStatus.paused);
+      await _persist();
+      _emit();
+      return _AttemptResult.paused;
+    }
+
+    // The stream ended. If we know the total and have fewer bytes, the
+    // connection was cut short without throwing (silent truncation) — treat
+    // it as retriable rather than saving a half file as "complete".
+    final expected = task.totalBytes;
+    if (expected != null && received < expected) {
+      throw http.ClientException(
+        'Connection ended early ($received/$expected bytes)',
+      );
+    }
+
+    _tasks[id] = task.copyWith(
+      status: DownloadStatus.completed,
+      totalBytes: task.totalBytes ?? received,
+      receivedBytes: received,
+    );
+    await _persist();
+    _emit();
+
+    unawaited(_resolver.recordServerDownload(
+      contentId: task.contentId,
+      type: task.contentType,
+    ));
+    return _AttemptResult.completed;
+  }
+
+  /// A network/transfer error worth retrying (a dropped connection), as
+  /// opposed to a permanent one (auth, bad URL, missing content).
+  bool _isTransient(Object e) {
+    if (e is SocketException || e is HttpException) return true;
+    if (e is http.ClientException) {
+      final m = e.message.toLowerCase();
+      // A 4xx/5xx we raised ourselves is not worth retrying, except the
+      // early-end case which is a dropped connection by another name.
+      if (m.startsWith('unexpected status')) return false;
+      return true;
+    }
+    final s = e.toString().toLowerCase();
+    return s.contains('connection closed') ||
+        s.contains('connection reset') ||
+        s.contains('connection ended') ||
+        s.contains('timed out') ||
+        s.contains('software caused connection abort');
+  }
+
+  /// A short, human message for a failed download — never the raw exception
+  /// or the signed URL inside it.
+  String _friendlyError(Object e) {
+    if (_isTransient(e)) {
+      return 'Download interrupted — check your connection and tap to retry.';
+    }
+    return 'Download failed — tap to retry.';
   }
 
   int? _resolveTotal(http.StreamedResponse response, int received) {

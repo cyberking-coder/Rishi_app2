@@ -129,10 +129,14 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
             durationSeconds: audio.durationSeconds,
           ));
       if (mounted) openNowPlaying(context);
-    } catch (e) {
+    } catch (_) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text(e.toString())));
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content:
+              Text("Couldn't play this track. Check your connection and try again."),
+        ),
+      );
     } finally {
       _starting = false;
     }
@@ -787,10 +791,14 @@ class _ContinueCard extends ConsumerWidget {
             resumeAt: Duration(seconds: item.progressSeconds),
           );
       if (context.mounted) openNowPlaying(context);
-    } catch (e) {
+    } catch (_) {
       if (!context.mounted) return;
-      ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text(e.toString())));
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content:
+              Text("Couldn't play this track. Check your connection and try again."),
+        ),
+      );
     }
   }
 }
