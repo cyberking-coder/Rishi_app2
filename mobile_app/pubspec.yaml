@@ -133,7 +133,13 @@ publish_to: "none"
 # +31 moves the "One account. One device." note above the login form (it was
 # below the sign-up link, off the bottom of the screen) so it is visible while
 # signing in rather than only after a scroll.
-version: 2.2.2+31
+#
+# +32 reverts the +30 cover change (BoxFit.contain) back to BoxFit.cover:
+# contain left visible empty (white) space around non-square covers, which read
+# worse than a centred crop. Filling with no gap requires cover; the real fix
+# for cropping is the upload SHAPE — square (1:1) audio art and 16:9 course art
+# fill every box with no crop and no gap.
+version: 2.2.2+32
 
 environment:
   sdk: ">=3.3.0 <4.0.0"

@@ -49,17 +49,15 @@ const bool kSupabaseImageTransformsEnabled = true;
 /// Only ONE of cacheWidth/cacheHeight is ever passed. Flutter's
 /// ResizeImage scales to exactly the dimensions given, so passing both
 /// would squash any image whose aspect ratio differs from its box.
-/// Passing one lets the other scale in proportion.
+/// Passing one lets the other scale in proportion, and [fit] crops the
+/// overflow.
 ///
-/// [fit] defaults to [BoxFit.contain] so the WHOLE uploaded cover is
-/// always visible, whatever box it lands in. The boxes across the app are
-/// different shapes — a 40px mini-player square, a 52px continue tile, a
-/// landscape course hero — and `cover` cropped the same image differently
-/// in each, so a portrait cover showed only its middle in the mini-player.
-/// `contain` shows all of it; a square image still fills a square box with
-/// no gap, and where an image's shape differs from its box the letterbox
-/// shows the surface behind. A call site that genuinely wants an edge-to-
-/// edge fill (a full-bleed background) can still pass `fit: BoxFit.cover`.
+/// [fit] defaults to [BoxFit.cover] — the image fills the box edge to edge
+/// with no gaps. `contain` was tried so non-square uploads showed whole, but
+/// it left visible empty space around them, which read as worse than a
+/// centred crop. The right answer is the SHAPE of the upload, not the fit:
+/// author audio art SQUARE (1:1) and course art 16:9, and `cover` then shows
+/// the whole thing with no crop and no gap in every box.
 class RemoteImage extends StatefulWidget {
   /// Null or empty renders [fallback] without touching the network.
   final String? url;
@@ -79,7 +77,7 @@ class RemoteImage extends StatefulWidget {
     required this.url,
     required this.fallback,
     this.fallbackWhileLoading = false,
-    this.fit = BoxFit.contain,
+    this.fit = BoxFit.cover,
   });
 
   @override
