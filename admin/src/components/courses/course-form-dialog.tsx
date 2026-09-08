@@ -206,8 +206,8 @@ export function CourseFormDialog({
                 onChange={(e) => onCoverPicked(e.target.files?.[0] ?? null)}
               />
               <p className="mt-1 text-xs text-muted-foreground">
-                Use a 16:9 image (e.g. 1600×900) with the subject centered — it
-                fills the course card and hero with no crop and no gaps.
+                16:9 (widescreen). Upload 1280×720 px. Subject centered — CROP
+                to 16:9, don&apos;t pad with black bars.
               </p>
             </div>
 
