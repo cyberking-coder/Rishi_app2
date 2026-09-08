@@ -132,11 +132,11 @@ class _DownloadsHeader extends StatelessWidget {
 
 /// The empty state — the screen most people see first, so it carries the
 /// instruction for how to leave it.
-class _DownloadsEmpty extends ConsumerWidget {
+class _DownloadsEmpty extends StatelessWidget {
   const _DownloadsEmpty();
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  Widget build(BuildContext context) {
     return Column(
       children: [
         // Centred in whatever room is left, with the hint pinned to the
@@ -185,25 +185,6 @@ class _DownloadsEmpty extends ConsumerWidget {
                     child: Text(kEducationFramingEnabled
                         ? 'Browse courses'
                         : 'Browse videos'),
-                  ),
-                  const SizedBox(height: 20),
-                  // TEMPORARY on-device diagnostic for the "downloads vanish
-                  // after restart" report. Shows whether the manifest was
-                  // read, how many tasks it held, and whether a purge fired —
-                  // so the fault can be pinpointed without a computer. Remove
-                  // once diagnosed.
-                  FutureBuilder<String>(
-                    future:
-                        ref.read(downloadRepositoryProvider).debugSummary(),
-                    builder: (context, snap) => Text(
-                      snap.data ?? 'diagnostic loading…',
-                      textAlign: TextAlign.center,
-                      style: const TextStyle(
-                        fontSize: 10,
-                        height: 1.4,
-                        color: Color(0xFF9A93A8),
-                      ),
-                    ),
                   ),
                 ],
               ),

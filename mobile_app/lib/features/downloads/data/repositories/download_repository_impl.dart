@@ -244,6 +244,45 @@ class DownloadRepositoryImpl implements DownloadRepository {
   }
 
   @override
+  Future<void> purgePremiumDownloads() async {
+    if (_tasks.isEmpty) return;
+
+    final audioIds = <String>[];
+    final videoIds = <String>[];
+    for (final t in _tasks.values) {
+      if (t.contentType == DownloadContentType.audio) {
+        audioIds.add(t.contentId);
+      } else {
+        videoIds.add(t.contentId);
+      }
+    }
+
+    Set<String> premium;
+    try {
+      premium = await _resolver.premiumContentIds(
+        audioIds: audioIds,
+        videoIds: videoIds,
+      );
+    } catch (e) {
+      // Cannot tell which are premium (offline). Deleting now could wipe a
+      // free download that never needed access — keep everything and try
+      // again next launch.
+      _lastPurge = 'lapse purge skipped (could not classify): $e';
+      return;
+    }
+
+    final toDelete = _tasks.values
+        .where((t) => premium.contains(t.contentId))
+        .map((t) => t.id)
+        .toList();
+    _lastPurge =
+        'lapse: purged ${toDelete.length} premium, kept ${_tasks.length - toDelete.length} free';
+    for (final id in toDelete) {
+      await delete(id);
+    }
+  }
+
+  @override
   Future<void> purgeRevokedAndExpired() async {
     // Locally-detectable expiry first.
     final expired = _tasks.values.where((t) => t.isLicenseExpired).toList();

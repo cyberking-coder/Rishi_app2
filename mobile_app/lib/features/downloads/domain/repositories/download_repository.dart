@@ -42,9 +42,16 @@ abstract class DownloadRepository {
   /// offline license has expired. Safe to call periodically / on launch.
   Future<void> purgeRevokedAndExpired();
 
-  /// Deletes every downloaded file and manifest entry. Called when the
-  /// user's retreat access window lapses.
+  /// Deletes every downloaded file and manifest entry. Called on LOGOUT, so
+  /// the next user never inherits the previous user's offline files.
   Future<void> purgeAll();
+
+  /// Purges only PREMIUM downloads, keeping free ones. Called when the
+  /// user's access window lapses: free content never required access, so
+  /// deleting it on expiry is wrong. Best-effort — if it cannot determine
+  /// which downloads are premium (offline), it deletes nothing and retries
+  /// on the next launch.
+  Future<void> purgePremiumDownloads();
 
   /// Human-readable snapshot of the download storage state, shown on the
   /// empty Downloads screen so a persistence/purge fault can be diagnosed on

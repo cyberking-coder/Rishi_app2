@@ -130,6 +130,44 @@ class DownloadSourceResolver {
     }
   }
 
+  /// Of the given downloaded items, returns the contentIds that are PREMIUM.
+  ///
+  /// Used by the access-lapsed purge so it only deletes premium downloads —
+  /// free content never needed access and must survive when a window ends.
+  /// Anything not returned (free, or a row that no longer exists) is treated
+  /// as free and kept. Throws on a network failure, so the caller can choose
+  /// to keep everything rather than guess.
+  Future<Set<String>> premiumContentIds({
+    required List<String> audioIds,
+    required List<String> videoIds,
+  }) async {
+    final premium = <String>{};
+
+    if (audioIds.isNotEmpty) {
+      final rows = await _client
+          .from('audios')
+          .select('id')
+          .inFilter('id', audioIds)
+          .eq('is_premium', true);
+      for (final row in rows as List) {
+        premium.add(row['id'] as String);
+      }
+    }
+
+    if (videoIds.isNotEmpty) {
+      final rows = await _client
+          .from('videos')
+          .select('id')
+          .inFilter('id', videoIds)
+          .eq('is_premium', true);
+      for (final row in rows as List) {
+        premium.add(row['id'] as String);
+      }
+    }
+
+    return premium;
+  }
+
   /// Returns the set of contentIds whose download the CURRENT active device
   /// should purge locally — i.e. revoked/expired server-side and NOT still
   /// held as a valid ('ready') download by this device.

@@ -76,9 +76,14 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
       // decision. If this line is in the log, the purge is the cause.
       debugPrint(
         'HomeScreen: access has lapsed (expiresAt=${access.expiresAt}, '
-        'role=${access.role}) — purging ALL offline downloads.',
+        'role=${access.role}) — purging PREMIUM offline downloads '
+        '(free downloads are kept).',
       );
-      ref.read(downloadRepositoryProvider).purgeAll();
+      // Only premium downloads are removed when access lapses. Free content
+      // never required access, so a free track the user downloaded must
+      // survive an expired window — deleting it was the "my free downloads
+      // vanished" bug.
+      ref.read(downloadRepositoryProvider).purgePremiumDownloads();
       return;
     }
 
