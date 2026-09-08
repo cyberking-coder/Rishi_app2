@@ -672,10 +672,10 @@ class _ContinueCard extends ConsumerWidget {
               child: Row(children: [
                 ClipRRect(
                   borderRadius: BorderRadius.circular(11),
-                  // 16:9 to match the audio covers' landscape shape.
+                  // Square (1:1) — audio art is authored square.
                   child: SizedBox(
-                    width: 84,
-                    height: 47,
+                    width: 52,
+                    height: 52,
                     child: RemoteImage(
                       url: item.coverArtUrl,
                       fallback: const _ArtFallback(),
@@ -1213,7 +1213,7 @@ class _FeaturedRow extends ConsumerWidget {
     final access = ref.watch(accessStateProvider).valueOrNull;
 
     return async.maybeWhen(
-      orElse: () => const SizedBox(height: 200),
+      orElse: () => const SizedBox(height: 216),
       data: (audios) {
         if (audios.isEmpty) return const SizedBox.shrink();
 
@@ -1221,7 +1221,7 @@ class _FeaturedRow extends ConsumerWidget {
           // Fixed rather than intrinsic: every cover starts at the same
           // height so the row reads as a shelf, and a two-line title on
           // one card can't shunt its neighbour's caption down.
-          height: 200,
+          height: 216,
           child: ListView.separated(
             scrollDirection: Axis.horizontal,
             padding: const EdgeInsets.symmetric(horizontal: 20),
@@ -1243,12 +1243,10 @@ class _FeaturedRow extends ConsumerWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Container(
-                        // 16:9 (168 wide), matching the course cards and the
-                        // landscape shape audio covers are actually authored
-                        // in — a landscape photo fills it with no crop and no
-                        // bars, and a black-barred square is cropped back to
-                        // its real content by the wider frame.
-                        height: 94,
+                        // Square (1:1, 168 wide). Audio art is authored 1:1,
+                        // so a square cover fills this with no crop and no
+                        // gaps; courses stay 16:9 in their own cards.
+                        height: 168,
                         width: double.infinity,
                         decoration: BoxDecoration(
                           borderRadius:

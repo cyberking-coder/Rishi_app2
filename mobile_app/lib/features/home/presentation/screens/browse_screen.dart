@@ -183,9 +183,9 @@ class _AudioRow extends ConsumerWidget {
       ),
         child: Row(children: [
           SizedBox(
-            // 16:9 to match the audio covers' landscape shape.
-            width: 84,
-            height: 47,
+            // Square (1:1) — audio art is authored square.
+            width: 50,
+            height: 50,
             child: Stack(children: [
               Container(
                 decoration: BoxDecoration(
