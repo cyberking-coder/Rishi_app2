@@ -71,9 +71,10 @@ class MiniPlayer extends ConsumerWidget {
                                   const SizedBox(width: 10),
                                   ClipRRect(
                                     borderRadius: BorderRadius.circular(4),
+                                    // 16:9 to match the audio covers' shape.
                                     child: SizedBox(
-                                      width: 40,
-                                      height: 40,
+                                      width: 56,
+                                      height: 32,
                                       child: RemoteImage(
                                         url: mediaItem.artUri?.toString(),
                                         fallback: const ColoredBox(

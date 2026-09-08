@@ -672,9 +672,10 @@ class _ContinueCard extends ConsumerWidget {
               child: Row(children: [
                 ClipRRect(
                   borderRadius: BorderRadius.circular(11),
+                  // 16:9 to match the audio covers' landscape shape.
                   child: SizedBox(
-                    width: 52,
-                    height: 52,
+                    width: 84,
+                    height: 47,
                     child: RemoteImage(
                       url: item.coverArtUrl,
                       fallback: const _ArtFallback(),
@@ -1242,7 +1243,12 @@ class _FeaturedRow extends ConsumerWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Container(
-                        height: 152,
+                        // 16:9 (168 wide), matching the course cards and the
+                        // landscape shape audio covers are actually authored
+                        // in — a landscape photo fills it with no crop and no
+                        // bars, and a black-barred square is cropped back to
+                        // its real content by the wider frame.
+                        height: 94,
                         width: double.infinity,
                         decoration: BoxDecoration(
                           borderRadius:

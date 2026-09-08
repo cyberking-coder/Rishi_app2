@@ -139,7 +139,13 @@ publish_to: "none"
 # worse than a centred crop. Filling with no gap requires cover; the real fix
 # for cropping is the upload SHAPE — square (1:1) audio art and 16:9 course art
 # fill every box with no crop and no gap.
-version: 2.2.2+32
+#
+# +33 makes the AUDIO cover boxes 16:9 (was square-ish), to match how covers
+# are actually authored (landscape) and the course cards. A landscape photo now
+# fills the featured card, browse tile, continue tile and mini-player cleanly,
+# and a square image that was letterboxed with black bars is cropped back to its
+# real content by the wider frame. Audio cover guidance becomes 16:9 too.
+version: 2.2.2+33
 
 environment:
   sdk: ">=3.3.0 <4.0.0"
