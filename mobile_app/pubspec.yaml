@@ -100,7 +100,11 @@ publish_to: "none"
 # won't push /now-playing if it is already the current route or while a push
 # is still in flight, so Home, Browse, the mini player and the lesson launcher
 # can no longer stack two identical Now Playing screens.
-version: 2.2.2+25
+#
+# 2.3.1+26 is a version-NAME bump only (2.2.2 -> 2.3.1); no behaviour changed
+# with it. The build number keeps climbing (+25 -> +26) because a store never
+# accepts a reused or lower one. Keep AppConfig.appVersion in step.
+version: 2.3.1+26
 
 environment:
   sdk: ">=3.3.0 <4.0.0"
