@@ -97,7 +97,19 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                 color: AppTheme.textSecondary,
               ),
             ),
-            const SizedBox(height: 26),
+            const SizedBox(height: 18),
+            // Above the form on purpose, so the one-device-per-account lock is
+            // read as a rule up front rather than discovered as a failure at
+            // login. It used to sit below the sign-up link, off the bottom of
+            // the screen, where it had to be scrolled to.
+            const AuthInfoCard(
+              icon: Icons.phonelink_lock_outlined,
+              title: 'One account. One device.',
+              body: 'One account can be used on one device only. Logging in '
+                  'on a new device will not work until the previous one is '
+                  'released.',
+            ),
+            const SizedBox(height: 22),
             AuthTextField(
               controller: _emailController,
               label: 'Email',
@@ -165,17 +177,6 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                   ),
                 ),
               ),
-            ),
-            const SizedBox(height: 10),
-            // Sets expectations up front for the one-device-per-account
-            // lock, so a user hitting it later understands why rather
-            // than reading it as a bug.
-            const AuthInfoCard(
-              icon: Icons.phonelink_lock_outlined,
-              title: 'One account. One device.',
-              body: 'One account can be used on one device only. Logging in '
-                  'on a new device will not work until the previous one is '
-                  'released.',
             ),
           ],
         ),

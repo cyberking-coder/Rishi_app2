@@ -130,7 +130,10 @@ publish_to: "none"
 # BoxFit.contain: a square image still fills a square box with no gap, and any
 # other shape is shown in full, letterboxed against the surface behind. One
 # upload now looks right in every section.
-version: 2.2.2+30
+# +31 moves the "One account. One device." note above the login form (it was
+# below the sign-up link, off the bottom of the screen) so it is visible while
+# signing in rather than only after a scroll.
+version: 2.2.2+31
 
 environment:
   sdk: ">=3.3.0 <4.0.0"
