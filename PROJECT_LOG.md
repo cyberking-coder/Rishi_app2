@@ -1471,9 +1471,32 @@ Home/Browse all show a short friendly message. The signed-URL lifetime was left
 at 10 minutes on purpose: the retry re-mints one each attempt, so lengthening
 it (a mild security trade-off) is unnecessary.
 
-The version name was bumped to **2.3.1** across this run (from 2.2.2), build
-number climbing to **+27**.
+**A few more device-test fixes rounded out the run:**
+
+* **iOS offline playback `-1004`, take two.** A submitted 2.2.2 build (build 36)
+  still showed `-1004` on offline files. Since the version string only became
+  2.2.2 *after* the `NSAllowsLocalNetworking` fix, that build already had it — so
+  the flag alone was not enough for AVPlayer to reach the raw `127.0.0.1` proxy.
+  Added an explicit `NSExceptionDomains` cleartext exception for `127.0.0.1` and
+  `localhost`, keeping `NSAllowsArbitraryLoads` false so ATS stays enforced for
+  every real host. If a fresh build still fails, the fallback is to move offline
+  playback off the loopback HTTP proxy onto an in-memory decrypting source.
+* **Covers show whole everywhere.** `RemoteImage` defaulted to `BoxFit.cover`,
+  which cropped one upload differently in every box (a portrait cover showed
+  only its middle in the 40px mini-player and 52px continue tile; course art
+  cropped in its hero). The default is now `BoxFit.contain`: a square image
+  still fills a square box, and any other shape is shown in full. Design audio
+  square and course art 16:9 for a gap-free fill; nothing is cropped either way.
+* **Login one-device note moved up.** "One account. One device." sat below the
+  sign-up link, off the bottom of the screen; it now sits above the email field
+  so the rule is read before signing in, not scrolled to afterwards.
+
+**Version note:** this run briefly carried the name **2.3.1**, then reverted to
+**2.2.2** because the App Store Connect version entry is 2.2.2 (its earlier
+build was developer-rejected) and a new upload must match that entry's version
+string — only the build number has to climb, which it did, reaching **+31**
+locally (Codemagic assigns its own, higher iOS build numbers).
 
 ---
 
-*Last updated: 8 September 2026 — 2.3.1: the offline-downloads work — the vanishing-downloads investigation (the revoke purge was user-scoped, and the real cause was the access-lapsed purge deleting FREE downloads as well as premium — now `purgePremiumDownloads` keeps free content, plus migration 20260908000001 restores a re-registering device's downloads), download retry/resume on a dropped connection with friendly errors instead of the raw signed URL, and the `openNowPlaying` single-open guard against stacked player screens. Before that, 31 August 2026 — 2.2.1: the account-wide Razorpay webhook fix (a live-disabled webhook), the iOS `-11828`/`-1004` playback fixes and the audio double-open, the admin Help & Support console and bulk audio upload, and — the headline — Apple GRANTING the External Link Account Entitlement (reversing the 27 August denial in Section 14), the iOS account link built for it, the Google-on-web sign-in that unblocked Google users from buying, and Resend custom SMTP for email. See Section 15. Before that, 27 August 2026 — 2.2.0: Help & Support, the course resume card, offline-player artwork and skip controls, the download-purge fix (hasLapsed vs hasAccess), and the dependency plan in Section 13. Before that, 25 August 2026, the day the App Store approved 2.1.1 as a reader app. That session also produced the purple-glass restyle, the image-decode and upload-resize work, and the full codebase audit in Section 12 — which found a critical entitlement hole that had been open since June. Before that: the App Store 3.1.1 rejection on 12 August — the iOS reader-app build and the public storefront it forced. Before that: live sessions, push notifications and the fan-out scaling work (2 August); Phases 3b, 4 and 5 landed in one extended session earlier still. See the bug-fix chronology at the end of Section 7 for what broke along the way and why.*
+*Last updated: 8 September 2026 — 2.2.2 (builds through +31): the offline-downloads work — the vanishing-downloads investigation (the revoke purge was user-scoped, and the real cause was the access-lapsed purge deleting FREE downloads as well as premium — now `purgePremiumDownloads` keeps free content, plus migration 20260908000001 restores a re-registering device's downloads), download retry/resume on a dropped connection with friendly errors instead of the raw signed URL, the `openNowPlaying` single-open guard against stacked player screens, the second iOS `-1004` fix (explicit 127.0.0.1/localhost ATS exception), whole-image covers (`RemoteImage` cover→contain), and the login one-device note moved above the fold. The version briefly read 2.3.1 before reverting to 2.2.2 to match the developer-rejected App Store Connect entry. Before that, 31 August 2026 — 2.2.1: the account-wide Razorpay webhook fix (a live-disabled webhook), the iOS `-11828`/`-1004` playback fixes and the audio double-open, the admin Help & Support console and bulk audio upload, and — the headline — Apple GRANTING the External Link Account Entitlement (reversing the 27 August denial in Section 14), the iOS account link built for it, the Google-on-web sign-in that unblocked Google users from buying, and Resend custom SMTP for email. See Section 15. Before that, 27 August 2026 — 2.2.0: Help & Support, the course resume card, offline-player artwork and skip controls, the download-purge fix (hasLapsed vs hasAccess), and the dependency plan in Section 13. Before that, 25 August 2026, the day the App Store approved 2.1.1 as a reader app. That session also produced the purple-glass restyle, the image-decode and upload-resize work, and the full codebase audit in Section 12 — which found a critical entitlement hole that had been open since June. Before that: the App Store 3.1.1 rejection on 12 August — the iOS reader-app build and the public storefront it forced. Before that: live sessions, push notifications and the fan-out scaling work (2 August); Phases 3b, 4 and 5 landed in one extended session earlier still. See the bug-fix chronology at the end of Section 7 for what broke along the way and why.*
