@@ -1407,6 +1407,53 @@ confirmation template (deep-violet header, `#6d4aff` button, Supabase
   migration `20260708000001` is actually live — verify with
   `select prosrc like '%applereview@gmail.com%' from pg_proc where proname='register_device'`.
 
+### "Offline downloads vanish after a restart" — three layers, one that mattered
+
+Reported as downloads disappearing on every full restart. It took three
+passes because the first two fixes were for real faults that were **not** the
+one being reported — the same lesson F-9 and F-10 taught.
+
+**First pass (a real but wrong fix): the revoke purge was user-scoped.**
+`main.dart` runs `purgeRevokedAndExpired()` at launch, and its
+`revokedContentIds()` filtered on `user_id` alone. The one-device lock makes
+"Reset device" routine, and each reset marks that device's downloads
+`revoked` (`revoke_downloads_for_device`). A user-scoped query then returned
+that content and the purge deleted the copy on a device that had re-registered
+and still had access. Fixed by making `revokedContentIds()` device-aware
+(skip when there is no active device; never delete content the active device
+still holds a `ready` row for) plus migration `20260908000001`, which
+un-revokes a device's downloads when it re-registers. Correct, shipped — but
+not the reported cause.
+
+**Second pass (the actual cause, found by an on-device diagnostic then the
+debug log): the lapse purge deleted FREE downloads too.** With active access
+and the new build the list still came back empty, which by the code should not
+happen — so a temporary readout was added to the empty Downloads screen (later
+removed) and `flutter run` produced the line that settled it:
+`HomeScreen: access has lapsed (expiresAt=…, role=user) — purging ALL offline
+downloads`. The tester's window had simply expired, and the lapse purge
+(`purgeAll` on `hasLapsed`) is **by design** — you may not keep premium content
+after access ends. The genuine bug the tester then spotted: it deleted **free**
+downloads too, and free content never needed access. Fixed with
+`purgePremiumDownloads()`, which asks the server which of the downloaded items
+are `is_premium` and deletes only those, keeping free ones; if it cannot
+classify (offline) it deletes nothing and retries. Logout still uses
+`purgeAll`. The home screen calls the new method on lapse.
+
+**The takeaway, again:** persistence and restore were never broken. Downloads
+were being deleted on purpose, by two different purges, one over-broad on the
+device axis and one over-broad on the free/premium axis. Neither was visible
+from reading the manifest code; the debug log named it in one line.
+
+**Also in the same build:** `openNowPlaying()`
+(`features/audio/presentation/utils/audio_navigation.dart`) replaced every
+direct `context.push('/now-playing')` in Home, Browse, the mini player and the
+lesson launcher. It refuses to push when the player is already the current
+route or while a push is still in flight, so two entry points firing together
+can no longer stack two identical Now Playing screens. The deep-link path keeps
+`pushReplacement` — different intent. Version reached 2.2.2+25 across these
+download and player fixes.
+
 ---
 
-*Last updated: 31 August 2026 — 2.2.1: the account-wide Razorpay webhook fix (a live-disabled webhook), the iOS `-11828`/`-1004` playback fixes and the audio double-open, the admin Help & Support console and bulk audio upload, and — the headline — Apple GRANTING the External Link Account Entitlement (reversing the 27 August denial in Section 14), the iOS account link built for it, the Google-on-web sign-in that unblocked Google users from buying, and Resend custom SMTP for email. See Section 15. Before that, 27 August 2026 — 2.2.0: Help & Support, the course resume card, offline-player artwork and skip controls, the download-purge fix (hasLapsed vs hasAccess), and the dependency plan in Section 13. Before that, 25 August 2026, the day the App Store approved 2.1.1 as a reader app. That session also produced the purple-glass restyle, the image-decode and upload-resize work, and the full codebase audit in Section 12 — which found a critical entitlement hole that had been open since June. Before that: the App Store 3.1.1 rejection on 12 August — the iOS reader-app build and the public storefront it forced. Before that: live sessions, push notifications and the fan-out scaling work (2 August); Phases 3b, 4 and 5 landed in one extended session earlier still. See the bug-fix chronology at the end of Section 7 for what broke along the way and why.*
+*Last updated: 8 September 2026 — 2.2.2: the offline-downloads investigation (the revoke purge was user-scoped, and the real cause was the access-lapsed purge deleting FREE downloads as well as premium — now `purgePremiumDownloads` keeps free content, plus migration 20260908000001 restores a re-registering device's downloads) and the `openNowPlaying` single-open guard against stacked player screens. Before that, 31 August 2026 — 2.2.1: the account-wide Razorpay webhook fix (a live-disabled webhook), the iOS `-11828`/`-1004` playback fixes and the audio double-open, the admin Help & Support console and bulk audio upload, and — the headline — Apple GRANTING the External Link Account Entitlement (reversing the 27 August denial in Section 14), the iOS account link built for it, the Google-on-web sign-in that unblocked Google users from buying, and Resend custom SMTP for email. See Section 15. Before that, 27 August 2026 — 2.2.0: Help & Support, the course resume card, offline-player artwork and skip controls, the download-purge fix (hasLapsed vs hasAccess), and the dependency plan in Section 13. Before that, 25 August 2026, the day the App Store approved 2.1.1 as a reader app. That session also produced the purple-glass restyle, the image-decode and upload-resize work, and the full codebase audit in Section 12 — which found a critical entitlement hole that had been open since June. Before that: the App Store 3.1.1 rejection on 12 August — the iOS reader-app build and the public storefront it forced. Before that: live sessions, push notifications and the fan-out scaling work (2 August); Phases 3b, 4 and 5 landed in one extended session earlier still. See the bug-fix chronology at the end of Section 7 for what broke along the way and why.*
