@@ -88,7 +88,7 @@ publish_to: "none"
 # even on an account that still had access; the purge is now device-aware and
 # never deletes a copy the active device still holds (paired with migration
 # 20260908000001, which un-revokes a device's downloads when it re-registers).
-version: 2.2.2+22
+version: 2.2.2+23
 
 environment:
   sdk: ">=3.3.0 <4.0.0"

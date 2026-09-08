@@ -111,6 +111,20 @@ class DownloadMetadataStore {
     }
   }
 
+  /// One-line description of the manifest file on disk, for the on-device
+  /// diagnostic shown on the empty Downloads screen. Never throws.
+  Future<String> debugInfo() async {
+    try {
+      final file = await _manifest();
+      final exists = await file.exists();
+      final size = exists ? await file.length() : 0;
+      final corrupt = await File('${file.path}.corrupt').exists();
+      return 'manifest exists=$exists size=${size}B corruptCopy=$corrupt\n${file.path}';
+    } catch (e) {
+      return 'manifest debugInfo failed: $e';
+    }
+  }
+
   Future<void> save(
     List<DownloadTask> tasks,
     Map<String, Uint8List> ivs,
