@@ -122,7 +122,15 @@ publish_to: "none"
 # an explicit NSExceptionAllowsInsecureHTTPLoads exception. ATS stays enforced
 # everywhere else (NSAllowsArbitraryLoads is still false). iOS build number is
 # assigned by Codemagic; this +29 governs local/Android builds.
-version: 2.2.2+29
+#
+# +30 makes cover art show WHOLE everywhere. RemoteImage defaulted to
+# BoxFit.cover, which cropped the same upload differently in each box (a
+# portrait cover showed only its middle in the 40px mini-player and the 52px
+# continue tile, and course art cropped in its hero). The default is now
+# BoxFit.contain: a square image still fills a square box with no gap, and any
+# other shape is shown in full, letterboxed against the surface behind. One
+# upload now looks right in every section.
+version: 2.2.2+30
 
 environment:
   sdk: ">=3.3.0 <4.0.0"
