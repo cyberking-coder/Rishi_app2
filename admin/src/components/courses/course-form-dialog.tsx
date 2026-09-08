@@ -206,8 +206,8 @@ export function CourseFormDialog({
                 onChange={(e) => onCoverPicked(e.target.files?.[0] ?? null)}
               />
               <p className="mt-1 text-xs text-muted-foreground">
-                Shown on the course card in the app. Landscape images look
-                best.
+                Use a 16:9 image (e.g. 1600×900) with the subject centered — it
+                fills the course card and hero with no crop and no gaps.
               </p>
             </div>
 

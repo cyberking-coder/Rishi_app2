@@ -286,7 +286,9 @@ export function UploadContentDialog({ kind }: { kind: ContentKind }) {
               onChange={(e) => setCover(e.target.files?.[0] ?? null)}
             />
             <p className="text-xs text-muted-foreground">
-              Shown on the audio card in the app. Square images look best.
+              {kind === "audio"
+                ? "Use a square image (1:1, e.g. 1200×1200) with the subject centered — it fills the mini-player, continue tile and cards with no crop and no gaps."
+                : "Use a 16:9 image (e.g. 1600×900) with the subject centered — it fills the video card and player with no crop and no gaps."}
             </p>
           </div>
           <DialogFooter>
