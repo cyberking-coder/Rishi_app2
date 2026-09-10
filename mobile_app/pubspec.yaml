@@ -154,7 +154,7 @@ publish_to: "none"
 # featured card is now a true square (168x168, row height nudged to 216) and the
 # browse tile, continue tile and mini-player art are back to square. A square
 # audio cover fills them with no crop and no gaps; courses keep their 16:9 cards.
-version: 2.2.2+36
+version: 2.2.2+37
 
 environment:
   sdk: ">=3.3.0 <4.0.0"

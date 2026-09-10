@@ -42,6 +42,14 @@ final goRouterProvider = Provider<GoRouter>((ref) {
       // must never be redirected away mid-animation.
       if (state.matchedLocation == '/splash') return null;
 
+      // A still-resolving auth stream is NOT a sign-out. Treating the
+      // transient null (while the stream re-subscribes, or after a relaunch)
+      // as logged-out is what bounced a signed-in user to /login — which is
+      // how tapping something like the account link could look like it
+      // logged you out. Only decide once there is a real value; until then,
+      // leave navigation where it is.
+      if (authState.isLoading) return null;
+
       final isLoggedIn = authState.valueOrNull != null;
       final isAuthRoute = state.matchedLocation == '/login' ||
           state.matchedLocation == '/forgot-password' ||
