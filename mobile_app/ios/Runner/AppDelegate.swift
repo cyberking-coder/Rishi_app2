@@ -1,6 +1,5 @@
 import Flutter
 import UIKit
-import StoreKit
 
 @UIApplicationMain
 @objc class AppDelegate: FlutterAppDelegate {
@@ -15,69 +14,13 @@ import StoreKit
     // setup can miss its window and background playback silently fails.
     GeneratedPluginRegistrant.register(with: self)
 
-    // External Link Account API bridge. App Review (Guideline 3.1.1) requires
-    // that linking out for account creation/management goes through StoreKit's
-    // ExternalLinkAccount.open(), which presents Apple's OWN disclosure sheet
-    // and then opens the URL declared in Info.plist's SKExternalLinkAccount.
-    // A self-drawn dialog + url_launcher (what shipped before) does NOT
-    // satisfy the entitlement and was rejected. The Dart side calls this
-    // channel instead; there is no URL argument because the system reads it
-    // from Info.plist.
-    if let controller = window?.rootViewController as? FlutterViewController {
-      let channel = FlutterMethodChannel(
-        name: "external_link_account",
-        binaryMessenger: controller.binaryMessenger
-      )
-      channel.setMethodCallHandler { call, result in
-        // Everything runs on @MainActor. StoreKit presents the sheet on the
-        // UI thread, and Flutter requires result() to be called on the main
-        // thread too. Calling result() from a plain (background) Task meant
-        // the Dart side never heard back, so the tap did nothing — no sheet,
-        // no error.
-        switch call.method {
-        case "canOpen":
-          if #available(iOS 16.0, *) {
-            Task { @MainActor in
-              let can = await ExternalLinkAccount.canOpen
-              result(can)
-            }
-          } else {
-            result(false)
-          }
-        case "open":
-          if #available(iOS 16.0, *) {
-            Task { @MainActor in
-              do {
-                try await ExternalLinkAccount.open()
-                result(true)
-              } catch {
-                // Full error, not just localizedDescription — the StoreKit
-                // error type is what tells us WHY open() failed (bad URL,
-                // ineligible, cancelled, …).
-                result(
-                  FlutterError(
-                    code: "open_failed",
-                    message: "\(error)",
-                    details: nil
-                  )
-                )
-              }
-            }
-          } else {
-            result(
-              FlutterError(
-                code: "unavailable",
-                message: "Requires iOS 16 or later",
-                details: nil
-              )
-            )
-          }
-        default:
-          result(FlutterMethodNotImplemented)
-        }
-      }
-    }
-
+    // NOTE: the external_link_account MethodChannel is NOT registered here.
+    // This app uses the UIScene lifecycle, so the window and its
+    // FlutterViewController belong to the scene and do not exist yet at this
+    // point — registering against window?.rootViewController here hit nil and
+    // was silently skipped (MissingPluginException on every call). The channel
+    // now lives in SceneDelegate.scene(_:willConnectTo:), where the controller
+    // is real.
     return super.application(application, didFinishLaunchingWithOptions: launchOptions)
   }
 }

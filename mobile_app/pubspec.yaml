@@ -154,7 +154,20 @@ publish_to: "none"
 # featured card is now a true square (168x168, row height nudged to 216) and the
 # browse tile, continue tile and mini-player art are back to square. A square
 # audio cover fills them with no crop and no gaps; courses keep their 16:9 cards.
-version: 2.2.2+39
+#
+# +40 actually registers the external_link_account MethodChannel. +35..+39
+# put the native handler in AppDelegate.didFinishLaunchingWithOptions, guarded
+# by `if let controller = window?.rootViewController as? FlutterViewController`.
+# But this app uses the UIScene lifecycle (UIApplicationSceneManifest +
+# FlutterSceneDelegate), so at that point the window and its FlutterViewController
+# belong to the not-yet-connected scene — window?.rootViewController was nil, the
+# guard silently skipped, the channel was never set up, and every tap on "Manage
+# your account" failed with MissingPluginException ("No implementation found for
+# method canOpen on channel external_link_account"). The handler now lives in
+# SceneDelegate.scene(_:willConnectTo:), after super, where the controller exists.
+# No Dart change; the entitlement/signing were already correct (confirmed in the
+# Codemagic build log).
+version: 2.2.2+40
 
 environment:
   sdk: ">=3.3.0 <4.0.0"
