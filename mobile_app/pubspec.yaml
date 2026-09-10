@@ -167,7 +167,12 @@ publish_to: "none"
 # SceneDelegate.scene(_:willConnectTo:), after super, where the controller exists.
 # No Dart change; the entitlement/signing were already correct (confirmed in the
 # Codemagic build log).
-version: 2.2.2+40
+#
+# +41 trims the temporary diagnostic snackbar on "Manage your account" back to
+# one friendly line, now that +40 is confirmed working on device (Apple's
+# StoreKit disclosure sheet appears and opens the store link). No behaviour
+# change beyond the message text.
+version: 2.2.2+41
 
 environment:
   sdk: ">=3.3.0 <4.0.0"
