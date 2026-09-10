@@ -8,6 +8,15 @@ workflows:
       app_store_connect: integration     # name of the App Store Connect API key added in Codemagic UI
 
     environment:
+      # MANUAL signing. Fetches the certificate (.p12) and provisioning
+      # profile uploaded to Codemagic -> Code signing identities that match
+      # this bundle id + distribution type. That profile was created by hand
+      # in the Apple portal against our own certificate and INCLUDES the
+      # managed External Link Account capability, which Apple's App Store
+      # Connect API refuses to add to an auto-created profile.
+      ios_signing:
+        distribution_type: app_store
+        bundle_identifier: com.anuragrishi.knowthyself
       flutter: stable
       xcode: latest
       cocoapods: default
@@ -23,42 +32,21 @@ workflows:
           include: true
 
     scripts:
-      - name: Set up code signing (fresh cert + profile)
+      - name: Set up code signing (manual — profile carries External Link Account)
         script: |
           set -e
+          # No more auto cert-create / revoke loop. That flow signed every
+          # build with an API-created profile that OMITS the managed External
+          # Link Account capability, so ExternalLinkAccount.open() never had
+          # the entitlement and App Review rejected it (3.1.1). We now sign
+          # with the uploaded .p12 + hand-made profile (see ios_signing above),
+          # which does include the entitlement.
           keychain initialize
-
-          echo "── Revoking any existing distribution certificates (clear orphans / stay under Apple's cert limit) ──"
-          for cert_id in $(app-store-connect certificates list --type IOS_DISTRIBUTION --json 2>/dev/null | python3 -c "import sys, json; data=json.load(sys.stdin); print('\n'.join(c.get('id','') for c in data))" 2>/dev/null); do
-            [ -z "$cert_id" ] && continue
-            echo "Revoking old distribution certificate $cert_id"
-            app-store-connect certificates delete "$cert_id" --certificate-key=@file:/tmp/dist_key.pem 2>/dev/null || \
-              app-store-connect certificates delete "$cert_id" 2>/dev/null || true
-          done
-
-          echo "── Generating a fresh RSA private key ──"
-          openssl genrsa -out /tmp/dist_key.pem 2048
-
-          echo "── Creating a new distribution certificate from that key ──"
-          app-store-connect certificates create \
-            --type IOS_DISTRIBUTION \
-            --certificate-key=@file:/tmp/dist_key.pem \
-            --save
-
           keychain add-certificates
-
-          echo "── Creating / fetching the App Store provisioning profile ──"
-          app-store-connect fetch-signing-files "$BUNDLE_ID" \
-            --type IOS_APP_STORE \
-            --certificate-key=@file:/tmp/dist_key.pem \
-            --create
-
-          keychain add-certificates
-
-          echo "── Signing identities now in keychain ──"
-          security find-identity -v -p codesigning || true
-
           xcode-project use-profiles
+
+          echo "── Signing identities in keychain ──"
+          security find-identity -v -p codesigning || true
 
       - name: Get Flutter packages
         script: |
