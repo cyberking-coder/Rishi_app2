@@ -927,9 +927,26 @@ class _SettingsSheetState extends ConsumerState<_SettingsSheet> {
   /// and opens the link.
   Future<void> _openExternalAccount() async {
     final messenger = ScaffoldMessenger.of(context);
+    // Catch EVERYTHING, not just PlatformException. If the native handler
+    // isn't present (e.g. an older binary) invokeMethod throws
+    // MissingPluginException, which is not a PlatformException — leaving that
+    // uncaught is what made the row look "not clickable": the tap fired and
+    // then silently did nothing. Now every path gives visible feedback.
     try {
+      final canOpen =
+          await _externalLinkChannel.invokeMethod<bool>('canOpen') ?? false;
+      if (!canOpen) {
+        messenger.showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Account management is not available on this device yet.',
+            ),
+          ),
+        );
+        return;
+      }
       await _externalLinkChannel.invokeMethod<bool>('open');
-    } on PlatformException {
+    } catch (_) {
       messenger.showSnackBar(
         const SnackBar(content: Text('Could not open account management.')),
       );
