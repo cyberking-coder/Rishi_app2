@@ -946,9 +946,16 @@ class _SettingsSheetState extends ConsumerState<_SettingsSheet> {
         return;
       }
       await _externalLinkChannel.invokeMethod<bool>('open');
-    } catch (_) {
+    } on PlatformException catch (e) {
+      // TEMPORARY: surface the real StoreKit error so the exact failure is
+      // visible on-device (bad URL / ineligible / cancelled). Trim back to a
+      // friendly message once diagnosed.
       messenger.showSnackBar(
-        const SnackBar(content: Text('Could not open account management.')),
+        SnackBar(content: Text('Link error [${e.code}]: ${e.message ?? ''}')),
+      );
+    } catch (e) {
+      messenger.showSnackBar(
+        SnackBar(content: Text('Could not open account management ($e).')),
       );
     }
   }

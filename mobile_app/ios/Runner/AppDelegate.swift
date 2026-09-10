@@ -51,10 +51,13 @@ import StoreKit
                 try await ExternalLinkAccount.open()
                 result(true)
               } catch {
+                // Full error, not just localizedDescription — the StoreKit
+                // error type is what tells us WHY open() failed (bad URL,
+                // ineligible, cancelled, …).
                 result(
                   FlutterError(
                     code: "open_failed",
-                    message: error.localizedDescription,
+                    message: "\(error)",
                     details: nil
                   )
                 )
