@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:url_launcher/url_launcher.dart';
+import 'package:flutter/services.dart';
 
 import '../../../../app/theme/app_theme.dart';
 import '../../../../app/widgets/remote_image.dart';
@@ -911,54 +911,27 @@ class _SettingsSheetState extends ConsumerState<_SettingsSheet> {
     );
   }
 
-  /// Opens the single external account-management link permitted by the
-  /// External Link Account Entitlement, behind the disclosure Apple requires.
+  /// The native bridge to StoreKit's ExternalLinkAccount API. See
+  /// ios/Runner/AppDelegate.swift.
+  static const _externalLinkChannel = MethodChannel('external_link_account');
+
+  /// Opens external account management through StoreKit's
+  /// `ExternalLinkAccount.open()` (iOS 16+).
   ///
-  /// The disclosure is not optional and its wording matters: it must tell the
-  /// person they are leaving the app for an external website and that the App
-  /// Store is not responsible for what happens there. The link itself is
-  /// neutral — it names no price and promotes no purchase — because the
-  /// entitlement forbids advertising the sale inside the app.
+  /// App Review (Guideline 3.1.1) requires that the SYSTEM's own disclosure
+  /// sheet — presented by this API — is shown before every link-out for
+  /// account creation/management. The previous build drew its own dialog and
+  /// opened the URL with url_launcher, which does not satisfy the entitlement
+  /// and was rejected. The API reads the destination from Info.plist's
+  /// SKExternalLinkAccount, so no URL is passed here; Apple shows the sheet
+  /// and opens the link.
   Future<void> _openExternalAccount() async {
     final messenger = ScaffoldMessenger.of(context);
-    final proceed = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: _kSurface,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(AppTheme.radiusCard),
-        ),
-        title: const Text('Manage your account on the web',
-            style: TextStyle(
-                color: _kText, fontSize: 19, fontWeight: FontWeight.w700)),
-        content: const Text(
-          'This opens our website in your browser, where you can create or '
-          'manage your account. You are leaving the app, and the App Store '
-          'is not responsible for the privacy or security of anything you do '
-          'on the web.',
-          style: TextStyle(color: _kSub, fontSize: 14, height: 1.5),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('Cancel', style: TextStyle(color: _kSub)),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('Continue', style: TextStyle(color: _kAccent)),
-          ),
-        ],
-      ),
-    );
-    if (proceed != true) return;
-
-    final ok = await launchUrl(
-      Uri.parse(externalAccountUrl),
-      mode: LaunchMode.externalApplication,
-    );
-    if (!ok) {
+    try {
+      await _externalLinkChannel.invokeMethod<bool>('open');
+    } on PlatformException {
       messenger.showSnackBar(
-        const SnackBar(content: Text('Could not open the website.')),
+        const SnackBar(content: Text('Could not open account management.')),
       );
     }
   }

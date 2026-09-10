@@ -1,5 +1,6 @@
 import Flutter
 import UIKit
+import StoreKit
 
 @UIApplicationMain
 @objc class AppDelegate: FlutterAppDelegate {
@@ -13,6 +14,62 @@ import UIKit
     // FlutterImplicitEngineDelegate, or the background-audio entitlement
     // setup can miss its window and background playback silently fails.
     GeneratedPluginRegistrant.register(with: self)
+
+    // External Link Account API bridge. App Review (Guideline 3.1.1) requires
+    // that linking out for account creation/management goes through StoreKit's
+    // ExternalLinkAccount.open(), which presents Apple's OWN disclosure sheet
+    // and then opens the URL declared in Info.plist's SKExternalLinkAccount.
+    // A self-drawn dialog + url_launcher (what shipped before) does NOT
+    // satisfy the entitlement and was rejected. The Dart side calls this
+    // channel instead; there is no URL argument because the system reads it
+    // from Info.plist.
+    if let controller = window?.rootViewController as? FlutterViewController {
+      let channel = FlutterMethodChannel(
+        name: "external_link_account",
+        binaryMessenger: controller.binaryMessenger
+      )
+      channel.setMethodCallHandler { call, result in
+        switch call.method {
+        case "canOpen":
+          if #available(iOS 16.0, *) {
+            Task {
+              let can = await ExternalLinkAccount.canOpen
+              result(can)
+            }
+          } else {
+            result(false)
+          }
+        case "open":
+          if #available(iOS 16.0, *) {
+            Task {
+              do {
+                try await ExternalLinkAccount.open()
+                result(true)
+              } catch {
+                result(
+                  FlutterError(
+                    code: "open_failed",
+                    message: error.localizedDescription,
+                    details: nil
+                  )
+                )
+              }
+            }
+          } else {
+            result(
+              FlutterError(
+                code: "unavailable",
+                message: "Requires iOS 16 or later",
+                details: nil
+              )
+            )
+          }
+        default:
+          result(FlutterMethodNotImplemented)
+        }
+      }
+    }
+
     return super.application(application, didFinishLaunchingWithOptions: launchOptions)
   }
 }

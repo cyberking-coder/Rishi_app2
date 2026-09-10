@@ -101,6 +101,15 @@ publish_to: "none"
 # is still in flight, so Home, Browse, the mini player and the lesson launcher
 # can no longer stack two identical Now Playing screens.
 #
+# +35 fixes the App Store 3.1.1 rejection of 2.2.2(38): the External Link
+# Account link must use StoreKit's ExternalLinkAccount.open() API, which
+# presents Apple's OWN disclosure sheet before opening the URL from Info.plist's
+# SKExternalLinkAccount. The previous build drew its own dialog + url_launcher,
+# which the entitlement does not accept. Added a native MethodChannel
+# (ios/Runner/AppDelegate.swift) calling ExternalLinkAccount.open(); the Dart
+# side (Profile -> Manage your account) invokes it and no longer shows a custom
+# dialog or launches the URL itself.
+#
 # 2.3.1+26/+27 briefly carried a version-NAME bump to 2.3.1, then the download
 # retry/resume work. The name is reverted to 2.2.2 at +28 because the App Store
 # Connect version entry is 2.2.2 (its earlier build was developer-rejected), and
@@ -145,7 +154,7 @@ publish_to: "none"
 # featured card is now a true square (168x168, row height nudged to 216) and the
 # browse tile, continue tile and mini-player art are back to square. A square
 # audio cover fills them with no crop and no gaps; courses keep their 16:9 cards.
-version: 2.2.2+34
+version: 2.2.2+35
 
 environment:
   sdk: ">=3.3.0 <4.0.0"
