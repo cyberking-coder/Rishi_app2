@@ -12,6 +12,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import {
   Dialog,
   DialogContent,
@@ -27,6 +28,8 @@ type ItemStatus = "pending" | "uploading" | "done" | "error";
 interface Item {
   file: File;
   title: string;
+  artist: string;
+  description: string;
   status: ItemStatus;
   progress: number; // 0-100
   error?: string;
@@ -82,6 +85,8 @@ export function BulkUploadAudioDialog() {
     const next: Item[] = Array.from(files).map((file) => ({
       file,
       title: titleFromName(file.name),
+      artist: "",
+      description: "",
       status: "pending",
       progress: 0,
     }));
@@ -109,6 +114,8 @@ export function BulkUploadAudioDialog() {
       const created = await createContent({
         kind: "audio",
         title,
+        artist: item.artist.trim() || undefined,
+        description: item.description.trim() || undefined,
         language: language || undefined,
         isPremium,
       });
@@ -190,13 +197,13 @@ export function BulkUploadAudioDialog() {
           Upload multiple
         </Button>
       </DialogTrigger>
-      <DialogContent className="max-w-xl">
+      <DialogContent className="max-w-2xl">
         <DialogHeader>
           <DialogTitle>Upload multiple audios</DialogTitle>
           <DialogDescription>
-            Pick several files at once. Each is created as its own audio, using
-            the filename as the title — edit any before uploading. Settings below
-            apply to all of them.
+            Pick several files at once. Give each its own name, artist and
+            description — they all upload together. Premium and language below
+            apply to the whole batch.
           </DialogDescription>
         </DialogHeader>
 
@@ -238,18 +245,15 @@ export function BulkUploadAudioDialog() {
           </div>
 
           {items.length > 0 && (
-            <div className="max-h-[40vh] space-y-2 overflow-y-auto rounded-md border p-2">
+            <div className="max-h-[46vh] space-y-3 overflow-y-auto rounded-md border p-2">
               {items.map((it, i) => (
-                <div key={i} className="flex items-center gap-2">
-                  <StatusIcon status={it.status} />
-                  <div className="min-w-0 flex-1">
-                    <Input
-                      value={it.title}
-                      onChange={(e) => setItem(i, { title: e.target.value })}
-                      disabled={busy || it.status === "done"}
-                      className="h-8"
-                    />
-                    <p className="mt-0.5 truncate text-[11px] text-muted-foreground">
+                <div
+                  key={i}
+                  className="space-y-2 rounded-md border bg-muted/30 p-2.5"
+                >
+                  <div className="flex items-center gap-2">
+                    <StatusIcon status={it.status} />
+                    <p className="min-w-0 flex-1 truncate text-[11px] text-muted-foreground">
                       {it.status === "uploading"
                         ? `Uploading… ${it.progress}%`
                         : it.status === "error"
@@ -258,18 +262,44 @@ export function BulkUploadAudioDialog() {
                             ? "Uploaded"
                             : it.file.name}
                     </p>
+                    {!busy && it.status !== "done" && (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        className="h-6 w-6 shrink-0"
+                        onClick={() => removeItem(i)}
+                      >
+                        <X className="h-4 w-4" />
+                      </Button>
+                    )}
                   </div>
-                  {!busy && it.status !== "done" && (
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon"
-                      className="h-7 w-7 shrink-0"
-                      onClick={() => removeItem(i)}
-                    >
-                      <X className="h-4 w-4" />
-                    </Button>
-                  )}
+
+                  <div className="grid gap-2 sm:grid-cols-2">
+                    <Input
+                      value={it.title}
+                      onChange={(e) => setItem(i, { title: e.target.value })}
+                      disabled={busy || it.status === "done"}
+                      placeholder="Title"
+                      className="h-8"
+                    />
+                    <Input
+                      value={it.artist}
+                      onChange={(e) => setItem(i, { artist: e.target.value })}
+                      disabled={busy || it.status === "done"}
+                      placeholder="Artist (optional)"
+                      className="h-8"
+                    />
+                  </div>
+                  <Textarea
+                    value={it.description}
+                    onChange={(e) =>
+                      setItem(i, { description: e.target.value })
+                    }
+                    disabled={busy || it.status === "done"}
+                    placeholder="Description (optional)"
+                    rows={2}
+                  />
                 </div>
               ))}
             </div>
