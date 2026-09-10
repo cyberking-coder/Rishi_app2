@@ -29,10 +29,15 @@ import StoreKit
         binaryMessenger: controller.binaryMessenger
       )
       channel.setMethodCallHandler { call, result in
+        // Everything runs on @MainActor. StoreKit presents the sheet on the
+        // UI thread, and Flutter requires result() to be called on the main
+        // thread too. Calling result() from a plain (background) Task meant
+        // the Dart side never heard back, so the tap did nothing — no sheet,
+        // no error.
         switch call.method {
         case "canOpen":
           if #available(iOS 16.0, *) {
-            Task {
+            Task { @MainActor in
               let can = await ExternalLinkAccount.canOpen
               result(can)
             }
@@ -41,7 +46,7 @@ import StoreKit
           }
         case "open":
           if #available(iOS 16.0, *) {
-            Task {
+            Task { @MainActor in
               do {
                 try await ExternalLinkAccount.open()
                 result(true)
