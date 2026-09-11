@@ -172,7 +172,17 @@ publish_to: "none"
 # one friendly line, now that +40 is confirmed working on device (Apple's
 # StoreKit disclosure sheet appears and opens the store link). No behaviour
 # change beyond the message text.
-version: 2.2.2+41
+#
+# +42 addresses the App Store 3.1.1 rejection of build 48. App Review accepted
+# the StoreKit API (the sheet now opens) but flagged the in-app affordance: the
+# External Link Account entitlement requires the link to be a STANDARD HTML-style
+# link that displays the destination URL and contains the website domain, and
+# that displayed URL must match Info.plist's SKExternalLinkAccount. We showed a
+# neutral "Manage your account" button instead. The Profile settings sheet now
+# renders the actual URL — https://pay.anuragrishi.com/store — as an underlined,
+# tappable link (still routed through ExternalLinkAccount.open(), so Apple's
+# disclosure sheet is shown). Info.plist/entitlement unchanged.
+version: 2.2.2+42
 
 environment:
   sdk: ">=3.3.0 <4.0.0"

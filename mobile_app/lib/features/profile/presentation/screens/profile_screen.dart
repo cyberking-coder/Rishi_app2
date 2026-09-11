@@ -838,18 +838,39 @@ class _SettingsSheetState extends ConsumerState<_SettingsSheet> {
                   const SizedBox(height: 20),
                   const _SheetSectionLabel('Account'),
                   const SizedBox(height: 10),
-                  _SheetTile(
-                    icon: Icons.person_outline_rounded,
-                    iconColor: _kAccent,
-                    title: 'Manage your account',
-                    onTap: _openExternalAccount,
-                  ),
-                  const SizedBox(height: 8),
+                  // Apple's External Link Account entitlement requires the
+                  // in-app affordance to be a STANDARD HTML-style link that
+                  // shows the actual destination URL — not a neutral button
+                  // labelled "Manage your account". The displayed URL must
+                  // also match, exactly, the one declared in Info.plist's
+                  // SKExternalLinkAccount. A button was rejected under 3.1.1
+                  // for precisely this ("not formatted as a standard HTML
+                  // link and/or does not contain the domain name of your
+                  // website"). The tap still routes through StoreKit's
+                  // ExternalLinkAccount.open(), which presents Apple's own
+                  // disclosure sheet before leaving the app.
                   const Padding(
                     padding: EdgeInsets.symmetric(horizontal: 4),
                     child: Text(
-                      'Create or manage your account on our website.',
-                      style: TextStyle(color: _kSub, fontSize: 12),
+                      'Create or manage your account on our website:',
+                      style: TextStyle(color: _kSub, fontSize: 13, height: 1.5),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 4),
+                    child: GestureDetector(
+                      onTap: _openExternalAccount,
+                      child: const Text(
+                        externalAccountUrl,
+                        style: TextStyle(
+                          color: _kAccent,
+                          fontSize: 14,
+                          fontWeight: FontWeight.w500,
+                          decoration: TextDecoration.underline,
+                          decorationColor: _kAccent,
+                        ),
+                      ),
                     ),
                   ),
                 ],
