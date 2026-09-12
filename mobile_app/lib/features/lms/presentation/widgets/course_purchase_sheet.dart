@@ -96,7 +96,11 @@ class _CoursePurchaseSheetState extends ConsumerState<_CoursePurchaseSheet> {
         22 + MediaQuery.of(context).viewInsets.bottom,
       ),
       decoration: BoxDecoration(
-        gradient: AppTheme.clayFill(),
+        // Opaque base, not the default translucent `glass` (0x99 white).
+        // Over the dimmed page a 60%-opaque sheet let the content behind
+        // bleed through and read as a broken, half-transparent card. An
+        // opaque surface keeps the subtle clay gradient but fills solid.
+        gradient: AppTheme.clayFill(AppTheme.surface),
         borderRadius: const BorderRadius.vertical(top: Radius.circular(26)),
         boxShadow: AppTheme.cardShadow,
       ),

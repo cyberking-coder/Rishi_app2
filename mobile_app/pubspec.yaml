@@ -182,7 +182,16 @@ publish_to: "none"
 # renders the actual URL — https://pay.anuragrishi.com/store — as an underlined,
 # tappable link (still routed through ExternalLinkAccount.open(), so Apple's
 # disclosure sheet is shown). Info.plist/entitlement unchanged.
-version: 2.2.2+42
+#
+# +43 is two visual fixes. (1) The course "locked" bottom sheet
+# (course_purchase_sheet) used the default translucent clay fill (glass,
+# 0x99 white); over the dimmed page the content behind bled through and it
+# read as a half-transparent card. It now fills with an opaque surface base.
+# (2) The iOS "manage your account" affordance is now a Netflix-style
+# bordered box — "Create or manage your account. Go to
+# https://pay.anuragrishi.com/store" — with the URL shown as a standard
+# underlined link, still routed through ExternalLinkAccount.open().
+version: 2.2.2+43
 
 environment:
   sdk: ">=3.3.0 <4.0.0"

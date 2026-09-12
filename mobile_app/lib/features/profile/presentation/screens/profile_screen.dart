@@ -849,27 +849,48 @@ class _SettingsSheetState extends ConsumerState<_SettingsSheet> {
                   // website"). The tap still routes through StoreKit's
                   // ExternalLinkAccount.open(), which presents Apple's own
                   // disclosure sheet before leaving the app.
-                  const Padding(
-                    padding: EdgeInsets.symmetric(horizontal: 4),
-                    child: Text(
-                      'Create or manage your account on our website:',
-                      style: TextStyle(color: _kSub, fontSize: 13, height: 1.5),
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 4),
-                    child: GestureDetector(
-                      onTap: _openExternalAccount,
-                      child: const Text(
-                        externalAccountUrl,
-                        style: TextStyle(
-                          color: _kAccent,
-                          fontSize: 14,
-                          fontWeight: FontWeight.w500,
-                          decoration: TextDecoration.underline,
-                          decorationColor: _kAccent,
+                  // Netflix-style linked box: a bordered card whose body is a
+                  // standard hyperlink displaying the full destination URL.
+                  // The whole box is tappable; the URL text is styled as a
+                  // link (accent colour, underlined) and shows the domain, so
+                  // it reads as the "standard HTML link containing the domain
+                  // name of your website" the entitlement requires.
+                  GestureDetector(
+                    onTap: _openExternalAccount,
+                    child: Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.symmetric(
+                          vertical: 16, horizontal: 18),
+                      decoration: BoxDecoration(
+                        color: _kSurface,
+                        borderRadius: BorderRadius.circular(14),
+                        border: Border.all(color: AppTheme.border),
+                      ),
+                      child: Text.rich(
+                        const TextSpan(
+                          children: [
+                            TextSpan(
+                              text: 'Create or manage your account.\nGo to ',
+                              style: TextStyle(
+                                color: _kSub,
+                                fontSize: 13.5,
+                                height: 1.6,
+                              ),
+                            ),
+                            TextSpan(
+                              text: externalAccountUrl,
+                              style: TextStyle(
+                                color: _kAccent,
+                                fontSize: 13.5,
+                                height: 1.6,
+                                fontWeight: FontWeight.w600,
+                                decoration: TextDecoration.underline,
+                                decorationColor: _kAccent,
+                              ),
+                            ),
+                          ],
                         ),
+                        textAlign: TextAlign.center,
                       ),
                     ),
                   ),
