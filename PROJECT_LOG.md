@@ -1512,4 +1512,102 @@ locally (Codemagic assigns its own, higher iOS build numbers).
 
 ---
 
-*Last updated: 8 September 2026 — 2.2.2 (builds through +31): the offline-downloads work — the vanishing-downloads investigation (the revoke purge was user-scoped, and the real cause was the access-lapsed purge deleting FREE downloads as well as premium — now `purgePremiumDownloads` keeps free content, plus migration 20260908000001 restores a re-registering device's downloads), download retry/resume on a dropped connection with friendly errors instead of the raw signed URL, the `openNowPlaying` single-open guard against stacked player screens, the second iOS `-1004` fix (explicit 127.0.0.1/localhost ATS exception), the cover aspect-ratio decision (audio 1:1, courses 16:9, with admin size hints), per-file metadata in bulk audio upload, and the login one-device note moved above the fold. The version briefly read 2.3.1 before reverting to 2.2.2 to match the developer-rejected App Store Connect entry. Before that, 31 August 2026 — 2.2.1: the account-wide Razorpay webhook fix (a live-disabled webhook), the iOS `-11828`/`-1004` playback fixes and the audio double-open, the admin Help & Support console and bulk audio upload, and — the headline — Apple GRANTING the External Link Account Entitlement (reversing the 27 August denial in Section 14), the iOS account link built for it, the Google-on-web sign-in that unblocked Google users from buying, and Resend custom SMTP for email. See Section 15. Before that, 27 August 2026 — 2.2.0: Help & Support, the course resume card, offline-player artwork and skip controls, the download-purge fix (hasLapsed vs hasAccess), and the dependency plan in Section 13. Before that, 25 August 2026, the day the App Store approved 2.1.1 as a reader app. That session also produced the purple-glass restyle, the image-decode and upload-resize work, and the full codebase audit in Section 12 — which found a critical entitlement hole that had been open since June. Before that: the App Store 3.1.1 rejection on 12 August — the iOS reader-app build and the public storefront it forced. Before that: live sessions, push notifications and the fan-out scaling work (2 August); Phases 3b, 4 and 5 landed in one extended session earlier still. See the bug-fix chronology at the end of Section 7 for what broke along the way and why.*
+## 16. The External Link Account link — three rejections to get one link right — 12 September 2026
+
+The entitlement was granted (Section 15). Shipping the single "manage your
+account" link it permits still took three App Store rejections, each a
+genuinely different fault. Worth recording because each one looked, at first,
+like the previous fix had simply not worked.
+
+### Rejection 1 (build 38, 3.1.1): a link is not enough — it must use the API
+
+The first attempt drew its own confirmation dialog and opened the URL with
+`url_launcher`. App Review rejected it: the External Link Account entitlement
+is only satisfied by StoreKit's **`ExternalLinkAccount.open()`**, which
+presents Apple's *own* disclosure sheet and then opens the URL declared in
+Info.plist's `SKExternalLinkAccount`. A self-drawn dialog plus a browser launch
+does not count, no matter that it visibly opens the same page.
+
+Fixed by adding a native bridge: a `FlutterMethodChannel("external_link_account")`
+whose `open` handler calls `ExternalLinkAccount.open()` (iOS 16+), with the Dart
+side (Profile → account link) invoking it and no longer drawing a dialog or
+launching the URL itself. The URL is **not** passed across the channel — the
+system reads it from Info.plist.
+
+### The signing detour: a managed capability the API cannot add
+
+`ExternalLinkAccount.open()` throws unless the entitlement is actually in the
+signed binary, and the External Link Account capability is **managed** — Apple's
+App Store Connect API refuses to add it to an auto-created provisioning profile.
+Codemagic's default flow (create/revoke a cert, fetch an API-made profile) will
+therefore *always* sign a build that lacks the entitlement. The fix was a
+**hand-made** distribution profile created in the Apple portal against our own
+certificate, which does include the capability. Done with no Mac: the private
+key → CSR → Apple Distribution cert → `.p12` was assembled with `openssl`, the
+`.p12` + profile uploaded to Codemagic, and `codemagic.yaml` switched to manual
+`ios_signing` (`distribution_type: app_store`, our bundle id) with the
+cert-create/revoke loop deleted. The build log then showed the profile
+"KnowThyself Manual AppStore" and one valid identity — confirming the
+entitlement was in the binary.
+
+### The bug that made the button "do nothing": the UIScene lifecycle
+
+Even correctly signed, tapping the link did nothing, then surfaced
+`MissingPluginException(No implementation found for method canOpen on channel
+external_link_account)`. The channel was being registered in
+`AppDelegate.didFinishLaunchingWithOptions`, guarded by
+`if let controller = window?.rootViewController as? FlutterViewController`.
+But this app uses the **UIScene lifecycle** (`UIApplicationSceneManifest` in
+Info.plist + a `FlutterSceneDelegate`), so at `didFinishLaunching` the window
+and its `FlutterViewController` belong to the not-yet-connected scene —
+`window?.rootViewController` is **nil**, the `if let` silently skipped, and the
+channel was never created. Moved the handler into
+`SceneDelegate.scene(_:willConnectTo:)`, after `super`, where the controller is
+real. (An earlier red herring on the same button: `result()` was being called
+off the main thread from a plain `Task`, so an even-earlier build's tap got no
+reply; fixed with `Task { @MainActor in … }`. Both had to be right.)
+
+### Rejection 2 (build 48, 3.1.1 again): the link must LOOK like a link
+
+Now the API worked and Apple's sheet appeared — but they rejected again, with a
+much narrower reason: *"The URL for linking out is not formatted as a standard
+HTML link and/or does not contain the domain name of your website (the URL must
+match the URL on the info.plist)."* The destination page and the Info.plist were
+both fine (the `*` wildcard key is the correct `SKExternalLinkAccount` format,
+and `pay.anuragrishi.com/store` loads with no redirect). The fault was the
+**in-app affordance**: we showed a neutral button labelled "Manage your
+account". The entitlement requires the visible element to be a **standard
+HTML-style link that displays the actual destination URL** (showing the domain),
+and that displayed URL must match Info.plist exactly. Replaced the button with
+the URL rendered as an underlined link, then styled it as a **Netflix-style
+bordered box** — "Create or manage your account. Go to
+`https://pay.anuragrishi.com/store`" — the URL shown as the link. Still routed
+through `ExternalLinkAccount.open()`.
+
+### The compliance line we deliberately did not cross
+
+The link lives in **Profile → Settings only**. It was tempting to put it under
+the "Why is this locked?" explanation on gated content, but combining an unlock
+explanation with the external link turns a neutral account link into a **call to
+action to purchase outside the app** — which the reader-app framing under
+3.1.3(a) (the basis on which 2.1.1 was approved) forbids, and which the External
+Link Account entitlement does not cover (that is the separate External *Purchase*
+Link entitlement). The lock screen may say content needs membership; it may not
+point at the link to "unlock". They stay apart.
+
+### One unrelated UI fix in the same build
+
+The course "locked" bottom sheet (`course_purchase_sheet`) looked
+half-transparent — the dimmed page bled through it. Cause: it used the default
+translucent clay fill, whose base is `glass` (`0x99FFFFFF`, 60% opaque). Over a
+dimmed backdrop that reads as a broken card. Filled it with an **opaque surface**
+base, keeping the subtle gradient.
+
+**Build-number note:** the local pubspec reached **+43** across this work
+(+35 the first API build, +40 the SceneDelegate fix, +42 the link-as-text fix,
++43 the box + opaque sheet); Codemagic assigns its own iOS build numbers, which
+is why App Review saw builds 38 and 48.
+
+---
+
+*Last updated: 12 September 2026 — 2.2.2 (builds through +43): the External Link Account link, finally landed after three App Store rejections (Section 16) — build 38 rejected because a self-drawn dialog + url_launcher does not satisfy the entitlement (it needs StoreKit's `ExternalLinkAccount.open()`); a native MethodChannel added for it, plus a manual-signing detour (openssl, no Mac) because the managed capability cannot be added to an API-created profile; the button then "did nothing" because the channel was registered in AppDelegate while the app uses the UIScene lifecycle, so `window.rootViewController` was nil there — moved to `SceneDelegate.scene(willConnectTo:)`; build 48 rejected again because the in-app affordance must be a standard HTML-style link showing the URL/domain matching Info.plist, not a neutral "Manage your account" button — now a Netflix-style bordered box showing `https://pay.anuragrishi.com/store`; and the link deliberately kept in Settings, never on the lock screen, to preserve the reader-app framing. Also an opaque fill for the previously see-through locked bottom sheet. Before that, 8 September 2026 — 2.2.2 (builds through +31): the offline-downloads work — the vanishing-downloads investigation (the revoke purge was user-scoped, and the real cause was the access-lapsed purge deleting FREE downloads as well as premium — now `purgePremiumDownloads` keeps free content, plus migration 20260908000001 restores a re-registering device's downloads), download retry/resume on a dropped connection with friendly errors instead of the raw signed URL, the `openNowPlaying` single-open guard against stacked player screens, the second iOS `-1004` fix (explicit 127.0.0.1/localhost ATS exception), the cover aspect-ratio decision (audio 1:1, courses 16:9, with admin size hints), per-file metadata in bulk audio upload, and the login one-device note moved above the fold. The version briefly read 2.3.1 before reverting to 2.2.2 to match the developer-rejected App Store Connect entry. Before that, 31 August 2026 — 2.2.1: the account-wide Razorpay webhook fix (a live-disabled webhook), the iOS `-11828`/`-1004` playback fixes and the audio double-open, the admin Help & Support console and bulk audio upload, and — the headline — Apple GRANTING the External Link Account Entitlement (reversing the 27 August denial in Section 14), the iOS account link built for it, the Google-on-web sign-in that unblocked Google users from buying, and Resend custom SMTP for email. See Section 15. Before that, 27 August 2026 — 2.2.0: Help & Support, the course resume card, offline-player artwork and skip controls, the download-purge fix (hasLapsed vs hasAccess), and the dependency plan in Section 13. Before that, 25 August 2026, the day the App Store approved 2.1.1 as a reader app. That session also produced the purple-glass restyle, the image-decode and upload-resize work, and the full codebase audit in Section 12 — which found a critical entitlement hole that had been open since June. Before that: the App Store 3.1.1 rejection on 12 August — the iOS reader-app build and the public storefront it forced. Before that: live sessions, push notifications and the fan-out scaling work (2 August); Phases 3b, 4 and 5 landed in one extended session earlier still. See the bug-fix chronology at the end of Section 7 for what broke along the way and why.*
