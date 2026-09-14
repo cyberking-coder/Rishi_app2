@@ -81,10 +81,16 @@ final goRouterProvider = Provider<GoRouter>((ref) {
         builder: (_, __) => const ForgotPasswordScreen(),
       ),
       GoRoute(path: '/signup', builder: (_, __) => const SignupScreen()),
+      // The four bottom-nav tabs use NoTransitionPage: tapping a tab should
+      // read as the same shell swapping its body, not as a page sliding in
+      // from the side ("page turning"). The default platform page animates a
+      // horizontal slide, which is wrong for peer tabs that replace each
+      // other. Drill-down routes (a lesson, a course) keep the default slide.
       GoRoute(
         path: '/home',
-        builder: (_, __) =>
-            const AppShell(tab: AppTab.home, child: HomeScreen()),
+        pageBuilder: (_, __) => const NoTransitionPage(
+          child: AppShell(tab: AppTab.home, child: HomeScreen()),
+        ),
       ),
       GoRoute(
         path: '/now-playing',
@@ -92,8 +98,9 @@ final goRouterProvider = Provider<GoRouter>((ref) {
       ),
       GoRoute(
         path: '/downloads',
-        builder: (_, __) =>
-            const AppShell(tab: AppTab.downloads, child: DownloadsScreen()),
+        pageBuilder: (_, __) => const NoTransitionPage(
+          child: AppShell(tab: AppTab.downloads, child: DownloadsScreen()),
+        ),
       ),
       GoRoute(
         path: '/offline-player/:contentId',
@@ -104,13 +111,15 @@ final goRouterProvider = Provider<GoRouter>((ref) {
       ),
       GoRoute(
         path: '/profile',
-        builder: (_, __) =>
-            const AppShell(tab: AppTab.profile, child: ProfileScreen()),
+        pageBuilder: (_, __) => const NoTransitionPage(
+          child: AppShell(tab: AppTab.profile, child: ProfileScreen()),
+        ),
       ),
       GoRoute(
         path: '/courses',
-        builder: (_, __) =>
-            const AppShell(tab: AppTab.courses, child: CoursesScreen()),
+        pageBuilder: (_, __) => const NoTransitionPage(
+          child: AppShell(tab: AppTab.courses, child: CoursesScreen()),
+        ),
       ),
       GoRoute(
         path: '/course/:id',

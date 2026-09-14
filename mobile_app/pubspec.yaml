@@ -191,7 +191,13 @@ publish_to: "none"
 # bordered box — "Create or manage your account. Go to
 # https://pay.anuragrishi.com/store" — with the URL shown as a standard
 # underlined link, still routed through ExternalLinkAccount.open().
-version: 2.2.2+43
+#
+# +44 removes the horizontal "page turning" slide when switching bottom-nav
+# tabs (Home / Courses / Downloads / Profile). Those four routes now use
+# NoTransitionPage, so tapping a tab reads as the shell swapping its body
+# rather than a new page sliding in from the side. Drill-down routes (a
+# lesson, a course, now-playing) keep the default slide.
+version: 2.2.2+44
 
 environment:
   sdk: ">=3.3.0 <4.0.0"
