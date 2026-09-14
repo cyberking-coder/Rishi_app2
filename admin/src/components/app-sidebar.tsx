@@ -16,6 +16,7 @@ import {
   Tags,
   TicketPercent,
   Users,
+  Video,
   Youtube,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -31,6 +32,7 @@ const NAV = [
   { href: "/audios", label: "Audios", icon: Music },
   { href: "/courses", label: "Courses", icon: GraduationCap },
   { href: "/youtube", label: "YouTube", icon: Youtube },
+  { href: "/sessions", label: "Live sessions", icon: Video },
   { href: "/plans", label: "Membership", icon: CreditCard },
   { href: "/coupons", label: "Coupons", icon: TicketPercent },
   { href: "/categories", label: "Categories", icon: Tags },
