@@ -21,6 +21,8 @@ import '../../domain/entities/continue_listening_item.dart';
 import '../../../lms/application/lms_providers.dart';
 import '../../../lms/presentation/lesson_launcher.dart';
 import '../../../lms/domain/entities/course_summary.dart';
+import '../../../live/application/live_providers.dart';
+import '../../../live/presentation/widgets/live_session_card.dart';
 import '../../../watch/application/watch_providers.dart';
 import '../../../audio/presentation/utils/audio_navigation.dart';
 import '../../../watch/presentation/widgets/youtube_card.dart';
@@ -59,6 +61,14 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     // force-quit or manually re-navigate.
     if (state == AppLifecycleState.resumed) {
       ref.invalidate(accessStateProvider);
+      // Same reason, for a seat at a paid session: the person has just
+      // come back from paying in a browser, and the card should say
+      // "Join" rather than still offering to sell them the seat. Android
+      // only — the session providers are never touched on iOS, where the
+      // feature is hidden (see kLiveSessionsEnabled).
+      if (kLiveSessionsEnabled) {
+        ref.invalidate(paidSessionsProvider);
+      }
     }
   }
 
@@ -200,6 +210,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
           ref.invalidate(continueListeningProvider);
           ref.invalidate(continueCourseProvider);
           ref.invalidate(youtubeVideosProvider);
+          if (kLiveSessionsEnabled) {
+            ref.invalidate(upcomingSessionsProvider);
+          }
         },
         child: ListView(
           padding: const EdgeInsets.only(bottom: 28),
@@ -231,6 +244,16 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
 
             const _ContinueCard(),
 
+            // Above everything else, and only when there is one. A live
+            // session is the single thing in this app that expires: it is
+            // the reason a notification was sent, and the card that
+            // notification is telling people to tap. Leaving it three taps
+            // deep behind a "Watch on YouTube" heading meant the reminder
+            // arrived and the thing it referred to was nowhere in sight.
+            //
+            // Android only — on iOS the section renders nothing and reads
+            // no provider (see kLiveSessionsEnabled).
+            const _LiveSessionSection(),
 
             _SectionTitle(
               title: 'Browse',
@@ -280,6 +303,51 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
           ],
         ),
       ),
+    );
+  }
+}
+
+// ── Live sessions ────────────────────────────────────────────────────
+
+/// Upcoming live sessions, or nothing at all.
+///
+/// Android only. On iOS [kLiveSessionsEnabled] is false and this returns
+/// immediately without ever reading the provider, so no `live_sessions`
+/// request is made from an iPhone and the feature is entirely absent.
+///
+/// On Android it renders nothing while loading and nothing on error,
+/// rather than a spinner or a message: this section is absent most of the
+/// time, and a placeholder for something that usually doesn't exist is
+/// worse than silence.
+class _LiveSessionSection extends ConsumerWidget {
+  const _LiveSessionSection();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    if (!kLiveSessionsEnabled) return const SizedBox.shrink();
+
+    final sessions =
+        ref.watch(upcomingSessionsProvider).asData?.value ?? const [];
+    final live = sessions.where((s) => !s.isCancelled && !s.isOver).toList();
+    if (live.isEmpty) return const SizedBox.shrink();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _SectionTitle(
+          title: live.length == 1 ? 'Live session' : 'Live sessions',
+          action: 'See all',
+          onAction: () => context.push('/watch'),
+        ),
+        const SizedBox(height: 12),
+        // Only the next one here. The rest are a tap away on Watch —
+        // Home is a starting point, not a schedule.
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 20),
+          child: LiveSessionCard(session: live.first),
+        ),
+        const SizedBox(height: 24),
+      ],
     );
   }
 }

@@ -197,7 +197,15 @@ publish_to: "none"
 # NoTransitionPage, so tapping a tab reads as the shell swapping its body
 # rather than a new page sliding in from the side. Drill-down routes (a
 # lesson, a course, now-playing) keep the default slide.
-version: 2.2.2+44
+#
+# +45 brings the live Zoom sessions feature back — ANDROID ONLY. It was
+# removed in 26d7a8b (a real-time service disqualifies the iOS reader-app /
+# External Link Account framing). Restored the features/live module (entity,
+# datasource, providers, card) and the Home + Watch sections, all gated behind
+# a new kLiveSessionsEnabled flag (false on iOS: the data is not even fetched
+# there). Certificates stay removed. The dashboard half is restored separately.
+# The database tables were never dropped, so nothing to migrate.
+version: 2.2.2+45
 
 environment:
   sdk: ">=3.3.0 <4.0.0"

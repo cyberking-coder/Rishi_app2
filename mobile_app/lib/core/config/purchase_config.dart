@@ -81,6 +81,29 @@ final bool kEducationFramingEnabled =
 /// change to either silently moving the other.
 final bool kGuideEnabled = defaultTargetPlatform != TargetPlatform.iOS;
 
+/// Whether live Zoom sessions are shown.
+///
+/// False on iOS. A live session is a real-time service, and that is an
+/// outright disqualifier on the External Link Account Entitlement's own
+/// eligibility list — it also undercuts the reader-app / 3.1.3(a) framing,
+/// whose whole claim is that this app plays content acquired elsewhere
+/// rather than hosting a scheduled, real-time event. So the feature ships
+/// on Android only.
+///
+/// This is not merely a UI hide: on iOS the session data is not even
+/// fetched. The Home and Watch screens skip watching the session
+/// providers entirely when this is false, so no request for
+/// `live_sessions` is ever made from an iPhone and the screens behave as
+/// though the feature does not exist.
+///
+/// Android keeps live sessions in full. If the position ever changes,
+/// flipping this back restores the feature with nothing to migrate — the
+/// tables and data layer were left intact.
+///
+/// `defaultTargetPlatform` rather than `Platform.isIOS` so this file
+/// carries no `dart:io` import, and so a test can override it.
+final bool kLiveSessionsEnabled = defaultTargetPlatform != TargetPlatform.iOS;
+
 /// Whether the iOS build shows the single external link to the website for
 /// account creation and management.
 ///
