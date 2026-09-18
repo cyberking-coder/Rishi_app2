@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Android 11 and below (fullBackupContent). Exclude flutter_secure_storage's
+  EncryptedSharedPreferences from Auto Backup. Its AES keys are wrapped by a
+  non-exportable Android Keystore key that CANNOT be backed up, so restoring
+  the encrypted prefs to a new device leaves undecryptable blobs and crashes
+  reads with BadPaddingException / BAD_DECRYPT. Excluding the file means a
+  migrated device simply has no stored download keys and re-downloads cleanly.
+-->
+<full-backup-content>
+    <exclude domain="sharedpref" path="FlutterSecureStorage.xml"/>
+</full-backup-content>

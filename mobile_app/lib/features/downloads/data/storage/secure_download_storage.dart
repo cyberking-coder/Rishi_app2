@@ -62,11 +62,31 @@ class SecureDownloadStorage {
   }
 
   /// Reloads a previously-stored key, combined with the [iv] from the
-  /// manifest. Returns null if the key is missing (e.g. wiped keystore).
+  /// manifest. Returns null if the key is missing (e.g. wiped keystore) OR
+  /// if the keystore blob can no longer be decrypted.
+  ///
+  /// The read can THROW rather than return null: on Android the key lives in
+  /// EncryptedSharedPreferences, wrapped by a non-exportable Android Keystore
+  /// key. When Auto Backup restores the encrypted prefs to a new device (or
+  /// after a keystore reset) that wrapping key is gone, and the read fails
+  /// with `BadPaddingException / BAD_DECRYPT`. Left unguarded that crashed
+  /// offline playback. Treat any read failure as "key unavailable": delete
+  /// the unusable entry so the download self-heals via a re-download, and
+  /// return null so the callers show "please re-download" instead of crashing.
   Future<DownloadCipherKey?> loadKey(String downloadId, Uint8List iv) async {
-    final stored = await _secureStorage.read(key: '$_keyPrefix$downloadId');
-    if (stored == null) return null;
-    return DownloadCipherKey(base64Decode(stored), iv);
+    try {
+      final stored = await _secureStorage.read(key: '$_keyPrefix$downloadId');
+      if (stored == null) return null;
+      return DownloadCipherKey(base64Decode(stored), iv);
+    } catch (_) {
+      try {
+        await _secureStorage.delete(key: '$_keyPrefix$downloadId');
+      } catch (_) {
+        // The store itself is unhealthy; nothing more to do here. The caller
+        // still gets null and the download is treated as needing re-download.
+      }
+      return null;
+    }
   }
 
   Future<void> deleteKey(String downloadId) =>

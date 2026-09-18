@@ -9,6 +9,7 @@ import '../../../audio/application/audio_providers.dart';
 import '../../../audio/domain/entities/audio_track.dart';
 import '../../application/home_providers.dart';
 import '../../../audio/presentation/utils/audio_navigation.dart';
+import '../../../audio/presentation/utils/playback_error.dart';
 import '../../domain/entities/audio_summary.dart';
 import '../widgets/premium_lock.dart';
 
@@ -56,13 +57,10 @@ class _BrowseScreenState extends ConsumerState<BrowseScreen> {
         durationSeconds: a.durationSeconds,
       ));
       if (mounted) openNowPlaying(context);
-    } catch (_) {
+    } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content:
-              Text("Couldn't play this track. Check your connection and try again."),
-        ),
+        SnackBar(content: Text(playbackErrorMessage(e))),
       );
     } finally {
       _starting = false;

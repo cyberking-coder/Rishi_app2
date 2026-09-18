@@ -213,7 +213,21 @@ publish_to: "none"
 # re-emitted, on to /home — tearing down the offline player. authStateChanges()
 # now treats only an explicit AuthChangeEvent.signedOut as logged-out and falls
 # back to the persisted session for every other event.
-version: 2.2.2+46
+#
+# +47 is three download/playback robustness fixes.
+# (1) Offline decrypt crash: flutter_secure_storage's loadKey read could throw
+#     BadPaddingException/BAD_DECRYPT (an Android Keystore-wrapped blob restored
+#     by Auto Backup to a device without the wrapping key). It was unguarded and
+#     crashed offline playback. loadKey now catches it, deletes the unusable key
+#     and returns null, so the download self-heals via re-download.
+# (2) Backup exclusion: Android backup_rules.xml + data_extraction_rules.xml now
+#     exclude the FlutterSecureStorage prefs from Auto Backup / device transfer,
+#     so a phone migration no longer carries over undecryptable keys.
+# (3) Honest play errors: the home/browse/continue play handlers caught every
+#     error as "check your connection", hiding a device-lock / no-active-device
+#     (an admin device reset). They now map the typed AuthFailure to the real
+#     reason (playback_error.dart).
+version: 2.2.2+47
 
 environment:
   sdk: ">=3.3.0 <4.0.0"

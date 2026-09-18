@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Android 12+ (dataExtractionRules). Same reasoning as backup_rules.xml, for
+  both cloud backup AND device-to-device transfer: flutter_secure_storage's
+  EncryptedSharedPreferences is excluded because its wrapping key lives in the
+  Android Keystore and never travels with a backup/transfer, so a restored
+  copy is undecryptable and crashes reads (BAD_DECRYPT). Excluded here, a new
+  device just re-downloads instead.
+-->
+<data-extraction-rules>
+    <cloud-backup>
+        <exclude domain="sharedpref" path="FlutterSecureStorage.xml"/>
+    </cloud-backup>
+    <device-transfer>
+        <exclude domain="sharedpref" path="FlutterSecureStorage.xml"/>
+    </device-transfer>
+</data-extraction-rules>

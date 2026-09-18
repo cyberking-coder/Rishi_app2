@@ -25,6 +25,7 @@ import '../../../live/application/live_providers.dart';
 import '../../../live/presentation/widgets/live_session_card.dart';
 import '../../../watch/application/watch_providers.dart';
 import '../../../audio/presentation/utils/audio_navigation.dart';
+import '../../../audio/presentation/utils/playback_error.dart';
 import '../../../watch/presentation/widgets/youtube_card.dart';
 import '../widgets/premium_lock.dart';
 
@@ -139,13 +140,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
             durationSeconds: audio.durationSeconds,
           ));
       if (mounted) openNowPlaying(context);
-    } catch (_) {
+    } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content:
-              Text("Couldn't play this track. Check your connection and try again."),
-        ),
+        SnackBar(content: Text(playbackErrorMessage(e))),
       );
     } finally {
       _starting = false;
@@ -860,13 +858,10 @@ class _ContinueCard extends ConsumerWidget {
             resumeAt: Duration(seconds: item.progressSeconds),
           );
       if (context.mounted) openNowPlaying(context);
-    } catch (_) {
+    } catch (e) {
       if (!context.mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content:
-              Text("Couldn't play this track. Check your connection and try again."),
-        ),
+        SnackBar(content: Text(playbackErrorMessage(e))),
       );
     }
   }
