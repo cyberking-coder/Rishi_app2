@@ -205,7 +205,15 @@ publish_to: "none"
 # a new kLiveSessionsEnabled flag (false on iOS: the data is not even fetched
 # there). Certificates stay removed. The dashboard half is restored separately.
 # The database tables were never dropped, so nothing to migrate.
-version: 2.2.2+45
+#
+# +46 stops offline playback jumping back to Home after a few seconds. The
+# auth stream mapped EVERY onAuthStateChange event to state.session?.user, so
+# a token refresh that fails while offline (null session) read as a sign-out;
+# GoRouterRefreshStream then bounced the router to /login and, once the session
+# re-emitted, on to /home — tearing down the offline player. authStateChanges()
+# now treats only an explicit AuthChangeEvent.signedOut as logged-out and falls
+# back to the persisted session for every other event.
+version: 2.2.2+46
 
 environment:
   sdk: ">=3.3.0 <4.0.0"
