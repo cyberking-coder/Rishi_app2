@@ -59,6 +59,7 @@ export interface Audio {
   duration_seconds: number | null;
   artist: string | null;
   album: string | null;
+  language: string | null;
   audio_type: "track" | "podcast_episode";
   is_premium: boolean;
   status: ContentStatus;
