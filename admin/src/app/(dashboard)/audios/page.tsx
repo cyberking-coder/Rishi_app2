@@ -23,7 +23,7 @@ export default async function AudiosPage() {
   const supabase = createClient();
   const { data: audios } = await supabase
     .from("audios")
-    .select("id, title, artist, status, audio_type, is_premium, play_count, created_at, cover_art_url")
+    .select("id, title, artist, album, description, language, status, audio_type, is_premium, play_count, created_at, cover_art_url")
     .order("created_at", { ascending: false })
     .returns<Audio[]>();
 
@@ -101,6 +101,11 @@ export default async function AudiosPage() {
                         contentId={a.id}
                         status={a.status}
                         isPremium={a.is_premium}
+                        title={a.title}
+                        artist={a.artist}
+                        album={a.album}
+                        description={a.description}
+                        language={a.language}
                       />
                     </TableCell>
                   </TableRow>

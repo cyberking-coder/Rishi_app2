@@ -26,7 +26,7 @@ export default async function VideosPage() {
   const [{ data: videos }, { data: assets }] = await Promise.all([
     supabase
       .from("videos")
-      .select("id, title, status, video_type, is_premium, view_count, created_at, bunny_video_id, bunny_status")
+      .select("id, title, description, language, status, video_type, is_premium, view_count, created_at, bunny_video_id, bunny_status")
       .order("created_at", { ascending: false })
       .returns<Video[]>(),
     // Which videos still have a playable R2 rendition. Without this the
@@ -105,6 +105,9 @@ export default async function VideosPage() {
                         contentId={v.id}
                         status={v.status}
                         isPremium={v.is_premium}
+                        title={v.title}
+                        description={v.description}
+                        language={v.language}
                       />
                     </TableCell>
                   </TableRow>

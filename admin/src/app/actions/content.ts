@@ -318,6 +318,42 @@ export async function updateContentStatus(args: {
   return { ok: true };
 }
 
+/** Edits the metadata of an already-created video/audio row (title,
+ *  description, language, and for audio the artist/album). Independent of
+ *  status, so details can be corrected after the item is published. */
+export async function updateContent(args: {
+  kind: ContentKind;
+  contentId: string;
+  title: string;
+  description?: string | null;
+  language?: string | null;
+  artist?: string | null; // audio only
+  album?: string | null; // audio only
+}): Promise<ActionResult> {
+  await requireAdmin();
+  const db = createAdminClient();
+  const table = args.kind === "video" ? "videos" : "audios";
+
+  const title = args.title.trim();
+  if (!title) return { ok: false, error: "Title can't be empty." };
+
+  const patch: Record<string, unknown> = {
+    title,
+    description: args.description?.trim() || null,
+    language: args.language?.trim() || null,
+  };
+  if (args.kind === "audio") {
+    patch.artist = args.artist?.trim() || null;
+    patch.album = args.album?.trim() || null;
+  }
+
+  const { error } = await db.from(table).update(patch).eq("id", args.contentId);
+  if (error) return { ok: false, error: error.message };
+
+  revalidatePath(args.kind === "video" ? "/videos" : "/audios");
+  return { ok: true };
+}
+
 export async function setContentPremium(args: {
   kind: ContentKind;
   contentId: string;
