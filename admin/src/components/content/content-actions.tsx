@@ -247,6 +247,22 @@ export function ContentActions({
                 onChange={(e) => setFLanguage(e.target.value)}
               />
             </div>
+            <div className="space-y-1.5">
+              <Label>Cover image</Label>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => coverInputRef.current?.click()}
+              >
+                Upload new cover…
+              </Button>
+              <p className="text-xs text-muted-foreground">
+                {kind === "audio"
+                  ? "Square (1:1) — 672×672 px. Crop to a square, don't pad with bars."
+                  : "16:9 — 1280×720 px. Crop to 16:9, don't pad with bars."}{" "}
+                Uploads immediately when you pick a file.
+              </p>
+            </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setEditOpen(false)}>
