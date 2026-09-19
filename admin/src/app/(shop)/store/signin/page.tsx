@@ -83,17 +83,17 @@ function SignInForm() {
     router.push(path ?? "/store");
   }
 
-  /// Sign in with the same Google account used in the app.
+  /// Sign in with the same Google or Apple account used in the app.
   ///
-  /// This is the fix for Google users: they created their account in the app
-  /// with Google and have NO password, so email+password sign-in here is
-  /// impossible for them. A web OAuth round-trip authenticates the same
-  /// Google account — same email, so Supabase resolves it to the SAME user —
-  /// and access bought here appears in the app.
+  /// This is the fix for social-login users: they created their account in the
+  /// app with Google/Apple and have NO password, so email+password sign-in
+  /// here is impossible for them. A web OAuth round-trip authenticates the same
+  /// account — same email, so Supabase resolves it to the SAME user — and
+  /// access bought here appears in the app.
   ///
   /// We come back via /auth/callback (which sets the session cookie), then to
   /// `next`: the purchase resumes if one was in flight, otherwise the store.
-  async function signInWithGoogle() {
+  async function signInWithProvider(provider: "google" | "apple") {
     setBusy(true);
     setError(null);
     setNotice(null);
@@ -107,14 +107,14 @@ function SignInForm() {
     const redirectTo = `${window.location.origin}/auth/callback?next=${encodeURIComponent(resume)}`;
 
     const { error } = await supabase.auth.signInWithOAuth({
-      provider: "google",
+      provider,
       options: { redirectTo },
     });
     if (error) {
       setError(humanise(error.message));
       setBusy(false);
     }
-    // On success the browser navigates away to Google; nothing else to do.
+    // On success the browser navigates away to the provider; nothing else to do.
   }
 
   // After the Google round-trip we land back here with ?resume=1 and a live
@@ -122,7 +122,7 @@ function SignInForm() {
   // Also surface a friendly message if the callback reported a failure.
   useEffect(() => {
     if (params.get("error") === "oauth") {
-      setError("Google sign-in didn't complete. Please try again.");
+      setError("Sign-in didn't complete. Please try again.");
       return;
     }
     // Arrived from an email-confirmation link. The email is now verified;
@@ -252,8 +252,8 @@ function SignInForm() {
       </h1>
       <p className="mt-2 text-sm text-muted-foreground">
         {target
-          ? "Sign in the same way you use the app — if you signed in with Google there, choose \"Continue with Google\" here. That keeps it one account, and your access appears in the app."
-          : "Sign in the same way you use the app — with Google if that's how you signed in there, otherwise the same email. That keeps everything on one account."}
+          ? "Sign in the same way you use the app — if you signed in with Google or Apple there, choose the matching button here. That keeps it one account, and your access appears in the app."
+          : "Sign in the same way you use the app — with Google or Apple if that's how you signed in there, otherwise the same email. That keeps everything on one account."}
       </p>
 
       {/* Both options, equally visible, above the form. As a text link
@@ -288,17 +288,26 @@ function SignInForm() {
 
       <Card className="mt-4">
         <CardContent className="p-5">
-          {/* Google first: the people who cannot sign in any other way — the
-              ones who used Google in the app and have no password — are
-              exactly who this page was failing. */}
+          {/* Social sign-in first: the people who cannot sign in any other
+              way — the ones who used Google/Apple in the app and have no
+              password — are exactly who this page was failing. */}
           <Button
             type="button"
             variant="outline"
             className="w-full"
-            onClick={signInWithGoogle}
+            onClick={() => signInWithProvider("google")}
             disabled={busy}
           >
             Continue with Google
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            className="mt-2 w-full"
+            onClick={() => signInWithProvider("apple")}
+            disabled={busy}
+          >
+            Continue with Apple
           </Button>
           <div className="my-4 flex items-center gap-3 text-xs text-muted-foreground">
             <span className="h-px flex-1 bg-border" />
