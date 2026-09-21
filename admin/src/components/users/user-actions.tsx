@@ -122,7 +122,7 @@ export function UserActions({
           Test: expire in 10 min
         </DropdownMenuItem>
         <DropdownMenuItem className="text-destructive" onClick={endAccess}>
-          End access now
+          Make free (end access)
         </DropdownMenuItem>
         <DropdownMenuSeparator />
         {status !== "active" && (
