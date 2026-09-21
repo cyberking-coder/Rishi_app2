@@ -44,6 +44,16 @@ export function UserActions({
     router.refresh();
   }
 
+  async function makePremium() {
+    // 0 days = unlimited: setUserAccessDays stores a null expiry with
+    // access_started_at set and subscription_tier 'premium', which
+    // resolve_user_tier reads as a permanent premium (retreat) member.
+    const result = await setUserAccessDays(userId, 0);
+    if (!result.ok) return toast.error(result.error);
+    toast.success("User is now a premium member (unlimited access)");
+    router.refresh();
+  }
+
   async function extendAccess(days: number) {
     const result = await setUserAccessDays(userId, days);
     if (!result.ok) return toast.error(result.error);
@@ -93,6 +103,9 @@ export function UserActions({
         </DropdownMenuItem>
         <DropdownMenuSeparator />
         <DropdownMenuLabel>Access</DropdownMenuLabel>
+        <DropdownMenuItem onClick={makePremium}>
+          Make premium (unlimited)
+        </DropdownMenuItem>
         <DropdownMenuItem onClick={() => extendAccess(30)}>
           Grant 30 more days
         </DropdownMenuItem>
