@@ -1,6 +1,8 @@
 import 'dart:async';
 
 import 'package:audio_service/audio_service.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_crashlytics/firebase_crashlytics.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -24,11 +26,33 @@ import 'features/downloads/data/storage/secure_download_storage.dart';
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // Surface any uncaught Flutter error instead of a blank black screen.
-  FlutterError.onError = (details) {
-    FlutterError.presentError(details);
-    debugPrint('FlutterError: ${details.exceptionAsString()}');
-  };
+  // Crash reporting first, so anything that fails after this — including the
+  // launch-time init below — is captured and shows up in Firebase Crashlytics
+  // and Play's crash reports. Guarded: a device with no Play Services / no
+  // google-services.json must still reach the login screen, so a failure here
+  // only costs reporting, not the app. Firebase.initializeApp is idempotent,
+  // so PushService.init() reusing it below is fine.
+  try {
+    await Firebase.initializeApp();
+    FlutterError.onError = (details) {
+      FlutterError.presentError(details);
+      FirebaseCrashlytics.instance.recordFlutterFatalError(details);
+    };
+    // Uncaught async (non-Flutter) errors — e.g. a failed Future during
+    // startup — which FlutterError.onError does not see.
+    WidgetsBinding.instance.platformDispatcher.onError = (error, stack) {
+      FirebaseCrashlytics.instance.recordError(error, stack, fatal: true);
+      return true;
+    };
+  } catch (e) {
+    // No crash reporting on this device; still surface errors to the log
+    // rather than a blank black screen.
+    FlutterError.onError = (details) {
+      FlutterError.presentError(details);
+      debugPrint('FlutterError: ${details.exceptionAsString()}');
+    };
+    debugPrint('Crashlytics init skipped: $e');
+  }
 
   await Supabase.initialize(
     url: AppConfig.supabaseUrl,

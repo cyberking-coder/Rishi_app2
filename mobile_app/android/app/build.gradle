@@ -15,6 +15,10 @@ plugins {
 // asking for a token.
 if (file("google-services.json").exists()) {
     apply plugin: "com.google.gms.google-services"
+    // Crashlytics rides on the same Firebase config. Applied in the same
+    // guard so a checkout without google-services.json still builds (with
+    // no crash reporting) rather than failing.
+    apply plugin: "com.google.firebase.crashlytics"
 }
 
 def localProperties = new Properties()

@@ -24,6 +24,10 @@ plugins {
     // Messaging SDK reads at startup. Declared here, applied in app/ —
     // and applied only when the file is actually present, see there.
     id "com.google.gms.google-services" version "4.5.0" apply false
+    // Firebase Crashlytics: uploads the R8/native mapping so store crash
+    // reports are symbolicated. Declared here, applied in app/ — and, like
+    // google-services, only when google-services.json is present.
+    id "com.google.firebase.crashlytics" version "3.0.3" apply false
 }
 
 include ":app"
