@@ -235,7 +235,13 @@ publish_to: "none"
 # without reporting. This is the build that also ships +44..+47 to users
 # (offline-playback-to-Home fix, decrypt-crash guard, honest play errors,
 # no-slide tabs, Android live sessions) — none of which were released yet.
-version: 2.2.2+48
+#
+# 2.2.3 is a version-NAME bump because 2.2.2 is already published on both
+# stores — a new upload needs a higher version string, not just a higher
+# build number. No behaviour changed with the rename; +48's contents (the
+# Crashlytics add plus the previously-unreleased +44..+47 fixes) are what
+# actually ships. Keep AppConfig.appVersion in step — support tickets report it.
+version: 2.2.3+48
 
 environment:
   sdk: ">=3.3.0 <4.0.0"
