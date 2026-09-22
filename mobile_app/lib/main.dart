@@ -4,6 +4,7 @@ import 'package:audio_service/audio_service.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_crashlytics/firebase_crashlytics.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_cache_manager/flutter_cache_manager.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -64,6 +65,20 @@ Future<void> main() async {
   // must still reach the login screen. PushService.init swallows its own
   // failures and reports isAvailable = false.
   await PushService.init();
+
+  // Open the image-cache SQLite DB ONCE, serially, before audio_service can
+  // touch it. audio_service loads every MediaItem's remote artUri through
+  // flutter_cache_manager; a queue of tracks triggered several first-time
+  // opens of the same DB at once and one lost the race with SQLITE_BUSY on
+  // 'BEGIN EXCLUSIVE' — a launch crash on some devices. Doing one awaited
+  // open here initialises the (singleton) cache store, so every later access
+  // reuses it instead of racing a first open. Guarded: a failure here must
+  // not itself stop the app from reaching login.
+  try {
+    await DefaultCacheManager().getFileFromCache('__warmup__');
+  } catch (e) {
+    debugPrint('Image cache warmup skipped: $e');
+  }
 
   final audioRepository =
       AudioRepositoryImpl(AudioRemoteDataSource(Supabase.instance.client));

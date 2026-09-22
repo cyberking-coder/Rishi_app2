@@ -241,7 +241,15 @@ publish_to: "none"
 # build number. No behaviour changed with the rename; +48's contents (the
 # Crashlytics add plus the previously-unreleased +44..+47 fixes) are what
 # actually ships. Keep AppConfig.appVersion in step — support tickets report it.
-version: 2.2.3+48
+#
+# +49 fixes a launch crash caught by Crashlytics on the first 2.2.3 build:
+# DatabaseException(database is locked, SQLITE_BUSY) on 'BEGIN EXCLUSIVE' from
+# flutter_cache_manager. audio_service loads each track's remote artUri through
+# that cache; a queue of tracks made several first-time opens of the one SQLite
+# cache DB race, and one lost. main() now warms the cache store open once,
+# awaited, before AudioService.init, so later accesses reuse the initialised
+# singleton instead of racing a first open. Version name unchanged (2.2.3).
+version: 2.2.3+49
 
 environment:
   sdk: ">=3.3.0 <4.0.0"
@@ -283,6 +291,12 @@ dependencies:
   # the one most worth showing, so foreground messages are re-posted
   # through the local plugin.
   flutter_local_notifications: ^17.2.3
+  # Already pulled transitively by audio_service (which loads each track's
+  # remote notification artwork through it). Declared directly so we can warm
+  # its SQLite cache DB open ONCE, serially, at boot — several first-time
+  # opens racing (a queue of tracks loading artwork at launch) lost with
+  # SQLITE_BUSY on BEGIN EXCLUSIVE and crashed the app on some devices.
+  flutter_cache_manager: ^3.4.1
   # Voice input for the guide. Uses the platform's own recogniser —
   # Android's SpeechRecognizer, iOS's SFSpeechRecognizer — so dictation
   # costs nothing per minute, works in the languages the handset already
