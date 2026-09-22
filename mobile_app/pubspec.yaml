@@ -248,8 +248,15 @@ publish_to: "none"
 # that cache; a queue of tracks made several first-time opens of the one SQLite
 # cache DB race, and one lost. main() now warms the cache store open once,
 # awaited, before AudioService.init, so later accesses reuse the initialised
-# singleton instead of racing a first open. Version name unchanged (2.2.3).
-version: 2.2.3+49
+# singleton instead of racing a first open.
+#
+# 2.2.4 is a version-NAME bump for the iOS submission: App Store Connect needs
+# a version string not already used there, so this build ships as 2.2.4. The
+# shared pubspec version drives both platforms, so an Android build from this
+# commit is also 2.2.4 (accepted by Play, higher than 2.2.3). No behaviour
+# changed with the rename; +49's contents are what ship. Keep
+# AppConfig.appVersion in step — support tickets report it.
+version: 2.2.4+49
 
 environment:
   sdk: ">=3.3.0 <4.0.0"
