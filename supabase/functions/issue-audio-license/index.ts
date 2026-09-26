@@ -6,9 +6,18 @@
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { handlePreflight, jsonResponse } from "../_shared/cors.ts";
-import { DEFAULT_DOWNLOAD_TTL_SECONDS, presignGet } from "../_shared/r2.ts";
+import { presignGet } from "../_shared/r2.ts";
 
-const SIGNED_URL_TTL_SECONDS = DEFAULT_DOWNLOAD_TTL_SECONDS;
+// Streaming playback needs a link that outlasts a whole listening session.
+// The old 10-minute download TTL was too short: the player streams a long
+// track in pieces and re-requests bytes as it goes (more so on mobile data,
+// after a pause, on a network blip, or while backgrounded). A re-request
+// landing after 10 minutes hit an EXPIRED presigned link (R2 403) and cut the
+// audio off mid-track — the "interruption after a while" reports. 6 hours
+// comfortably exceeds any single track plus long pauses. Downloads keep the
+// short DEFAULT_DOWNLOAD_TTL — they re-mint a fresh link on every retry, so a
+// long-lived link there would only widen the sharing window for no benefit.
+const SIGNED_URL_TTL_SECONDS = 6 * 60 * 60; // 6 hours
 
 interface AudioRow {
   id: string;
