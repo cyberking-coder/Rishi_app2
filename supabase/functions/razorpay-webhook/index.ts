@@ -23,6 +23,35 @@ import {
   verifyRazorpayWebhookSignature,
 } from "../_shared/razorpay.ts";
 
+/**
+ * Claims a coupon redemption after a payment has been confirmed. create-order
+ * carries the coupon id in the order notes and does NOT claim it up front, so
+ * an abandoned/failed checkout can't burn a limited code without paying; this
+ * is where the atomic `redeem_coupon` increment actually happens. Best-effort
+ * on purpose: access is already granted by the time this runs, and the webhook
+ * is idempotent (webhook_events dedups a retried delivery, so it runs once per
+ * payment), so a redeem miss — an inactive code, or the cap hit in a rare
+ * last-redemption race — is logged, never fatal.
+ */
+// deno-lint-ignore no-explicit-any
+async function redeemCouponIfAny(supabase: any, couponId?: string | null) {
+  if (!couponId) return;
+  try {
+    const { data: redeemed, error } = await supabase.rpc("redeem_coupon", {
+      p_coupon_id: couponId,
+    });
+    if (error || redeemed !== true) {
+      console.warn(
+        "[razorpay-webhook] coupon redeem after payment did not apply:",
+        couponId,
+        error?.message ?? "(inactive or over limit)",
+      );
+    }
+  } catch (e) {
+    console.warn("[razorpay-webhook] coupon redeem threw:", couponId, e);
+  }
+}
+
 const PLAN_INTERVAL_DAYS: Record<string, number> = {
   weekly: 7,
   monthly: 30,
@@ -252,6 +281,7 @@ async function processEvent(
       payment,
       userId: notes.user_id,
       courseId: notes.course_id,
+      couponId: notes.coupon_id ?? null,
       billing: {
         email: notes.billing_email ?? null,
         name: notes.billing_name ?? null,
@@ -410,6 +440,15 @@ async function processEvent(
     extendedFrom: extendFrom.toISOString(),
     accessExpiresAt: isUnlimited ? "unlimited (left as-is)" : periodEnd.toISOString(),
   });
+
+  // Claim the coupon redemption now that the payment has actually landed.
+  // create-order deliberately does NOT claim it up front, so an abandoned or
+  // failed checkout can't burn a limited code without paying; the coupon id
+  // rides in the order notes. The webhook is idempotent (webhook_events dedups
+  // a retried delivery), so this runs once per payment. Best-effort: access is
+  // already granted above, so a redeem miss (e.g. the code hit its cap in a
+  // rare last-redemption race) must not fail the webhook — only log it.
+  await redeemCouponIfAny(supabase, notes.coupon_id);
 
   const { data: existingSub } = await supabase
     .from("subscriptions")
@@ -718,10 +757,11 @@ async function handleCoursePurchase(
     payment: any;
     userId?: string;
     courseId: string;
+    couponId?: string | null;
     billing: CourseBilling;
   },
 ): Promise<Response> {
-  const { eventType, payment, userId, courseId, billing } = args;
+  const { eventType, payment, userId, courseId, couponId, billing } = args;
 
   if (!userId) {
     console.error("[razorpay-webhook] course purchase missing user_id");
@@ -865,6 +905,12 @@ async function handleCoursePurchase(
     courseId,
     status,
   });
+
+  // Claim the coupon redemption now that this course payment has landed —
+  // create-order deferred it here (only the 100%-off path claims up front).
+  // Reached only on a genuine grant; the duplicate branch returned already.
+  // Best-effort: the purchase is recorded, so a redeem miss is logged only.
+  await redeemCouponIfAny(supabase, couponId ?? undefined);
 
   // The coupon (if any) was attached to the row at checkout time and
   // survives this upsert untouched (see the comment above the upsert) —

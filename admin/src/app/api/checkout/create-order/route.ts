@@ -121,6 +121,9 @@ export async function POST(req: NextRequest) {
   // at the gateway call.
   let planPaise = Math.round(Number(plan.price) * 100);
   const couponCode = (body.coupon ?? "").trim().toUpperCase() || null;
+  // Carried into the order notes so razorpay-webhook can claim the redemption
+  // only once the payment actually lands — see the coupon block below.
+  let subscriptionCouponId: string | null = null;
 
   if (couponCode) {
     const { data: couponRow } = await db
@@ -158,19 +161,15 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Claim the redemption before charging, exactly as the course path
-    // does: if two buyers race for the last one, only the winner gets it.
-    const { data: claimed } = await db.rpc("redeem_coupon", {
-      p_coupon_id: priced.result.coupon.id,
-    });
-    if (claimed !== true) {
-      return NextResponse.json(
-        { error: "That code has just been fully redeemed." },
-        { status: 409 },
-      );
-    }
-
+    // Do NOT claim the redemption here. It is claimed by razorpay-webhook
+    // only when the payment actually lands (the coupon id travels in the
+    // order notes below), so an abandoned or failed checkout — or an attacker
+    // replaying create-order with a limited code — cannot burn a redemption
+    // without paying. priceWithCoupon already rejected an exhausted code above;
+    // a rare concurrent last-redemption is over-redeemed by at most one, which
+    // is far better than the old "burned before payment" behaviour.
     planPaise = priced.result.finalAmount;
+    subscriptionCouponId = priced.result.coupon.id;
   }
 
   try {
@@ -187,6 +186,7 @@ export async function POST(req: NextRequest) {
         billing_email: email,
         billing_country: country,
         billing_state: state,
+        ...(subscriptionCouponId ? { coupon_id: subscriptionCouponId } : {}),
       },
     });
 
@@ -449,19 +449,11 @@ async function createCourseOrder(
       return NextResponse.json({ error: priced.error }, { status: 400 });
     }
 
-    // Claim the redemption before charging. If two buyers race for the
-    // last one, only the winner gets the discount — the loser is told
-    // rather than silently charged full price.
-    const { data: claimed } = await db.rpc("redeem_coupon", {
-      p_coupon_id: priced.result.coupon.id,
-    });
-    if (claimed !== true) {
-      return NextResponse.json(
-        { error: "That code has just been fully redeemed." },
-        { status: 409 },
-      );
-    }
-
+    // Do NOT claim the redemption here — see the subscription path. For a
+    // PAID course it is claimed by razorpay-webhook when the payment lands
+    // (the coupon id travels in the order notes). The one exception is a
+    // 100%-off grant just below, which has no payment/webhook and claims it
+    // itself. priceWithCoupon already rejected an exhausted code above.
     payable = priced.result.finalAmount;
     discountAmount = priced.result.discountAmount;
     couponId = priced.result.coupon.id;
@@ -471,6 +463,20 @@ async function createCourseOrder(
   // than sending the buyer to a gateway for a ₹0 payment, which Razorpay
   // would reject anyway.
   if (payable === 0) {
+    // 100%-off has no gateway payment and no webhook, so this is the ONE path
+    // that must claim the redemption itself — atomically, before granting.
+    if (couponId) {
+      const { data: claimed } = await db.rpc("redeem_coupon", {
+        p_coupon_id: couponId,
+      });
+      if (claimed !== true) {
+        return NextResponse.json(
+          { error: "That code has just been fully redeemed." },
+          { status: 409 },
+        );
+      }
+    }
+
     // Plain insert, not an upsert: the "already owned" check above
     // already returned 409, and the paid-row unique index is partial
     // (status = 'paid') so it can't serve as an ON CONFLICT target
@@ -537,6 +543,7 @@ async function createCourseOrder(
         billing_email: billing.email,
         billing_country: billing.country,
         billing_state: billing.state,
+        ...(couponId ? { coupon_id: couponId } : {}),
       },
     });
 
