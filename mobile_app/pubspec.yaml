@@ -265,7 +265,16 @@ publish_to: "none"
 # Supabase session (currentSession, which keeps the refresh token through an
 # offline expiry and clears only on an explicit sign-out), not just the live
 # stream value. Version name unchanged (2.2.4).
-version: 2.2.4+50
+#
+# +51 is the DEFINITIVE offline-never-redirects fix. 2.2.3 shipped with +46 and
+# STILL bounced offline listeners to Home on iOS — proof that gotrue drops its
+# persisted session there after the access token expires offline, so any check
+# that reads Supabase's session (including +50's currentSession) can still fail.
+# The router now also honours an app-owned durable login flag (LoginFlagStore, a
+# plain file) that is set the moment a real session is seen and cleared ONLY on
+# an explicit sign-out / account deletion — completely independent of gotrue. An
+# offline token expiry can no longer be read as a sign-out. Version unchanged.
+version: 2.2.4+51
 
 environment:
   sdk: ">=3.3.0 <4.0.0"

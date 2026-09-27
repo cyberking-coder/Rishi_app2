@@ -34,6 +34,9 @@ import '../widgets/app_shell.dart';
 
 final goRouterProvider = Provider<GoRouter>((ref) {
   final authState = ref.watch(authStateChangesProvider);
+  // Durable, app-owned "signed in" flag (see loginFlagProvider). Watched here
+  // so the router re-evaluates when it flips on login / off on logout.
+  final loginFlag = ref.watch(loginFlagProvider);
 
   return GoRouter(
     initialLocation: '/splash',
@@ -51,19 +54,22 @@ final goRouterProvider = Provider<GoRouter>((ref) {
       // leave navigation where it is.
       if (authState.isLoading) return null;
 
-      // Signed-in is decided by the PERSISTED session, not only the live
-      // stream value. A device that has logged in keeps its Supabase session
-      // (with the refresh token) stored locally; gotrue clears it ONLY on an
-      // explicit sign-out or a genuinely invalid refresh token — never on a
-      // network failure. While the device is offline and the short access
-      // token expires, the live stream (`authState`) can momentarily read
-      // null because it cannot refresh, but `currentSession` stays put. Using
-      // it means offline use — e.g. playing a downloaded track with no
-      // connection — can never be bounced to /login (and on to /home) just
-      // because a token could not be refreshed. An explicit logout still
-      // clears currentSession, so a real sign-out is unaffected.
+      // Signed-in is decided from THREE signals, any of which is enough, so an
+      // offline token expiry can never bounce a user to /login (and on to
+      // /home) mid-use — e.g. while playing a downloaded track:
+      //   1. the live auth stream has a user, or
+      //   2. Supabase still holds a persisted session, or
+      //   3. our own durable login flag is set.
+      // (1) and (2) both come from Supabase, and on iOS gotrue was observed to
+      // DROP the persisted session after the short access token expires while
+      // offline — which is why +46 (fall back to currentUser) and a
+      // currentSession-only check were not enough. (3) is app-owned: set the
+      // moment a real session is seen and cleared only on an explicit
+      // sign-out, so it survives gotrue dropping its session offline. A real
+      // logout clears all three, so signing out still works.
       final isLoggedIn = authState.valueOrNull != null ||
-          Supabase.instance.client.auth.currentSession != null;
+          Supabase.instance.client.auth.currentSession != null ||
+          loginFlag;
       final isAuthRoute = state.matchedLocation == '/login' ||
           state.matchedLocation == '/forgot-password' ||
           state.matchedLocation == '/signup';

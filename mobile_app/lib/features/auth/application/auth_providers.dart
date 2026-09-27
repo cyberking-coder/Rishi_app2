@@ -63,3 +63,11 @@ final authControllerProvider =
 final authStateChangesProvider = StreamProvider<AppUser?>((ref) {
   return ref.watch(authRepositoryProvider).authStateChanges();
 });
+
+/// A durable, app-owned "signed in on this device" flag, read synchronously by
+/// the router. It is true from the moment a real session is seen and cleared
+/// only on an explicit sign-out — independent of Supabase's session, which can
+/// drop offline. Overridden in main.dart with the value persisted by
+/// [LoginFlagStore]; see it for the full rationale (offline playback must never
+/// be redirected to /login for a token that could not be refreshed).
+final loginFlagProvider = StateProvider<bool>((ref) => false);

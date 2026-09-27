@@ -13,6 +13,8 @@ import 'app/theme/app_theme.dart';
 import 'features/profile/application/profile_providers.dart';
 import 'core/config/app_config.dart';
 import 'core/push/push_service.dart';
+import 'features/auth/application/auth_providers.dart';
+import 'features/auth/data/login_flag_store.dart';
 import 'features/audio/application/audio_player_handler.dart';
 import 'features/audio/application/audio_providers.dart';
 import 'features/audio/data/datasources/audio_remote_datasource.dart';
@@ -116,11 +118,24 @@ Future<void> main() async {
     debugPrint('Download restore failed: $e\n$st');
   }
 
+  // Resolve the durable login flag BEFORE the router first evaluates, so an
+  // offline launch is decided correctly from the first frame. If Supabase
+  // still holds a session at startup (an existing or just-updated user), treat
+  // the device as logged in and persist that — later, offline, gotrue may drop
+  // that session, but the flag will already be set. See LoginFlagStore.
+  var loggedInFlag = await LoginFlagStore().read();
+  if (!loggedInFlag &&
+      Supabase.instance.client.auth.currentSession != null) {
+    loggedInFlag = true;
+    unawaited(LoginFlagStore().set(true));
+  }
+
   runApp(
     ProviderScope(
       overrides: [
         audioHandlerProvider.overrideWithValue(audioHandler),
         downloadRepositoryProvider.overrideWithValue(downloadRepository),
+        loginFlagProvider.overrideWith((ref) => loggedInFlag),
       ],
       child: const MeditationApp(),
     ),
