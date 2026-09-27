@@ -274,7 +274,16 @@ publish_to: "none"
 # plain file) that is set the moment a real session is seen and cleared ONLY on
 # an explicit sign-out / account deletion — completely independent of gotrue. An
 # offline token expiry can no longer be read as a sign-out. Version unchanged.
-version: 2.2.4+51
+#
+# +52 fixes an audit finding that is very likely the DEEPER root of "jumps to
+# Home": goRouterProvider did `ref.watch(authStateChangesProvider)`, so it built
+# a brand-new GoRouter on every auth emission (a ~hourly token refresh, a
+# resume, an offline refresh attempt) — and MaterialApp.router reinitialises a
+# new router from initialLocation (/splash -> /home), discarding the navigation
+# stack and bouncing a deep-in-app user to Home. The router instance is now
+# stable; the redirect reads auth/login-flag with ref.read and re-runs via
+# refreshListenable (which now also listens to the login flag). Version 2.2.4.
+version: 2.2.4+52
 
 environment:
   sdk: ">=3.3.0 <4.0.0"

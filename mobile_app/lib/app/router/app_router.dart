@@ -33,11 +33,16 @@ import '../../features/watch/presentation/screens/watch_screen.dart';
 import '../widgets/app_shell.dart';
 
 final goRouterProvider = Provider<GoRouter>((ref) {
-  final authState = ref.watch(authStateChangesProvider);
-  // Durable, app-owned "signed in" flag (see loginFlagProvider). Watched here
-  // so the router re-evaluates when it flips on login / off on logout.
-  final loginFlag = ref.watch(loginFlagProvider);
-
+  // IMPORTANT: do NOT `ref.watch` auth (or the login flag) in this provider
+  // body. Watching rebuilds this provider on every auth-stream emission —
+  // and AppUser has no ==, so every event (a ~hourly token refresh, an app
+  // resume, an offline refresh attempt) counts as a change. That built a
+  // brand-new GoRouter each time, which MaterialApp.router reinitialises from
+  // initialLocation (/splash -> /home), throwing away the navigation stack —
+  // i.e. it bounced a user deep in the app back to Home mid-session. The
+  // router instance must be STABLE; re-evaluation is driven by
+  // refreshListenable below, and the redirect reads the CURRENT auth/flag with
+  // ref.read each time it runs.
   return GoRouter(
     initialLocation: '/splash',
     refreshListenable: GoRouterRefreshStream(ref),
@@ -45,6 +50,10 @@ final goRouterProvider = Provider<GoRouter>((ref) {
       // The splash screen owns its own navigation (after a short delay) and
       // must never be redirected away mid-animation.
       if (state.matchedLocation == '/splash') return null;
+
+      // Read (not watch) the current auth value each time the redirect runs;
+      // GoRouterRefreshStream re-runs it whenever auth or the login flag moves.
+      final authState = ref.read(authStateChangesProvider);
 
       // A still-resolving auth stream is NOT a sign-out. Treating the
       // transient null (while the stream re-subscribes, or after a relaunch)
@@ -69,7 +78,7 @@ final goRouterProvider = Provider<GoRouter>((ref) {
       // logout clears all three, so signing out still works.
       final isLoggedIn = authState.valueOrNull != null ||
           Supabase.instance.client.auth.currentSession != null ||
-          loginFlag;
+          ref.read(loginFlagProvider);
       final isAuthRoute = state.matchedLocation == '/login' ||
           state.matchedLocation == '/forgot-password' ||
           state.matchedLocation == '/signup';
@@ -231,6 +240,13 @@ final goRouterProvider = Provider<GoRouter>((ref) {
 
 class GoRouterRefreshStream extends ChangeNotifier {
   GoRouterRefreshStream(Ref ref) {
+    // Re-run the redirect on an auth change OR when the app-owned login flag
+    // flips (login / logout / account deletion). The redirect reads both with
+    // ref.read, so it needs a notify to re-evaluate — without listening to the
+    // flag, a login/logout would not re-gate navigation. This only re-runs the
+    // redirect; it does NOT rebuild the GoRouter, so the navigation stack is
+    // preserved (see the note in goRouterProvider).
     ref.listen(authStateChangesProvider, (_, __) => notifyListeners());
+    ref.listen(loginFlagProvider, (_, __) => notifyListeners());
   }
 }
