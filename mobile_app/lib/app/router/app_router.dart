@@ -158,11 +158,18 @@ final goRouterProvider = Provider<GoRouter>((ref) {
       ),
       GoRoute(
         path: '/lesson-video/:id',
+        // A lesson is opened only via launchLesson, which passes the Lesson in
+        // `extra`. A cold deep link or state restoration has no extra, and
+        // `state.extra as Lesson` would then crash the router builder on
+        // `null as Lesson`. Redirect to the catalogue instead; the cast below
+        // is safe once this guard has run.
+        redirect: (_, state) => state.extra is Lesson ? null : '/courses',
         builder: (_, state) =>
             VideoLessonScreen(lesson: state.extra as Lesson),
       ),
       GoRoute(
         path: '/lesson-text/:id',
+        redirect: (_, state) => state.extra is Lesson ? null : '/courses',
         builder: (_, state) =>
             TextLessonScreen(lesson: state.extra as Lesson),
       ),

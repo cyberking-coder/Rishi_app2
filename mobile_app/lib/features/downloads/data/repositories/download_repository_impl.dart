@@ -183,7 +183,15 @@ class DownloadRepositoryImpl implements DownloadRepository {
     final task = _tasks[downloadId];
     if (task == null || task.status.isActive) return;
 
-    final cipherKey = await _storage.loadKey(downloadId, _ivs[downloadId]!);
+    // A manifest can carry a task with no matching IV entry (partial write,
+    // older schema). Treat a missing IV as a missing key — the self-heal path
+    // — rather than force-unwrapping into a null-check crash.
+    final iv = _ivs[downloadId];
+    if (iv == null) {
+      _fail(downloadId, 'Encryption key missing — please re-download.');
+      return;
+    }
+    final cipherKey = await _storage.loadKey(downloadId, iv);
     if (cipherKey == null) {
       _fail(downloadId, 'Encryption key missing — please re-download.');
       return;
@@ -216,7 +224,13 @@ class DownloadRepositoryImpl implements DownloadRepository {
       orElse: () => throw StateError('Not available offline'),
     );
 
-    final cipherKey = await _storage.loadKey(task.id, _ivs[task.id]!);
+    // A missing IV (partial manifest / older schema) is the same failure as a
+    // missing key — surface it as "not available" instead of crashing on `!`.
+    final iv = _ivs[task.id];
+    if (iv == null) {
+      throw StateError('Encryption key missing for offline file');
+    }
+    final cipherKey = await _storage.loadKey(task.id, iv);
     if (cipherKey == null) {
       throw StateError('Encryption key missing for offline file');
     }
@@ -415,6 +429,16 @@ class DownloadRepositoryImpl implements DownloadRepository {
         final encrypted = transformer.process(Uint8List.fromList(chunk));
         await raf.writeFrom(encrypted);
         received += chunk.length;
+
+        // delete()/purge can run during the write await above — it sets
+        // cancelRequested AND removes _tasks[id] and purges the files. Re-check
+        // before writing the task back, or this iteration resurrects a
+        // just-deleted entry whose .enc file and key no longer exist (a zombie
+        // download that then fails on play).
+        if (control.cancelRequested) {
+          await raf.close();
+          return _AttemptResult.cancelled;
+        }
 
         task = task.copyWith(receivedBytes: received);
         _tasks[id] = task;

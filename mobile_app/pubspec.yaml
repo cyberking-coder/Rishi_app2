@@ -283,7 +283,14 @@ publish_to: "none"
 # stack and bouncing a deep-in-app user to Home. The router instance is now
 # stable; the redirect reads auth/login-flag with ref.read and re-runs via
 # refreshListenable (which now also listens to the login flag). Version 2.2.4.
-version: 2.2.4+52
+#
+# +53 fixes three audit edge cases: a null-deref crash when a download manifest
+# has a task with no matching IV (now self-heals as "re-download", A5); a race
+# where deleting an actively-downloading item could resurrect a zombie entry
+# after its files were purged (re-check cancel after the write await, A6); and
+# an unguarded `state.extra as Lesson` cast that would crash the router on a
+# lesson deep link with no extra (now redirects to the catalogue, A7).
+version: 2.2.4+53
 
 environment:
   sdk: ">=3.3.0 <4.0.0"
