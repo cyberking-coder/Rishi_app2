@@ -256,7 +256,16 @@ publish_to: "none"
 # commit is also 2.2.4 (accepted by Play, higher than 2.2.3). No behaviour
 # changed with the rename; +49's contents are what ship. Keep
 # AppConfig.appVersion in step — support tickets report it.
-version: 2.2.4+49
+#
+# +50 makes the offline-playback-never-redirects fix bulletproof. +46 stopped
+# a TRANSIENT null auth event from reading as a sign-out, but did not cover the
+# case where the short access token actually EXPIRES while offline and cannot
+# refresh — on iOS the app could still bounce a downloaded-track listener to
+# /login and on to /home. The router now decides "signed in" from the PERSISTED
+# Supabase session (currentSession, which keeps the refresh token through an
+# offline expiry and clears only on an explicit sign-out), not just the live
+# stream value. Version name unchanged (2.2.4).
+version: 2.2.4+50
 
 environment:
   sdk: ">=3.3.0 <4.0.0"

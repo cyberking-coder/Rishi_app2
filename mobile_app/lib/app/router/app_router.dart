@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:supabase_flutter/supabase_flutter.dart' show Supabase;
 
 import '../../features/auth/application/auth_providers.dart';
 import '../../features/auth/presentation/screens/forgot_password_screen.dart';
@@ -50,7 +51,19 @@ final goRouterProvider = Provider<GoRouter>((ref) {
       // leave navigation where it is.
       if (authState.isLoading) return null;
 
-      final isLoggedIn = authState.valueOrNull != null;
+      // Signed-in is decided by the PERSISTED session, not only the live
+      // stream value. A device that has logged in keeps its Supabase session
+      // (with the refresh token) stored locally; gotrue clears it ONLY on an
+      // explicit sign-out or a genuinely invalid refresh token — never on a
+      // network failure. While the device is offline and the short access
+      // token expires, the live stream (`authState`) can momentarily read
+      // null because it cannot refresh, but `currentSession` stays put. Using
+      // it means offline use — e.g. playing a downloaded track with no
+      // connection — can never be bounced to /login (and on to /home) just
+      // because a token could not be refreshed. An explicit logout still
+      // clears currentSession, so a real sign-out is unaffected.
+      final isLoggedIn = authState.valueOrNull != null ||
+          Supabase.instance.client.auth.currentSession != null;
       final isAuthRoute = state.matchedLocation == '/login' ||
           state.matchedLocation == '/forgot-password' ||
           state.matchedLocation == '/signup';
