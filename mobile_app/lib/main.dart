@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io' show HandshakeException, HttpException, SocketException;
 
 import 'package:audio_service/audio_service.dart';
 import 'package:firebase_core/firebase_core.dart';
@@ -39,12 +40,34 @@ Future<void> main() async {
     await Firebase.initializeApp();
     FlutterError.onError = (details) {
       FlutterError.presentError(details);
-      FirebaseCrashlytics.instance.recordFlutterFatalError(details);
+      // A failed image load — a cover image on a network blip, a "connection
+      // closed", or a 403 from Supabase's image-transform endpoint — is
+      // reported here via FlutterError.reportError even though RemoteImage's
+      // errorBuilder already handled it and the app kept running. Recording
+      // those as FATAL inflates the crash rate and buries real crashes. Log
+      // image/network errors as NON-fatal; everything else stays fatal.
+      final e = details.exception;
+      final nonFatal = details.library == 'image resource service' ||
+          e is SocketException ||
+          e is HttpException ||
+          e is HandshakeException ||
+          e is TimeoutException;
+      if (nonFatal) {
+        FirebaseCrashlytics.instance.recordFlutterError(details);
+      } else {
+        FirebaseCrashlytics.instance.recordFlutterFatalError(details);
+      }
     };
     // Uncaught async (non-Flutter) errors — e.g. a failed Future during
     // startup — which FlutterError.onError does not see.
     WidgetsBinding.instance.platformDispatcher.onError = (error, stack) {
-      FirebaseCrashlytics.instance.recordError(error, stack, fatal: true);
+      // Same reasoning: a bare network/IO failure that bubbles up here is not
+      // an app crash. Record it, but not as fatal.
+      final fatal = !(error is SocketException ||
+          error is HttpException ||
+          error is HandshakeException ||
+          error is TimeoutException);
+      FirebaseCrashlytics.instance.recordError(error, stack, fatal: fatal);
       return true;
     };
   } catch (e) {
