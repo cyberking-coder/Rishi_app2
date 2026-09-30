@@ -10,7 +10,7 @@ import 'package:flutter/material.dart';
 /// wasted request per image, never a broken screen.
 ///
 /// Set to false to stop even trying, once you know the answer.
-const bool kSupabaseImageTransformsEnabled = true;
+const bool kSupabaseImageTransformsEnabled = false;
 
 /// A network image that is fetched and decoded at the size it will
 /// actually be drawn.
