@@ -347,8 +347,14 @@ dependencies:
 dev_dependencies:
   flutter_test:
     sdk: flutter
+  # Device/emulator journey tests (Phase 9). Pulled in now so the
+  # integration_test/ folder compiles under CI from Phase 1 onward.
+  integration_test:
+    sdk: flutter
   flutter_lints: ^4.0.0
   flutter_launcher_icons: ^0.13.1
+  # Mocking without codegen — no build_runner step to wire into CI.
+  mocktail: ^1.0.4
 
 flutter_launcher_icons:
   android: true
