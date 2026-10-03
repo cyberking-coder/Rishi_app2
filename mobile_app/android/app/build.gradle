@@ -109,8 +109,20 @@ android {
             )
         }
         debug {
-            applicationIdSuffix ".debug"
-            versionNameSuffix "-debug"
+            // A separate ".debug" application id lets a debug build sit next
+            // to a release install — but the Google Services Gradle plugin
+            // then needs a Firebase client registered for
+            // "com.knowthyself.app.debug", or it fails the build with
+            // "No matching client found for package name ...". So only apply
+            // the suffix when a debug-specific google-services.json is present
+            // (i.e. that client exists, dropped at src/debug/). Otherwise fall
+            // back to the base id, which the main google-services.json already
+            // matches — this is what lets `flutter run`/integration tests build
+            // in debug on a machine with only the release Firebase config.
+            if (file("src/debug/google-services.json").exists()) {
+                applicationIdSuffix ".debug"
+                versionNameSuffix "-debug"
+            }
         }
     }
 }
