@@ -9,6 +9,12 @@ class _ProxyEntry {
   final File file;
   final DownloadCipherKey key;
   final String mimeType;
+
+  /// The Content-Type actually served, resolved once by sniffing the
+  /// decrypted file header (see [LocalDecryptingProxy._resolveContentType]).
+  /// Null until first resolved, then cached for every later range request.
+  String? resolvedMimeType;
+
   _ProxyEntry(this.file, this.key, this.mimeType);
 }
 
@@ -78,6 +84,14 @@ class LocalDecryptingProxy {
     final entry = _entries[segments[1]]!;
     final totalLength = await entry.file.length();
 
+    // Resolve the real Content-Type from the decrypted header rather than
+    // trusting the type passed at download time. Audio uploads are a mix
+    // of MP3 (audio/mpeg) and M4A/AAC (audio/mp4); every audio download was
+    // previously announced as audio/mpeg, so M4A files handed to iOS
+    // AVPlayer failed to play offline while the identical MP3 worked. This
+    // also repairs files already on disk — nothing has to be re-downloaded.
+    final contentType = await _resolveContentType(entry);
+
     final range = _parseRange(request.headers.value(HttpHeaders.rangeHeader),
         totalLength);
     final start = range?.start ?? 0;
@@ -87,7 +101,7 @@ class LocalDecryptingProxy {
     final response = request.response;
     response.headers
       ..set(HttpHeaders.acceptRangesHeader, 'bytes')
-      ..set(HttpHeaders.contentTypeHeader, entry.mimeType)
+      ..set(HttpHeaders.contentTypeHeader, contentType)
       ..set(HttpHeaders.contentLengthHeader, length.toString());
 
     if (range != null) {
@@ -124,6 +138,68 @@ class LocalDecryptingProxy {
       await raf.close();
       await response.close();
     }
+  }
+
+  /// The Content-Type to serve [entry], resolved once by decrypting and
+  /// inspecting the first bytes of the file, then cached.
+  ///
+  /// Video downloads are always MP4 and keep their declared type. For
+  /// audio, the declared type is ignored in favour of what the bytes say,
+  /// because the download pipeline does not record which audio container
+  /// was fetched (MP3 vs M4A/AAC) and announcing the wrong one is what
+  /// stopped some downloaded tracks playing offline on iOS. Falls back to
+  /// the declared type when the header is unrecognised or unreadable.
+  Future<String> _resolveContentType(_ProxyEntry entry) async {
+    final cached = entry.resolvedMimeType;
+    if (cached != null) return cached;
+
+    var resolved = entry.mimeType;
+    if (entry.mimeType.startsWith('audio/')) {
+      try {
+        final raf = await entry.file.open();
+        try {
+          final encrypted = await raf.read(16);
+          if (encrypted.isNotEmpty) {
+            final header = CtrTransformer.atOffset(entry.key, 0)
+                .process(Uint8List.fromList(encrypted));
+            resolved = _sniffAudioMime(header) ?? entry.mimeType;
+          }
+        } finally {
+          await raf.close();
+        }
+      } catch (_) {
+        // Unreadable header — keep the declared type.
+      }
+    }
+
+    entry.resolvedMimeType = resolved;
+    return resolved;
+  }
+
+  /// Identifies an audio container from its leading bytes, or null when it
+  /// matches nothing known (so the caller keeps the declared type).
+  String? _sniffAudioMime(Uint8List b) {
+    if (b.length < 4) return null;
+
+    String ascii(int i, int n) =>
+        (i + n <= b.length) ? String.fromCharCodes(b.sublist(i, i + n)) : '';
+
+    // ISO base-media (MP4/M4A/M4B/AAC-in-MP4): '....ftyp' at byte 4.
+    if (ascii(4, 4) == 'ftyp') return 'audio/mp4';
+    // ID3v2-tagged MP3.
+    if (ascii(0, 3) == 'ID3') return 'audio/mpeg';
+    // WAV.
+    if (ascii(0, 4) == 'RIFF' && ascii(8, 4) == 'WAVE') return 'audio/wav';
+    // FLAC.
+    if (ascii(0, 4) == 'fLaC') return 'audio/flac';
+    // Ogg.
+    if (ascii(0, 4) == 'OggS') return 'audio/ogg';
+    // Raw frame-sync formats all start 0xFF 0xEx. ADTS AAC uses 0xF1/0xF9
+    // in the second byte; anything else in that range is an MPEG-audio
+    // (MP3) frame. Check ADTS first — its sync also satisfies the MP3 mask.
+    if (b[0] == 0xFF && (b[1] == 0xF1 || b[1] == 0xF9)) return 'audio/aac';
+    if (b[0] == 0xFF && (b[1] & 0xE0) == 0xE0) return 'audio/mpeg';
+    return null;
   }
 
   ({int start, int end})? _parseRange(String? header, int totalLength) {

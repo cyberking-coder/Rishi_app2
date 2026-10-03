@@ -30,18 +30,92 @@ class AudioPlayerHandler extends BaseAudioHandler
     _player.playbackEventStream.listen(
       _broadcastState,
       onError: (Object e, StackTrace st) {
-        playbackState.add(playbackState.value.copyWith(
-          processingState: AudioProcessingState.error,
-        ));
+        // A mid-stream playback error (a network blip while streaming, or a
+        // signed URL the platform player dropped) used to end here: flip to
+        // the error state and stay frozen — the reported "audio gets stuck".
+        // Try to recover in place first by re-resolving a fresh source and
+        // resuming from the current position; only surface the error state
+        // if recovery is impossible or exhausted.
+        debugPrint('Playback error: $e');
+        unawaited(_recoverFromError());
       },
     );
 
     _player.processingStateStream.listen((state) {
+      // A clean stretch of playback refills the recovery budget, so a later,
+      // unrelated blip is not denied a retry because an earlier one used them.
+      if (state == ProcessingState.ready) _recoverAttempts = 0;
       if (state == ProcessingState.completed) {
         _flushProgress(completed: true);
         skipToNext();
       }
     });
+  }
+
+  // Mid-stream recovery state. Guards against re-entrant recovery and
+  // caps how many times a single stall is retried before giving up.
+  bool _recovering = false;
+  int _recoverAttempts = 0;
+  static const _maxRecoverAttempts = 3;
+
+  /// True once playback was deliberately stopped or reset, so a late error
+  /// event cannot trigger recovery of a track the user already left. Cleared
+  /// the moment a new track begins loading.
+  bool _stopped = false;
+
+  /// Attempts to resume the current track after a streaming error by
+  /// re-resolving its source (a fresh signed URL) and seeking back to where
+  /// it stalled. Bounded and non-throwing: if it cannot recover, it leaves
+  /// the player in the error state so the UI can react.
+  Future<void> _recoverFromError() async {
+    final track = currentTrack;
+    // Nothing playing, a load already in flight, a recovery already running,
+    // or the player was deliberately stopped/reset — don't pile on or
+    // resurrect a track the user left. (Not keyed on the player's idle state:
+    // just_audio can itself drop to idle ON the error we are recovering
+    // from.) An offline file plays through a different player, so this only
+    // ever touches the streaming path.
+    if (track == null || _loading || _recovering || _stopped) return;
+
+    _recovering = true;
+    try {
+      while (_recoverAttempts < _maxRecoverAttempts) {
+        _recoverAttempts++;
+        // Hold the position from before the stall so we resume, not restart.
+        final resumeAt = _player.position;
+        try {
+          await Future<void>.delayed(
+              Duration(milliseconds: 500 * _recoverAttempts));
+          // The track may have changed (user tapped another) while we waited.
+          if (currentTrack?.id != track.id) return;
+
+          final source = await _repository
+              .getPlaybackSource(track.id)
+              .timeout(const Duration(seconds: 30));
+          final uri = Uri.tryParse(source.url);
+          if (uri == null) throw StateError('Invalid playback URL');
+
+          await _player.setAudioSource(
+            AudioSource.uri(uri),
+            initialPosition: resumeAt,
+          );
+          unawaited(_player.play().catchError((Object e) {
+            debugPrint('Playback failed after recovery: $e');
+          }));
+          _startProgressTimer();
+          return; // recovered
+        } catch (e) {
+          debugPrint('Recovery attempt $_recoverAttempts failed: $e');
+          if (currentTrack?.id != track.id) return;
+        }
+      }
+      // Exhausted — surface the error so the UI stops showing a live player.
+      playbackState.add(playbackState.value.copyWith(
+        processingState: AudioProcessingState.error,
+      ));
+    } finally {
+      _recovering = false;
+    }
   }
 
   // Guards against a rapid double-tap kicking off two concurrent loads of
@@ -102,6 +176,7 @@ class AudioPlayerHandler extends BaseAudioHandler
 
     if (flush) await _flushProgress();
 
+    _stopped = false; // a fresh load; late errors may now recover again
     _currentIndex = index;
     final track = _tracks[index];
     mediaItem.add(_toMediaItem(track));
@@ -226,6 +301,7 @@ class AudioPlayerHandler extends BaseAudioHandler
 
   @override
   Future<void> stop() async {
+    _stopped = true;
     _progressTimer?.cancel();
     _sleepTimer?.cancel();
     await _flushProgress();
@@ -241,12 +317,14 @@ class AudioPlayerHandler extends BaseAudioHandler
   /// never throws (logout must always proceed).
   Future<void> reset() async {
     try {
+      _stopped = true;
       _progressTimer?.cancel();
       _sleepTimer?.cancel();
       sleepTimerRemaining.value = null;
       _tracks = [];
       _currentIndex = -1;
       _loading = false;
+      _recovering = false;
       await _player.stop();
       await _player.setLoopMode(LoopMode.off);
       mediaItem.add(null);
