@@ -13,8 +13,8 @@ import '../../../../core/errors/auth_failure.dart';
 import '../../../../core/testing/e2e_keys.dart';
 import '../../../access/application/access_providers.dart';
 import '../../../access/domain/access_state.dart';
+import '../../../auth/application/app_access_controller.dart';
 import '../../../auth/application/auth_providers.dart';
-import '../../../auth/data/login_flag_store.dart';
 import '../../../downloads/application/download_providers.dart';
 import '../../../lms/application/lms_providers.dart';
 import '../../../lms/domain/entities/course_summary.dart';
@@ -1079,10 +1079,9 @@ class _SettingsSheetState extends ConsumerState<_SettingsSheet> {
 
     try {
       await ref.read(deleteAccountUseCaseProvider).call();
-      // Clear the durable login flag so the router does not keep treating the
-      // (now deleted) account as signed in. Mirrors what logout does.
-      ref.read(loginFlagProvider.notifier).state = false;
-      unawaited(LoginFlagStore().set(false));
+      // Clear identity so the router does not keep treating the (now deleted)
+      // account as signed in. Mirrors what logout does.
+      await ref.read(appAccessModeProvider.notifier).onSignedOut();
       router.go('/login');
       messenger.showSnackBar(
         const SnackBar(content: Text('Your account has been deleted.')),

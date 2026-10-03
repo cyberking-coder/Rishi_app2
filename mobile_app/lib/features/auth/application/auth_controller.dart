@@ -1,5 +1,3 @@
-import 'dart:async';
-
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -7,7 +5,7 @@ import '../../../core/errors/auth_failure.dart';
 import '../../../core/push/push_registration.dart';
 import '../../../core/push/push_service.dart';
 import '../../audio/application/audio_providers.dart';
-import '../data/login_flag_store.dart';
+import 'app_access_controller.dart';
 import 'auth_providers.dart';
 import 'auth_state.dart';
 
@@ -15,14 +13,14 @@ class AuthController extends Notifier<AuthState> {
   @override
   AuthState build() => const AuthInitial();
 
-  /// Records (or clears) the durable, app-owned "signed in on this device"
-  /// flag the router reads, and persists it. Set true on any successful auth,
-  /// cleared only on an explicit sign-out — so an offline token expiry can
-  /// never make the router treat the user as logged out. See [LoginFlagStore].
-  void _setLoggedIn(bool value) {
-    ref.read(loginFlagProvider.notifier).state = value;
-    unawaited(LoginFlagStore().set(value));
-  }
+  /// Records a verified online identity (writes the offline token + flips the
+  /// access mode to online). Called on any successful interactive sign-in.
+  Future<void> _markVerified(String userId) =>
+      ref.read(appAccessModeProvider.notifier).onVerifiedOnline(userId);
+
+  /// Clears identity on an explicit sign-out / account deletion.
+  Future<void> _markSignedOut() =>
+      ref.read(appAccessModeProvider.notifier).onSignedOut();
 
   Future<void> login({required String email, required String password}) async {
     state = const AuthLoading();
@@ -30,7 +28,7 @@ class AuthController extends Notifier<AuthState> {
       final user = await ref
           .read(loginUseCaseProvider)
           .call(email: email, password: password);
-      _setLoggedIn(true);
+      await _markVerified(user.id);
       state = AuthAuthenticated(user);
     } on AuthFailure catch (failure) {
       state = AuthFailureState(failure);
@@ -54,7 +52,7 @@ class AuthController extends Notifier<AuthState> {
       // A null user means the project requires email confirmation — no
       // session yet. Reuse AuthUnauthenticated as the "succeeded, nothing
       // more to do here" signal, same convention as sendPasswordResetEmail.
-      if (user != null) _setLoggedIn(true);
+      if (user != null) await _markVerified(user.id);
       state = user != null ? AuthAuthenticated(user) : const AuthUnauthenticated();
     } on AuthFailure catch (failure) {
       state = AuthFailureState(failure);
@@ -67,7 +65,7 @@ class AuthController extends Notifier<AuthState> {
     state = const AuthLoading();
     try {
       final user = await ref.read(appleSignInUseCaseProvider).call();
-      _setLoggedIn(true);
+      await _markVerified(user.id);
       state = AuthAuthenticated(user);
     } on AuthFailure catch (failure) {
       state = AuthFailureState(failure);
@@ -80,7 +78,7 @@ class AuthController extends Notifier<AuthState> {
     state = const AuthLoading();
     try {
       final user = await ref.read(googleSignInUseCaseProvider).call();
-      _setLoggedIn(true);
+      await _markVerified(user.id);
       state = AuthAuthenticated(user);
     } on AuthFailure catch (failure) {
       state = AuthFailureState(failure);
@@ -112,7 +110,7 @@ class AuthController extends Notifier<AuthState> {
       }
 
       await ref.read(logoutUseCaseProvider).call();
-      _setLoggedIn(false);
+      await _markSignedOut();
       state = const AuthUnauthenticated();
     } catch (e) {
       state = AuthFailureState(AuthFailure.unknown(e.toString()));

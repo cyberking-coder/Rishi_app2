@@ -7,7 +7,8 @@ import 'package:go_router/go_router.dart';
 import '../../../../app/theme/app_theme.dart';
 import '../../../../app/widgets/lotus_logo.dart';
 import '../../../../app/widgets/soft_halo.dart';
-import '../../application/auth_providers.dart';
+import '../../application/app_access_controller.dart';
+import '../../domain/entities/app_access_mode.dart';
 
 /// The branded opening screen: a soft sage wash behind the lotus mark and
 /// the "Anurag Rishi — Find Peace Within" wordmark. Holds for a moment, then
@@ -39,14 +40,23 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
     );
     _controller.forward();
 
-    // Hold the splash briefly, then route based on the auth session.
+    // Hold the splash briefly, then route based on the resolved access mode.
     _navTimer = Timer(const Duration(milliseconds: 2600), _goNext);
   }
 
   void _goNext() {
     if (!mounted) return;
-    final loggedIn = ref.read(authRepositoryProvider).currentUser != null;
-    context.go(loggedIn ? '/home' : '/login');
+    final mode = ref.read(appAccessModeProvider);
+    // If the controller is still resolving (slow refresh at startup), wait a
+    // little longer rather than guessing — the router will also keep us put
+    // while resolving.
+    if (mode == AppAccessMode.resolving) {
+      _navTimer = Timer(const Duration(milliseconds: 400), _goNext);
+      return;
+    }
+    // Offline and online both go into the app; only a true sign-out goes to
+    // login. (Phase 2 routes offline users to the Offline Hub.)
+    context.go(mode == AppAccessMode.signedOut ? '/login' : '/home');
   }
 
   @override

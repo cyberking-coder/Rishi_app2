@@ -14,8 +14,7 @@ import 'app/theme/app_theme.dart';
 import 'features/profile/application/profile_providers.dart';
 import 'core/config/app_config.dart';
 import 'core/push/push_service.dart';
-import 'features/auth/application/auth_providers.dart';
-import 'features/auth/data/login_flag_store.dart';
+import 'features/auth/application/app_access_controller.dart';
 import 'features/audio/application/audio_player_handler.dart';
 import 'features/audio/application/audio_providers.dart';
 import 'features/audio/data/datasources/audio_remote_datasource.dart';
@@ -141,48 +140,16 @@ Future<void> main() async {
     debugPrint('Download restore failed: $e\n$st');
   }
 
-  // Resolve the durable login flag BEFORE the router first evaluates, so an
-  // offline launch is decided correctly from the first frame. If Supabase
-  // still holds a session at startup (an existing or just-updated user), treat
-  // the device as logged in and persist that — later, offline, gotrue may drop
-  // that session, but the flag will already be set. See LoginFlagStore.
-  final auth = Supabase.instance.client.auth;
-  var loggedInFlag = await LoginFlagStore().read();
-  if (auth.currentSession != null) {
-    if (!loggedInFlag) {
-      loggedInFlag = true;
-      unawaited(LoginFlagStore().set(true));
-    }
-  } else if (loggedInFlag) {
-    // The flag says "logged in" but Supabase holds NO session. That happens in
-    // two very different situations with the same local fingerprint:
-    //   • a genuine offline user whose session simply can't be refreshed now, or
-    //   • a FRESH INSTALL where Android Auto Backup restored this plain flag
-    //     file but NOT the session (FlutterSecureStorage is excluded from
-    //     backup). That left the app "logged in" with no user — no login
-    //     screen, nothing plays, and Profile says not signed in.
-    //
-    // Tell them apart by asking gotrue to refresh. With no stored session it
-    // throws an AuthException synchronously (no network) — that is the stale
-    // restored-flag case, so clear the flag and let the router show /login. A
-    // real network failure throws something else; keep the flag so a genuine
-    // offline user is never bounced. The timeout guards a slow refresh.
-    try {
-      await auth.refreshSession().timeout(const Duration(seconds: 8));
-    } on AuthException {
-      loggedInFlag = false;
-      unawaited(LoginFlagStore().set(false));
-    } catch (_) {
-      // Offline / transient — preserve offline access.
-    }
-  }
-
+  // Access state (online / offline / signed-out) is resolved by the single
+  // AppAccessController (appAccessModeProvider) once the app mounts — splash
+  // and the router both wait on it. No flag bootstrap here any more: identity
+  // lives only in Supabase + the secure offline token, so a reinstall (which
+  // cannot restore either) resolves cleanly to signed-out.
   runApp(
     ProviderScope(
       overrides: [
         audioHandlerProvider.overrideWithValue(audioHandler),
         downloadRepositoryProvider.overrideWithValue(downloadRepository),
-        loginFlagProvider.overrideWith((ref) => loggedInFlag),
       ],
       child: const MeditationApp(),
     ),
@@ -238,25 +205,10 @@ class _MeditationAppState extends ConsumerState<MeditationApp> {
     final router = ref.watch(goRouterProvider);
     final themeMode = ref.watch(themeModeProvider);
 
-    // Clear the durable login flag on a DEFINITIVE sign-out.
-    //
-    // authStateChangesProvider maps every non-signedOut event back to the
-    // persisted user, so it only resolves to null on a real signedOut (or a
-    // genuine no-user). The Android reinstall bug lives here: Auto Backup can
-    // restore a STALE Supabase session, so the app starts "logged in"
-    // (currentSession != null, startup heal skipped); gotrue then fails to
-    // refresh the dead token and fires signedOut — but the restored login flag
-    // kept isLoggedIn true, leaving the app in a logged-in shell with no user
-    // (no login screen, nothing plays, empty Profile). Clearing the flag here
-    // lets the router fall through to /login. A real logout hits this too,
-    // which is correct; an offline token-refresh failure does NOT (the stream
-    // falls back to the still-present user), so offline playback is unaffected.
-    ref.listen(authStateChangesProvider, (previous, next) {
-      if (next.hasValue && next.value == null) {
-        ref.read(loginFlagProvider.notifier).state = false;
-        unawaited(LoginFlagStore().set(false));
-      }
-    });
+    // Keep the single access controller alive for the whole app lifetime, so
+    // its auth-event listener (online / offline / signed-out) is always
+    // running. All sign-out handling now lives there — see AppAccessController.
+    ref.watch(appAccessModeProvider);
 
     // Deep links (meditationapp://app/...) are delivered straight to
     // go_router by Flutter's Router API — no separate listener needed.

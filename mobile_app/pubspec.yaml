@@ -303,6 +303,8 @@ dependencies:
   supabase_flutter: ^2.5.6
   device_info_plus: ^10.1.0
   flutter_secure_storage: ^9.2.2
+  # Online/offline branch in the access-mode resolver (3-state auth model).
+  connectivity_plus: ^6.1.0
   crypto: ^3.0.3
   just_audio: ^0.9.40
   audio_service: ^0.18.15

@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:supabase_flutter/supabase_flutter.dart' show Supabase;
 
-import '../../features/auth/application/auth_providers.dart';
+import '../../features/auth/application/app_access_controller.dart';
+import '../../features/auth/domain/entities/app_access_mode.dart';
 import '../../features/auth/presentation/screens/forgot_password_screen.dart';
 import '../../features/auth/presentation/screens/login_screen.dart';
 import '../../features/auth/presentation/screens/signup_screen.dart';
@@ -51,40 +51,26 @@ final goRouterProvider = Provider<GoRouter>((ref) {
       // must never be redirected away mid-animation.
       if (state.matchedLocation == '/splash') return null;
 
-      // Read (not watch) the current auth value each time the redirect runs;
-      // GoRouterRefreshStream re-runs it whenever auth or the login flag moves.
-      final authState = ref.read(authStateChangesProvider);
+      // ONE source of truth: the access-mode controller. Splash, profile and
+      // the router used to each decide "logged in?" differently, which is how
+      // a reinstall could land inside the app with no real session. Now the
+      // controller resolves a single AppAccessMode and the router just obeys.
+      final mode = ref.read(appAccessModeProvider);
 
-      // A still-resolving auth stream is NOT a sign-out. Treating the
-      // transient null (while the stream re-subscribes, or after a relaunch)
-      // as logged-out is what bounced a signed-in user to /login — which is
-      // how tapping something like the account link could look like it
-      // logged you out. Only decide once there is a real value; until then,
-      // leave navigation where it is.
-      if (authState.isLoading) return null;
+      // Still resolving (first frames after launch): leave navigation where
+      // it is — a transient unknown is never a sign-out.
+      if (mode == AppAccessMode.resolving) return null;
 
-      // Signed-in is decided from THREE signals, any of which is enough, so an
-      // offline token expiry can never bounce a user to /login (and on to
-      // /home) mid-use — e.g. while playing a downloaded track:
-      //   1. the live auth stream has a user, or
-      //   2. Supabase still holds a persisted session, or
-      //   3. our own durable login flag is set.
-      // (1) and (2) both come from Supabase, and on iOS gotrue was observed to
-      // DROP the persisted session after the short access token expires while
-      // offline — which is why +46 (fall back to currentUser) and a
-      // currentSession-only check were not enough. (3) is app-owned: set the
-      // moment a real session is seen and cleared only on an explicit
-      // sign-out, so it survives gotrue dropping its session offline. A real
-      // logout clears all three, so signing out still works.
-      final isLoggedIn = authState.valueOrNull != null ||
-          Supabase.instance.client.auth.currentSession != null ||
-          ref.read(loginFlagProvider);
       final isAuthRoute = state.matchedLocation == '/login' ||
           state.matchedLocation == '/forgot-password' ||
           state.matchedLocation == '/signup';
 
-      if (!isLoggedIn && !isAuthRoute) return '/login';
-      if (isLoggedIn && isAuthRoute) return '/home';
+      // Offline is still "authenticated" for routing purposes here; Phase 2
+      // adds the per-route offline restrictions and the Offline Hub.
+      final signedOut = mode == AppAccessMode.signedOut;
+
+      if (signedOut && !isAuthRoute) return '/login';
+      if (!signedOut && isAuthRoute) return '/home';
       return null;
     },
     routes: [
@@ -247,13 +233,11 @@ final goRouterProvider = Provider<GoRouter>((ref) {
 
 class GoRouterRefreshStream extends ChangeNotifier {
   GoRouterRefreshStream(Ref ref) {
-    // Re-run the redirect on an auth change OR when the app-owned login flag
-    // flips (login / logout / account deletion). The redirect reads both with
-    // ref.read, so it needs a notify to re-evaluate — without listening to the
-    // flag, a login/logout would not re-gate navigation. This only re-runs the
-    // redirect; it does NOT rebuild the GoRouter, so the navigation stack is
-    // preserved (see the note in goRouterProvider).
-    ref.listen(authStateChangesProvider, (_, __) => notifyListeners());
-    ref.listen(loginFlagProvider, (_, __) => notifyListeners());
+    // Re-run the redirect whenever the single access mode changes
+    // (resolving → online/offline/signedOut, a login, a logout, a
+    // server-side sign-out). This only re-runs the redirect; it does NOT
+    // rebuild the GoRouter, so the navigation stack is preserved (see the
+    // note in goRouterProvider).
+    ref.listen(appAccessModeProvider, (_, __) => notifyListeners());
   }
 }
