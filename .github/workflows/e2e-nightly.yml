@@ -1,0 +1,70 @@
+# Device-level E2E catalog sweep — scheduled, NOT a PR gate.
+#
+# Runs the integration_test sweep on an Android emulator against STAGING,
+# walking every audio/course/lesson/live/event through the real pipeline.
+# Needs these repo/environment secrets:
+#   E2E_SUPABASE_URL, E2E_SUPABASE_ANON_KEY, E2E_EMAIL, E2E_PASSWORD
+# (The test account must have an active device row in staging — see
+#  mobile_app/integration_test/README.md.)
+name: E2E Nightly
+
+on:
+  schedule:
+    - cron: "30 2 * * *" # 02:30 UTC daily
+  workflow_dispatch:
+    inputs:
+      check_playback:
+        description: "Load each stream with just_audio (slower)"
+        type: boolean
+        default: false
+
+concurrency:
+  group: e2e-nightly
+  cancel-in-progress: true
+
+jobs:
+  sweep:
+    name: Catalog sweep (Android emulator)
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - run: flutter pub get
+        working-directory: mobile_app
+
+      # KVM for a fast hardware-accelerated emulator.
+      - name: Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' \
+            | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+
+      - name: Run catalog sweep on emulator
+        uses: reactivecircus/android-emulator-runner@v2
+        env:
+          E2E_SUPABASE_URL: ${{ secrets.E2E_SUPABASE_URL }}
+          E2E_SUPABASE_ANON_KEY: ${{ secrets.E2E_SUPABASE_ANON_KEY }}
+          E2E_EMAIL: ${{ secrets.E2E_EMAIL }}
+          E2E_PASSWORD: ${{ secrets.E2E_PASSWORD }}
+          E2E_CHECK_PLAYBACK: ${{ github.event.inputs.check_playback || 'false' }}
+        with:
+          api-level: 34
+          arch: x86_64
+          profile: pixel_6
+          script: |
+            cd mobile_app
+            flutter test integration_test/e2e_content_sweep_test.dart \
+              --dart-define=E2E_SUPABASE_URL="$E2E_SUPABASE_URL" \
+              --dart-define=E2E_SUPABASE_ANON_KEY="$E2E_SUPABASE_ANON_KEY" \
+              --dart-define=E2E_EMAIL="$E2E_EMAIL" \
+              --dart-define=E2E_PASSWORD="$E2E_PASSWORD" \
+              --dart-define=E2E_CHECK_LICENSES=true \
+              --dart-define=E2E_CHECK_PLAYBACK="$E2E_CHECK_PLAYBACK" \
+              --dart-define=E2E_PLAYBACK_SAMPLE=15
