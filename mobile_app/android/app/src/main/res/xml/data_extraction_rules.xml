@@ -10,8 +10,12 @@
 <data-extraction-rules>
     <cloud-backup>
         <exclude domain="sharedpref" path="FlutterSecureStorage.xml"/>
+        <!-- See backup_rules.xml: a restored login flag with no restorable
+             session left fresh installs "logged in" with no user. -->
+        <exclude domain="file" path="login_flag"/>
     </cloud-backup>
     <device-transfer>
         <exclude domain="sharedpref" path="FlutterSecureStorage.xml"/>
+        <exclude domain="file" path="login_flag"/>
     </device-transfer>
 </data-extraction-rules>

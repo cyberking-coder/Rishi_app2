@@ -146,11 +146,35 @@ Future<void> main() async {
   // still holds a session at startup (an existing or just-updated user), treat
   // the device as logged in and persist that — later, offline, gotrue may drop
   // that session, but the flag will already be set. See LoginFlagStore.
+  final auth = Supabase.instance.client.auth;
   var loggedInFlag = await LoginFlagStore().read();
-  if (!loggedInFlag &&
-      Supabase.instance.client.auth.currentSession != null) {
-    loggedInFlag = true;
-    unawaited(LoginFlagStore().set(true));
+  if (auth.currentSession != null) {
+    if (!loggedInFlag) {
+      loggedInFlag = true;
+      unawaited(LoginFlagStore().set(true));
+    }
+  } else if (loggedInFlag) {
+    // The flag says "logged in" but Supabase holds NO session. That happens in
+    // two very different situations with the same local fingerprint:
+    //   • a genuine offline user whose session simply can't be refreshed now, or
+    //   • a FRESH INSTALL where Android Auto Backup restored this plain flag
+    //     file but NOT the session (FlutterSecureStorage is excluded from
+    //     backup). That left the app "logged in" with no user — no login
+    //     screen, nothing plays, and Profile says not signed in.
+    //
+    // Tell them apart by asking gotrue to refresh. With no stored session it
+    // throws an AuthException synchronously (no network) — that is the stale
+    // restored-flag case, so clear the flag and let the router show /login. A
+    // real network failure throws something else; keep the flag so a genuine
+    // offline user is never bounced. The timeout guards a slow refresh.
+    try {
+      await auth.refreshSession().timeout(const Duration(seconds: 8));
+    } on AuthException {
+      loggedInFlag = false;
+      unawaited(LoginFlagStore().set(false));
+    } catch (_) {
+      // Offline / transient — preserve offline access.
+    }
   }
 
   runApp(

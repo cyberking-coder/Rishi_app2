@@ -9,4 +9,12 @@
 -->
 <full-backup-content>
     <exclude domain="sharedpref" path="FlutterSecureStorage.xml"/>
+    <!--
+      The app-owned login flag (LoginFlagStore, a plain file in the app
+      support dir). It must NOT be restored to a fresh install: the session it
+      stands for lives in FlutterSecureStorage, which is excluded above and
+      cannot be restored, so a restored flag made the app think it was logged
+      in with no session (no login screen, nothing plays, Profile empty).
+    -->
+    <exclude domain="file" path="login_flag"/>
 </full-backup-content>
