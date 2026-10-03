@@ -54,9 +54,18 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
       _navTimer = Timer(const Duration(milliseconds: 400), _goNext);
       return;
     }
-    // Offline and online both go into the app; only a true sign-out goes to
-    // login. (Phase 2 routes offline users to the Offline Hub.)
-    context.go(mode == AppAccessMode.signedOut ? '/login' : '/home');
+    // Route to the right landing for the resolved mode. The router's redirect
+    // enforces the same rules, so this just avoids a visible bounce.
+    switch (mode) {
+      case AppAccessMode.signedOut:
+        context.go('/login');
+      case AppAccessMode.authenticatedOffline:
+        context.go('/offline');
+      case AppAccessMode.authenticatedOnline:
+        context.go('/home');
+      case AppAccessMode.resolving:
+        break; // unreachable: handled above
+    }
   }
 
   @override

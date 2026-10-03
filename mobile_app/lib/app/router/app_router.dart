@@ -12,6 +12,7 @@ import '../../features/audio/presentation/screens/now_playing_screen.dart';
 import '../../core/config/purchase_config.dart';
 import '../../features/chat/presentation/screens/chat_screen.dart';
 import '../../features/downloads/presentation/screens/downloads_screen.dart';
+import '../../features/downloads/presentation/screens/offline_hub_screen.dart';
 import '../../features/downloads/presentation/screens/offline_player_screen.dart';
 import '../../features/home/presentation/screens/home_screen.dart';
 import '../../features/home/presentation/screens/browse_screen.dart';
@@ -31,6 +32,14 @@ import '../../features/profile/presentation/screens/profile_screen.dart';
 import '../../features/audio/presentation/screens/audio_link_screen.dart';
 import '../../features/watch/presentation/screens/watch_screen.dart';
 import '../widgets/app_shell.dart';
+
+/// Locations an [AppAccessMode.authenticatedOffline] user may reach: the
+/// Offline Hub, their Downloads list, and the encrypted offline player.
+/// Everything else routes to the hub while offline.
+bool _offlineAllowed(String loc) =>
+    loc == '/offline' ||
+    loc == '/downloads' ||
+    loc.startsWith('/offline-player');
 
 final goRouterProvider = Provider<GoRouter>((ref) {
   // IMPORTANT: do NOT `ref.watch` auth (or the login flag) in this provider
@@ -61,17 +70,24 @@ final goRouterProvider = Provider<GoRouter>((ref) {
       // it is — a transient unknown is never a sign-out.
       if (mode == AppAccessMode.resolving) return null;
 
-      final isAuthRoute = state.matchedLocation == '/login' ||
-          state.matchedLocation == '/forgot-password' ||
-          state.matchedLocation == '/signup';
+      final loc = state.matchedLocation;
+      final isAuthRoute =
+          loc == '/login' || loc == '/forgot-password' || loc == '/signup';
 
-      // Offline is still "authenticated" for routing purposes here; Phase 2
-      // adds the per-route offline restrictions and the Offline Hub.
-      final signedOut = mode == AppAccessMode.signedOut;
-
-      if (signedOut && !isAuthRoute) return '/login';
-      if (!signedOut && isAuthRoute) return '/home';
-      return null;
+      switch (mode) {
+        case AppAccessMode.resolving:
+          return null; // handled above, kept for exhaustiveness
+        case AppAccessMode.signedOut:
+          return isAuthRoute ? null : '/login';
+        case AppAccessMode.authenticatedOffline:
+          // Only downloaded/cached content is reachable offline; everything
+          // else goes to the Offline Hub instead of failing network calls.
+          return _offlineAllowed(loc) ? null : '/offline';
+        case AppAccessMode.authenticatedOnline:
+          // Back online: never strand the user on an auth screen or the hub.
+          if (isAuthRoute || loc == '/offline') return '/home';
+          return null;
+      }
     },
     routes: [
       GoRoute(path: '/splash', builder: (_, __) => const SplashScreen()),
@@ -123,6 +139,8 @@ final goRouterProvider = Provider<GoRouter>((ref) {
           title: state.extra as String? ?? 'Offline',
         ),
       ),
+      // Landing screen while in authenticatedOffline mode (see the redirect).
+      GoRoute(path: '/offline', builder: (_, __) => const OfflineHubScreen()),
       GoRoute(
         path: '/profile',
         pageBuilder: (_, __) => const NoTransitionPage(
