@@ -150,6 +150,10 @@ Future<void> main() async {
     );
   }
 
+  // Configure the audio session + interruption handling AFTER AudioService.init
+  // so it never races the service's own session setup. Best-effort.
+  unawaited(audioHandler.initAudioSession());
+
   // Restore the manifest now; playback happens later, after this completes.
   try {
     await downloadRepository.restore();

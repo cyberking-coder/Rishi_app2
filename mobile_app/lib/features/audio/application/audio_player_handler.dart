@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:audio_service/audio_service.dart';
+import 'package:audio_session/audio_session.dart';
 import 'package:flutter/foundation.dart';
 import 'package:just_audio/just_audio.dart';
 
@@ -32,7 +33,17 @@ class AudioPlayerHandler extends BaseAudioHandler
   /// an offline meditation's progress is not lost. Null in tests.
   final PendingSyncStore? _syncStore;
 
-  final AudioPlayer _player = AudioPlayer();
+  // handleInterruptions: false — we handle interruptions explicitly via
+  // audio_session (see initAudioSession). handleAudioSessionActivation stays
+  // at its default (true), so just_audio still activates the session and
+  // background/notification behaviour is unchanged.
+  final AudioPlayer _player = AudioPlayer(handleInterruptions: false);
+
+  /// True when an interruption (call, another app, headphone/BT change,
+  /// speech input) paused us mid-play, so we know to resume when it ends.
+  bool _resumeAfterInterruption = false;
+
+  bool _audioSessionReady = false;
 
   List<AudioTrack> _tracks = [];
   int _currentIndex = -1;
@@ -71,6 +82,56 @@ class AudioPlayerHandler extends BaseAudioHandler
         skipToNext();
       }
     });
+  }
+
+  /// Configures the audio session and interruption handling. Called from
+  /// main() AFTER AudioService.init so it never races the service's own
+  /// session setup (configuring inside the constructor, during init, was what
+  /// disturbed background playback before). Safe to call more than once.
+  Future<void> initAudioSession() async {
+    if (_audioSessionReady) return;
+    try {
+      final session = await AudioSession.instance;
+      await session.configure(const AudioSessionConfiguration.music());
+
+      session.interruptionEventStream.listen((event) {
+        if (event.begin) {
+          switch (event.type) {
+            case AudioInterruptionType.duck:
+              // Transient (e.g. a nav prompt): lower volume, don't pause.
+              _player.setVolume(0.3);
+            case AudioInterruptionType.pause:
+            case AudioInterruptionType.unknown:
+              // A call / another media app took over. Remember whether we were
+              // playing so we only resume if we actually paused for this.
+              _resumeAfterInterruption = _player.playing;
+              if (_player.playing) _player.pause();
+          }
+        } else {
+          switch (event.type) {
+            case AudioInterruptionType.duck:
+              _player.setVolume(1.0);
+            case AudioInterruptionType.pause:
+              if (_resumeAfterInterruption) _player.play();
+              _resumeAfterInterruption = false;
+            case AudioInterruptionType.unknown:
+              _resumeAfterInterruption = false;
+          }
+        }
+      });
+
+      // Headphones unplugged / Bluetooth disconnected: pause rather than blast
+      // a meditation out of the phone speaker. Do not auto-resume on reconnect.
+      session.becomingNoisyEventStream.listen((_) {
+        _resumeAfterInterruption = false;
+        _player.pause();
+      });
+
+      _audioSessionReady = true;
+    } catch (e) {
+      // A flaky/absent audio session must never stop the app from playing.
+      debugPrint('Audio session configuration skipped: $e');
+    }
   }
 
   // Mid-stream recovery state. Guards against re-entrant recovery and
@@ -332,6 +393,7 @@ class AudioPlayerHandler extends BaseAudioHandler
   @override
   Future<void> stop() async {
     _stopped = true;
+    _resumeAfterInterruption = false;
     _progressTimer?.cancel();
     _sleepTimer?.cancel();
     await _flushProgress();
@@ -355,6 +417,7 @@ class AudioPlayerHandler extends BaseAudioHandler
       _currentIndex = -1;
       _loading = false;
       _recovering = false;
+      _resumeAfterInterruption = false;
       await _player.stop();
       await _player.setLoopMode(LoopMode.off);
       mediaItem.add(null);
@@ -476,13 +539,9 @@ class AudioPlayerHandler extends BaseAudioHandler
 
   @override
   Future<void> onTaskRemoved() async {
-    // Deliberately do NOT stop. For a meditation app, swiping the app off the
-    // Recents list should not kill a session that is playing — the media
-    // notification keeps it going until the user pauses/stops there, the same
-    // as other audio apps. If nothing is playing, let the service wind down.
-    if (!_player.playing) {
-      await stop();
-    }
+    // Swiping the app off Recents stops playback (and tears down the media
+    // notification) — the product's chosen behavior.
+    await stop();
   }
 }
 

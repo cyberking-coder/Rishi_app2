@@ -308,6 +308,9 @@ dependencies:
   crypto: ^3.0.3
   just_audio: ^0.9.40
   audio_service: ^0.18.15
+  # Interruption / becoming-noisy handling (calls, headphone unplug,
+  # Bluetooth, speech input). Configured AFTER AudioService.init.
+  audio_session: ^0.1.21
   rxdart: ^0.27.7
   path_provider: ^2.1.4
   http: ^1.2.2
