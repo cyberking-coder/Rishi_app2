@@ -238,6 +238,26 @@ class _MeditationAppState extends ConsumerState<MeditationApp> {
     final router = ref.watch(goRouterProvider);
     final themeMode = ref.watch(themeModeProvider);
 
+    // Clear the durable login flag on a DEFINITIVE sign-out.
+    //
+    // authStateChangesProvider maps every non-signedOut event back to the
+    // persisted user, so it only resolves to null on a real signedOut (or a
+    // genuine no-user). The Android reinstall bug lives here: Auto Backup can
+    // restore a STALE Supabase session, so the app starts "logged in"
+    // (currentSession != null, startup heal skipped); gotrue then fails to
+    // refresh the dead token and fires signedOut — but the restored login flag
+    // kept isLoggedIn true, leaving the app in a logged-in shell with no user
+    // (no login screen, nothing plays, empty Profile). Clearing the flag here
+    // lets the router fall through to /login. A real logout hits this too,
+    // which is correct; an offline token-refresh failure does NOT (the stream
+    // falls back to the still-present user), so offline playback is unaffected.
+    ref.listen(authStateChangesProvider, (previous, next) {
+      if (next.hasValue && next.value == null) {
+        ref.read(loginFlagProvider.notifier).state = false;
+        unawaited(LoginFlagStore().set(false));
+      }
+    });
+
     // Deep links (meditationapp://app/...) are delivered straight to
     // go_router by Flutter's Router API — no separate listener needed.
     return MaterialApp.router(
