@@ -75,21 +75,14 @@ class AppAccessController extends Notifier<AppAccessMode> {
       final offline = await _store.read();
       final hasNetwork = await _hasNetwork();
 
-      if (session != null) {
-        await _store.markVerified(userId: session.user.id);
-        state = AppAccessMode.authenticatedOnline;
-        unawaited(_reconcileDownloads());
-        return;
-      }
-
       var decision = decideAccessMode(
-        hasSession: false,
+        hasSession: session != null,
         hasOfflineIdentity: offline != null,
         offlineStillValid: offline?.isStillValid() ?? false,
         hasNetwork: hasNetwork,
       );
 
-      // The online-with-offline-identity branch needs a refresh to decide.
+      // The no-session-but-identity-and-online branch needs a refresh to decide.
       if (decision == AppAccessMode.resolving) {
         final outcome = await _attemptRefresh();
         decision = decideAccessMode(
@@ -105,6 +98,13 @@ class AppAccessController extends Notifier<AppAccessMode> {
         } else if (outcome == RefreshOutcome.invalid) {
           await _store.clear();
         }
+      }
+
+      // With a live session AND a network, (re)verify the offline token so the
+      // 7-day grace slides forward. Offline (session but no network) does not
+      // renew it — the grace reflects the last real verification.
+      if (session != null && hasNetwork) {
+        await _store.markVerified(userId: session.user.id);
       }
 
       state = decision;

@@ -7,15 +7,29 @@ import 'package:meditation_app/features/auth/domain/entities/app_access_mode.dar
 /// ever returning.
 void main() {
   group('decideAccessMode', () {
-    test('a live session is always online', () {
+    test('a live session with a network is online', () {
       expect(
         decideAccessMode(
           hasSession: true,
-          hasOfflineIdentity: false,
-          offlineStillValid: false,
-          hasNetwork: false,
+          hasOfflineIdentity: true,
+          offlineStillValid: true,
+          hasNetwork: true,
         ),
         AppAccessMode.authenticatedOnline,
+      );
+    });
+
+    test('a cached session with NO network is offline, not online', () {
+      // supabase_flutter keeps the session offline, so a session alone must
+      // not route an airplane-mode launch into the online UI.
+      expect(
+        decideAccessMode(
+          hasSession: true,
+          hasOfflineIdentity: true,
+          offlineStillValid: true,
+          hasNetwork: false,
+        ),
+        AppAccessMode.authenticatedOffline,
       );
     });
 

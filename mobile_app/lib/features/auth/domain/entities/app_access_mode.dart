@@ -53,9 +53,15 @@ AppAccessMode decideAccessMode({
   required bool hasNetwork,
   RefreshOutcome refreshOutcome = RefreshOutcome.notAttempted,
 }) {
-  // Identity present → online. The backend stays authoritative for
-  // subscription / entitlement / device-lock / license on each call.
-  if (hasSession) return AppAccessMode.authenticatedOnline;
+  // A cached Supabase session is kept even with no connectivity, so a
+  // session alone does NOT mean online. Online = session AND a network;
+  // a session with no network is offline mode (play downloads, gate the
+  // rest), not a broken "online" where every request fails.
+  if (hasSession) {
+    return hasNetwork
+        ? AppAccessMode.authenticatedOnline
+        : AppAccessMode.authenticatedOffline;
+  }
 
   // No identity ever established on this install (e.g. a fresh reinstall:
   // the offline token lives in secure storage, which Android backup does

@@ -1,7 +1,6 @@
 import 'dart:async';
 
 import 'package:audio_service/audio_service.dart';
-import 'package:audio_session/audio_session.dart';
 import 'package:flutter/foundation.dart';
 import 'package:just_audio/just_audio.dart';
 
@@ -33,14 +32,7 @@ class AudioPlayerHandler extends BaseAudioHandler
   /// an offline meditation's progress is not lost. Null in tests.
   final PendingSyncStore? _syncStore;
 
-  // handleInterruptions: false — we take explicit control of interruptions
-  // via audio_session below, so there is ONE authority (not just_audio's
-  // defaults fighting our own handling).
-  final AudioPlayer _player = AudioPlayer(handleInterruptions: false);
-
-  /// True when an interruption (call, another app, headphone/BT change,
-  /// speech input) paused us mid-play, so we know to resume when it ends.
-  bool _resumeAfterInterruption = false;
+  final AudioPlayer _player = AudioPlayer();
 
   List<AudioTrack> _tracks = [];
   int _currentIndex = -1;
@@ -79,57 +71,6 @@ class AudioPlayerHandler extends BaseAudioHandler
         skipToNext();
       }
     });
-
-    unawaited(_configureAudioSession());
-  }
-
-  /// Explicit audio-session handling: what to do when something else wants the
-  /// audio — a phone call, another app, Siri/voice input, or the headphones
-  /// being unplugged / a Bluetooth device disconnecting.
-  Future<void> _configureAudioSession() async {
-    try {
-      final session = await AudioSession.instance;
-      await session.configure(const AudioSessionConfiguration.music());
-
-      session.interruptionEventStream.listen((event) {
-        if (event.begin) {
-          switch (event.type) {
-            case AudioInterruptionType.duck:
-              // Transient (e.g. a nav prompt): drop volume instead of pausing.
-              _player.setVolume(0.3);
-            case AudioInterruptionType.pause:
-            case AudioInterruptionType.unknown:
-              // A call / another media app took over. Remember whether we were
-              // actually playing so we only resume if we interrupted playback.
-              _resumeAfterInterruption = _player.playing;
-              if (_player.playing) _player.pause();
-          }
-        } else {
-          switch (event.type) {
-            case AudioInterruptionType.duck:
-              _player.setVolume(1.0);
-            case AudioInterruptionType.pause:
-              // Resume only if WE paused for this interruption (and the user
-              // hasn't since pressed stop, which clears the flag).
-              if (_resumeAfterInterruption) _player.play();
-              _resumeAfterInterruption = false;
-            case AudioInterruptionType.unknown:
-              // Don't auto-resume after an unknown interruption.
-              _resumeAfterInterruption = false;
-          }
-        }
-      });
-
-      // Headphones unplugged / Bluetooth disconnected: pause rather than blast
-      // a meditation out of the phone speaker. Do not auto-resume on reconnect.
-      session.becomingNoisyEventStream.listen((_) {
-        _resumeAfterInterruption = false;
-        _player.pause();
-      });
-    } catch (e) {
-      // A missing/!flaky audio session must never stop the app from playing.
-      debugPrint('Audio session configuration skipped: $e');
-    }
   }
 
   // Mid-stream recovery state. Guards against re-entrant recovery and
@@ -391,7 +332,6 @@ class AudioPlayerHandler extends BaseAudioHandler
   @override
   Future<void> stop() async {
     _stopped = true;
-    _resumeAfterInterruption = false;
     _progressTimer?.cancel();
     _sleepTimer?.cancel();
     await _flushProgress();
@@ -415,7 +355,6 @@ class AudioPlayerHandler extends BaseAudioHandler
       _currentIndex = -1;
       _loading = false;
       _recovering = false;
-      _resumeAfterInterruption = false;
       await _player.stop();
       await _player.setLoopMode(LoopMode.off);
       mediaItem.add(null);
