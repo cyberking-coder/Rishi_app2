@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../../core/network/supabase_client_provider.dart';
+import '../../downloads/application/download_providers.dart';
 import '../data/offline_session_store.dart';
 import '../domain/entities/app_access_mode.dart';
 
@@ -18,6 +19,8 @@ class AppAccessController extends Notifier<AppAccessMode> {
   late final SupabaseClient _client;
   late final OfflineSessionStore _store;
   StreamSubscription<AuthState>? _authSub;
+  StreamSubscription<List<ConnectivityResult>>? _connSub;
+  bool _resolving = false;
 
   @override
   AppAccessMode build() {
@@ -26,7 +29,20 @@ class AppAccessController extends Notifier<AppAccessMode> {
 
     // React to real auth transitions for the life of the app.
     _authSub = _client.auth.onAuthStateChange.listen(_onAuthEvent);
-    ref.onDispose(() => _authSub?.cancel());
+
+    // When connectivity returns, reconcile: re-verify the session (which
+    // slides the offline grace window forward) and purge anything the server
+    // revoked while we were offline. Only act on a transition to having a
+    // network, and never while a resolve is already in flight.
+    _connSub = Connectivity().onConnectivityChanged.listen((results) {
+      final hasNetwork = results.any((r) => r != ConnectivityResult.none);
+      if (hasNetwork && !_resolving) unawaited(resolve());
+    });
+
+    ref.onDispose(() {
+      _authSub?.cancel();
+      _connSub?.cancel();
+    });
 
     // Kick off resolution; stay in `resolving` until it lands.
     unawaited(resolve());
@@ -51,42 +67,62 @@ class AppAccessController extends Notifier<AppAccessMode> {
 
   /// Resolves the mode at startup (and can be re-run on connectivity return).
   Future<void> resolve() async {
-    final session = _client.auth.currentSession;
-    final offline = await _store.read();
-    final hasNetwork = await _hasNetwork();
+    if (_resolving) return;
+    _resolving = true;
+    try {
+      final session = _client.auth.currentSession;
+      final offline = await _store.read();
+      final hasNetwork = await _hasNetwork();
 
-    if (session != null) {
-      await _store.markVerified(userId: session.user.id);
-      state = AppAccessMode.authenticatedOnline;
-      return;
-    }
+      if (session != null) {
+        await _store.markVerified(userId: session.user.id);
+        state = AppAccessMode.authenticatedOnline;
+        unawaited(_reconcileDownloads());
+        return;
+      }
 
-    var decision = decideAccessMode(
-      hasSession: false,
-      hasOfflineIdentity: offline != null,
-      offlineStillValid: offline?.isStillValid() ?? false,
-      hasNetwork: hasNetwork,
-    );
-
-    // The online-with-offline-identity branch needs a refresh to decide.
-    if (decision == AppAccessMode.resolving) {
-      final outcome = await _attemptRefresh();
-      decision = decideAccessMode(
+      var decision = decideAccessMode(
         hasSession: false,
         hasOfflineIdentity: offline != null,
         offlineStillValid: offline?.isStillValid() ?? false,
         hasNetwork: hasNetwork,
-        refreshOutcome: outcome,
       );
-      if (outcome == RefreshOutcome.success) {
-        final uid = _client.auth.currentSession?.user.id;
-        if (uid != null) await _store.markVerified(userId: uid);
-      } else if (outcome == RefreshOutcome.invalid) {
-        await _store.clear();
-      }
-    }
 
-    state = decision;
+      // The online-with-offline-identity branch needs a refresh to decide.
+      if (decision == AppAccessMode.resolving) {
+        final outcome = await _attemptRefresh();
+        decision = decideAccessMode(
+          hasSession: false,
+          hasOfflineIdentity: offline != null,
+          offlineStillValid: offline?.isStillValid() ?? false,
+          hasNetwork: hasNetwork,
+          refreshOutcome: outcome,
+        );
+        if (outcome == RefreshOutcome.success) {
+          final uid = _client.auth.currentSession?.user.id;
+          if (uid != null) await _store.markVerified(userId: uid);
+        } else if (outcome == RefreshOutcome.invalid) {
+          await _store.clear();
+        }
+      }
+
+      state = decision;
+      if (decision == AppAccessMode.authenticatedOnline) {
+        unawaited(_reconcileDownloads());
+      }
+    } finally {
+      _resolving = false;
+    }
+  }
+
+  /// Best-effort server reconciliation once online: drop downloads whose
+  /// license expired or was revoked server-side. Never throws into the UI.
+  Future<void> _reconcileDownloads() async {
+    try {
+      await ref.read(downloadRepositoryProvider).purgeRevokedAndExpired();
+    } catch (_) {
+      // Transient / offline again — the next online resolve retries.
+    }
   }
 
   Future<RefreshOutcome> _attemptRefresh() async {
