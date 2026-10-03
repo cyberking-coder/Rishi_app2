@@ -13,7 +13,6 @@ import '../../core/config/purchase_config.dart';
 import '../../features/chat/presentation/screens/chat_screen.dart';
 import '../../features/downloads/presentation/screens/downloads_screen.dart';
 import '../../features/downloads/presentation/screens/offline_hub_screen.dart';
-import '../../features/downloads/presentation/screens/offline_player_screen.dart';
 import '../../features/home/presentation/screens/home_screen.dart';
 import '../../features/home/presentation/screens/browse_screen.dart';
 import '../../features/lms/domain/entities/lesson.dart';
@@ -34,12 +33,10 @@ import '../../features/watch/presentation/screens/watch_screen.dart';
 import '../widgets/app_shell.dart';
 
 /// Locations an [AppAccessMode.authenticatedOffline] user may reach: the
-/// Offline Hub, their Downloads list, and the encrypted offline player.
-/// Everything else routes to the hub while offline.
+/// Offline Hub, their Downloads list, and Now Playing (downloaded tracks play
+/// through the same global handler). Everything else routes to the hub.
 bool _offlineAllowed(String loc) =>
-    loc == '/offline' ||
-    loc == '/downloads' ||
-    loc.startsWith('/offline-player');
+    loc == '/offline' || loc == '/downloads' || loc == '/now-playing';
 
 final goRouterProvider = Provider<GoRouter>((ref) {
   // IMPORTANT: do NOT `ref.watch` auth (or the login flag) in this provider
@@ -130,13 +127,6 @@ final goRouterProvider = Provider<GoRouter>((ref) {
         path: '/downloads',
         pageBuilder: (_, __) => const NoTransitionPage(
           child: AppShell(tab: AppTab.downloads, child: DownloadsScreen()),
-        ),
-      ),
-      GoRoute(
-        path: '/offline-player/:contentId',
-        builder: (_, state) => OfflinePlayerScreen(
-          contentId: state.pathParameters['contentId']!,
-          title: state.extra as String? ?? 'Offline',
         ),
       ),
       // Landing screen while in authenticatedOffline mode (see the redirect).

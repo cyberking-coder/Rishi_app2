@@ -60,6 +60,9 @@ jobs:
           profile: pixel_6
           script: |
             cd mobile_app
+            set -e
+            # 1) Catalog sweep: every audio/course/event through the real
+            #    pipeline (backend from dart-defines).
             flutter test integration_test/e2e_content_sweep_test.dart \
               --dart-define=E2E_SUPABASE_URL="$E2E_SUPABASE_URL" \
               --dart-define=E2E_SUPABASE_ANON_KEY="$E2E_SUPABASE_ANON_KEY" \
@@ -68,3 +71,12 @@ jobs:
               --dart-define=E2E_CHECK_LICENSES=true \
               --dart-define=E2E_CHECK_PLAYBACK="$E2E_CHECK_PLAYBACK" \
               --dart-define=E2E_PLAYBACK_SAMPLE=15
+            # 2) User journeys incl. sustained streaming + offline-download
+            #    playback. These boot the real app, so the build targets
+            #    whatever AppConfig points at — build/point this at STAGING.
+            flutter test \
+              integration_test/e2e_user_journey_test.dart \
+              integration_test/e2e_streaming_audio_test.dart \
+              integration_test/e2e_offline_download_test.dart \
+              --dart-define=E2E_EMAIL="$E2E_EMAIL" \
+              --dart-define=E2E_PASSWORD="$E2E_PASSWORD"

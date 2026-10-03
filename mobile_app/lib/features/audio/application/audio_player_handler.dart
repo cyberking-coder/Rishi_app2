@@ -6,6 +6,7 @@ import 'package:just_audio/just_audio.dart';
 
 import '../domain/entities/audio_track.dart';
 import '../domain/repositories/audio_repository.dart';
+import '../../downloads/domain/repositories/download_repository.dart';
 import '../../sync/data/pending_sync_store.dart';
 import '../../sync/domain/pending_sync.dart';
 
@@ -18,6 +19,13 @@ const List<double> kAvailableAudioSpeeds = [0.75, 1.0, 1.25, 1.5, 1.75, 2.0];
 class AudioPlayerHandler extends BaseAudioHandler
     with QueueHandler, SeekHandler {
   final AudioRepository _repository;
+
+  /// Downloaded content is played through THIS same handler (not a separate
+  /// screen-scoped player): if a track is available offline, its source is the
+  /// local decrypting-proxy URL instead of a signed R2 URL. One player, one
+  /// lifecycle, one Now Playing, one notification, one recovery path — for
+  /// both online and offline. Null in tests / if downloads are unavailable.
+  final DownloadRepository? _downloads;
 
   /// Shared offline queue. When a progress save fails (offline), the latest
   /// position is parked here and replayed when the app next comes online, so
@@ -34,8 +42,12 @@ class AudioPlayerHandler extends BaseAudioHandler
   /// Null when no sleep timer is set; counts down while one is active.
   final ValueNotifier<Duration?> sleepTimerRemaining = ValueNotifier(null);
 
-  AudioPlayerHandler(this._repository, {PendingSyncStore? syncStore})
-      : _syncStore = syncStore {
+  AudioPlayerHandler(
+    this._repository, {
+    DownloadRepository? downloads,
+    PendingSyncStore? syncStore,
+  })  : _downloads = downloads,
+        _syncStore = syncStore {
     _player.playbackEventStream.listen(
       _broadcastState,
       onError: (Object e, StackTrace st) {
@@ -98,11 +110,10 @@ class AudioPlayerHandler extends BaseAudioHandler
           // The track may have changed (user tapped another) while we waited.
           if (currentTrack?.id != track.id) return;
 
-          final source = await _repository
-              .getPlaybackSource(track.id)
-              .timeout(const Duration(seconds: 30));
-          final uri = Uri.tryParse(source.url);
-          if (uri == null) throw StateError('Invalid playback URL');
+          // Re-resolve the source the same way the first load did: a fresh
+          // signed URL online, or a freshly-registered proxy URL offline
+          // (which also restarts the loopback server if it had stopped).
+          final uri = await _resolveSource(track);
 
           await _player.setAudioSource(
             AudioSource.uri(uri),
@@ -195,13 +206,7 @@ class AudioPlayerHandler extends BaseAudioHandler
     ));
 
     try {
-      final source = await _repository
-          .getPlaybackSource(track.id)
-          .timeout(const Duration(seconds: 30));
-      final uri = Uri.tryParse(source.url);
-      if (uri == null) {
-        throw StateError('Invalid playback URL');
-      }
+      final uri = await _resolveSource(track);
       // Load once, positioned where it should start, by passing
       // initialPosition to setAudioSource instead of loading and THEN
       // seeking. The old code set the source and then issued a separate
@@ -239,6 +244,22 @@ class AudioPlayerHandler extends BaseAudioHandler
       ));
       rethrow;
     }
+  }
+
+  /// Resolves the playable URI for [track]: the local decrypting-proxy URL
+  /// when the track is downloaded (so it plays with no network through the
+  /// same engine), otherwise a signed streaming URL from the license service.
+  Future<Uri> _resolveSource(AudioTrack track) async {
+    final downloads = _downloads;
+    if (downloads != null && downloads.isDownloaded(track.id)) {
+      return downloads.localPlaybackUrl(track.id);
+    }
+    final source = await _repository
+        .getPlaybackSource(track.id)
+        .timeout(const Duration(seconds: 30));
+    final uri = Uri.tryParse(source.url);
+    if (uri == null) throw StateError('Invalid playback URL');
+    return uri;
   }
 
   MediaItem _toMediaItem(AudioTrack track) => MediaItem(
@@ -455,7 +476,13 @@ class AudioPlayerHandler extends BaseAudioHandler
 
   @override
   Future<void> onTaskRemoved() async {
-    await stop();
+    // Deliberately do NOT stop. For a meditation app, swiping the app off the
+    // Recents list should not kill a session that is playing — the media
+    // notification keeps it going until the user pauses/stops there, the same
+    // as other audio apps. If nothing is playing, let the service wind down.
+    if (!_player.playing) {
+      await stop();
+    }
   }
 }
 

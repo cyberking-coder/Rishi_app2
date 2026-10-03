@@ -29,7 +29,6 @@ class E2eKeys {
   // Audio player transport.
   static const playPause = Key('e2e_play_pause'); // Now Playing
   static const miniPlayPause = Key('e2e_mini_play_pause'); // persistent bar
-  static const offlinePlayPause = Key('e2e_offline_play_pause'); // offline screen
 
   // Downloads.
   static const downloadButton = Key('e2e_download_button'); // start/observe a download

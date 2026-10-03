@@ -113,14 +113,26 @@ Future<void> main() async {
   // progress saved offline) and by SyncService (to replay it when online).
   final pendingSyncStore = PendingSyncStore();
 
+  // Created before the audio handler so the handler can play downloaded
+  // tracks through the same engine (offline source = local proxy URL).
+  final downloadRepository = DownloadRepositoryImpl(
+    storage: SecureDownloadStorage(),
+    metadataStore: DownloadMetadataStore(),
+    resolver: DownloadSourceResolver(Supabase.instance.client),
+    proxy: LocalDecryptingProxy(),
+  );
+
   // Audio + downloads are optional at boot. If either fails to initialise
   // (e.g. missing native channel, storage permission), the app must still
   // reach the login screen rather than dying to a black screen.
   AudioPlayerHandler? audioHandler;
   try {
     audioHandler = await AudioService.init(
-      builder: () =>
-          AudioPlayerHandler(audioRepository, syncStore: pendingSyncStore),
+      builder: () => AudioPlayerHandler(
+        audioRepository,
+        downloads: downloadRepository,
+        syncStore: pendingSyncStore,
+      ),
       config: const AudioServiceConfig(
         androidNotificationChannelId: AppConfig.audioChannelId,
         androidNotificationChannelName: AppConfig.audioChannelName,
@@ -131,15 +143,14 @@ Future<void> main() async {
     debugPrint('AudioService.init failed: $e\n$st');
     // Provide a plain handler so the app can still reach the login screen.
     // Background audio notification won't work but the UI will load.
-    audioHandler = AudioPlayerHandler(audioRepository, syncStore: pendingSyncStore);
+    audioHandler = AudioPlayerHandler(
+      audioRepository,
+      downloads: downloadRepository,
+      syncStore: pendingSyncStore,
+    );
   }
 
-  final downloadRepository = DownloadRepositoryImpl(
-    storage: SecureDownloadStorage(),
-    metadataStore: DownloadMetadataStore(),
-    resolver: DownloadSourceResolver(Supabase.instance.client),
-    proxy: LocalDecryptingProxy(),
-  );
+  // Restore the manifest now; playback happens later, after this completes.
   try {
     await downloadRepository.restore();
     unawaited(downloadRepository.purgeRevokedAndExpired());

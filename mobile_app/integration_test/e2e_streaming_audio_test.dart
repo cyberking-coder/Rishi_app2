@@ -47,10 +47,16 @@ void main() {
       markTestSkipped('Now Playing did not open (audio may be gated).');
       return;
     }
-    // Toggle; it must stay mounted (no crash on play/pause).
-    await tester.tap(find.byKey(E2eKeys.playPause));
-    await tester.pump(const Duration(seconds: 2));
-    expect(find.byKey(E2eKeys.playPause), findsOneWidget);
+    // Dwell: let it play for a stretch and confirm the player is still there
+    // and has not torn itself down — a cheap guard against the "plays then
+    // stops after a while" class. (A precise position-advance assertion wants
+    // a test hook on the handler; this at least catches a crash/freeze that
+    // removes the transport.)
+    for (var i = 0; i < 6; i++) {
+      await tester.pump(const Duration(seconds: 5));
+    }
+    expect(find.byKey(E2eKeys.playPause), findsWidgets,
+        reason: 'player disappeared during sustained playback');
 
     // Back out → the persistent mini-player should carry the session.
     await tester.pageBack();

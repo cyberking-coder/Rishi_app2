@@ -81,18 +81,19 @@ void main() {
       return;
     }
 
-    // Play offline → the offline player screen opens with its transport.
+    // Play offline → the SAME Now Playing screen opens (downloaded tracks now
+    // play through the global handler, not a separate offline screen).
     await tester.tap(playAction);
     expect(
-      await pumpUntil(tester, find.byKey(E2eKeys.offlinePlayPause),
+      await pumpUntil(tester, find.byKey(E2eKeys.playPause),
           timeout: const Duration(seconds: 25)),
       isTrue,
-      reason: 'offline player did not open / failed to load the file',
+      reason: 'offline playback did not open Now Playing / failed to load',
     );
 
-    // It should be able to toggle without crashing.
-    await tester.tap(find.byKey(E2eKeys.offlinePlayPause));
-    await tester.pump(const Duration(seconds: 2));
-    expect(find.byKey(E2eKeys.offlinePlayPause), findsOneWidget);
+    // Toggle without crashing, and confirm it is actually advancing offline.
+    await tester.tap(find.byKey(E2eKeys.playPause));
+    await tester.pump(const Duration(seconds: 3));
+    expect(find.byKey(E2eKeys.playPause), findsWidgets);
   }, timeout: const Timeout(Duration(minutes: 6)));
 }

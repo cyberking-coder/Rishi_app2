@@ -5,6 +5,9 @@ import 'package:go_router/go_router.dart';
 import '../../../../app/theme/app_theme.dart';
 import '../../../../core/config/purchase_config.dart';
 import '../../../../core/testing/e2e_keys.dart';
+import '../../../audio/application/audio_providers.dart';
+import '../../../audio/domain/entities/audio_track.dart';
+import '../../../audio/presentation/utils/audio_navigation.dart';
 import '../../application/download_providers.dart';
 import '../../domain/entities/download_status.dart';
 import '../widgets/download_tile.dart';
@@ -95,12 +98,24 @@ class _DownloadsScreenState extends ConsumerState<DownloadsScreen> {
                         onPlay: () async {
                           if (_navigating) return;
                           setState(() => _navigating = true);
-                          await context.push(
-                            '/offline-player/${task.contentId}',
-                            extra: task.title,
-                          );
-                          if (mounted) {
-                            setState(() => _navigating = false);
+                          try {
+                            // Play through the SAME global handler as online
+                            // audio: the handler sees the track is downloaded
+                            // and sources it from the local decrypting proxy,
+                            // so offline playback gets the same background
+                            // service, notification, Now Playing and recovery.
+                            await ref.read(audioHandlerProvider).playSingleTrack(
+                                  AudioTrack(
+                                    id: task.contentId,
+                                    title: task.title,
+                                    coverArtUrl: task.thumbnailUrl,
+                                  ),
+                                );
+                            if (mounted) openNowPlaying(context);
+                          } catch (e) {
+                            _showError('Could not play this download.');
+                          } finally {
+                            if (mounted) setState(() => _navigating = false);
                           }
                         },
                       );
