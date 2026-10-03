@@ -6,6 +6,7 @@ import '../../../../app/theme/app_theme.dart';
 import '../../../../app/widgets/lotus_logo.dart';
 import '../../../../app/widgets/soft_halo.dart';
 import '../../../../core/errors/auth_failure.dart';
+import '../../../../core/testing/e2e_keys.dart';
 import '../../application/auth_providers.dart';
 import '../../application/auth_state.dart';
 import '../widgets/apple_sign_in_button.dart';
@@ -111,6 +112,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
             ),
             const SizedBox(height: 22),
             AuthTextField(
+              fieldKey: E2eKeys.loginEmail,
               controller: _emailController,
               label: 'Email',
               keyboardType: TextInputType.emailAddress,
@@ -118,6 +120,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
             ),
             const SizedBox(height: 14),
             AuthTextField(
+              fieldKey: E2eKeys.loginPassword,
               controller: _passwordController,
               label: 'Password',
               obscureText: true,
@@ -141,6 +144,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
             ),
             const SizedBox(height: 6),
             PrimaryGradientButton(
+              key: E2eKeys.loginSubmit,
               label: 'Log in',
               loading: isLoading,
               onPressed: isLoading ? null : _submit,

@@ -24,6 +24,10 @@ class AuthTextField extends StatefulWidget {
   /// Placeholder inside the input. Falls back to "Enter your <label>".
   final String? hint;
 
+  /// Optional key placed on the inner editable field (not this wrapper), so
+  /// a test can target the text input directly. Null in normal use.
+  final Key? fieldKey;
+
   const AuthTextField({
     super.key,
     required this.controller,
@@ -33,6 +37,7 @@ class AuthTextField extends StatefulWidget {
     this.keyboardType = TextInputType.text,
     this.icon,
     this.hint,
+    this.fieldKey,
   });
 
   @override
@@ -87,6 +92,7 @@ class _AuthTextFieldState extends State<AuthTextField> {
                   ),
                 ),
                 TextFormField(
+                  key: widget.fieldKey,
                   controller: widget.controller,
                   obscureText: _obscured,
                   keyboardType: widget.keyboardType,

@@ -20,8 +20,45 @@ Walks **every** published item and drives it through the production pipeline:
 One bad item never aborts the run — all failures are collected and printed as a
 single report, and the test fails listing them.
 
+### `e2e_user_journey_test.dart` — the critical journey, as real taps
+Boots the actual app (`main()`) and drives the full flow on-screen:
+
+> launch → **login** → home shell → **Courses** → open a course → open a
+> lesson → **playback appears** (audio lessons open Now Playing) → Profile →
+> Settings → **logout** → back to login.
+
+It uses stable widget keys from `lib/core/testing/e2e_keys.dart` (so it does
+not rely on visible text, which changes with the education-framing flag). The
+journey degrades gracefully — if the account has no courses/lessons it still
+verifies login, navigation and logout and logs what it skipped — and uses a
+`pumpUntil` helper instead of `pumpAndSettle` (the player's position bar ticks
+forever, so `pumpAndSettle` would hang).
+
+Run it with a test account:
+
+```bash
+flutter test integration_test/e2e_user_journey_test.dart \
+  --dart-define=E2E_EMAIL=tester@example.com \
+  --dart-define=E2E_PASSWORD='<password>'
+```
+
+Without `E2E_EMAIL`/`E2E_PASSWORD` the test **skips** (it cannot log in).
+
+> ⚠️ The journey boots the real `main()`, which initialises Supabase from the
+> app's baked-in `AppConfig` — i.e. it hits **whatever backend the build
+> targets**. Build/point at **staging** before running the journey so it does
+> not log in against production. (The content-sweep test, by contrast, takes
+> its backend from `--dart-define` and so can target staging without a special
+> build.)
+
 ### `smoke_test.dart`
 Confirms the `integration_test` binding runs on the device (sanity check).
+
+## Widget keys
+The journey relies on keys centralised in `lib/core/testing/e2e_keys.dart`
+(login fields/button, nav tabs, per-id course cards and lesson tiles, the
+Settings row and Logout tile, and the play/pause control). They add no
+behaviour; keep them in sync if those widgets are restructured.
 
 ## Prerequisites
 

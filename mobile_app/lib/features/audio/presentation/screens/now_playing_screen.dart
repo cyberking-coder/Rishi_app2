@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../app/widgets/lotus_logo.dart';
+import '../../../../core/testing/e2e_keys.dart';
 import '../../../downloads/domain/entities/download_content_type.dart';
 import '../../../downloads/presentation/widgets/download_button.dart';
 import '../../application/audio_providers.dart';
@@ -400,6 +401,7 @@ class _TransportState extends State<_Transport> {
             const SizedBox(width: 8),
             // Play / Pause — large violet circle
             GestureDetector(
+              key: E2eKeys.playPause,
               onTap: playing ? widget.handler.pause : widget.handler.play,
               child: Container(
                 width: 64,

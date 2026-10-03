@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../core/config/purchase_config.dart';
+import '../../core/testing/e2e_keys.dart';
 import '../theme/app_theme.dart';
 import '../../features/audio/presentation/widgets/mini_player.dart';
 import '../../core/push/push_registration.dart';
@@ -82,6 +83,7 @@ class _BottomNav extends StatelessWidget {
           child: Row(
             children: [
               _NavItem(
+                key: E2eKeys.navHome,
                 icon: Icons.home_outlined,
                 activeIcon: Icons.home_rounded,
                 label: 'Home',
@@ -89,6 +91,7 @@ class _BottomNav extends StatelessWidget {
                 onTap: () => _go(context, AppTab.home),
               ),
               _NavItem(
+                key: E2eKeys.navCourses,
                 // A graduation cap is a literal education signal sitting
                 // in the navigation bar, which is the first thing a
                 // reviewer sees and the last place to leave one.
@@ -110,6 +113,7 @@ class _BottomNav extends StatelessWidget {
                 onTap: () => _go(context, AppTab.downloads),
               ),
               _NavItem(
+                key: E2eKeys.navProfile,
                 icon: Icons.person_outline_rounded,
                 activeIcon: Icons.person_rounded,
                 label: 'Profile',
@@ -139,6 +143,7 @@ class _NavItem extends StatelessWidget {
   final VoidCallback onTap;
 
   const _NavItem({
+    super.key,
     required this.icon,
     required this.activeIcon,
     required this.label,

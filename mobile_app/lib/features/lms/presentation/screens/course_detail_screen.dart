@@ -10,6 +10,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../../../app/theme/app_theme.dart';
+import '../../../../core/testing/e2e_keys.dart';
 import '../../../../app/widgets/remote_image.dart';
 import '../../../../core/config/purchase_config.dart';
 import '../../application/lms_providers.dart';
@@ -232,6 +233,7 @@ class _CourseDetailScreenState extends ConsumerState<CourseDetailScreen>
                     return Padding(
                         padding: const EdgeInsets.symmetric(horizontal: 20),
                         child: _LessonTile(
+                          key: E2eKeys.lessonTile(lesson.id),
                           number: lessonNumber,
                           lesson: lesson,
                           locked: locked,
@@ -502,6 +504,7 @@ class _LessonTile extends StatelessWidget {
   final VoidCallback onTap;
 
   const _LessonTile({
+    super.key,
     required this.number,
     required this.lesson,
     required this.locked,

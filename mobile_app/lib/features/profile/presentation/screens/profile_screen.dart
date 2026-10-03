@@ -10,6 +10,7 @@ import '../../../../app/widgets/remote_image.dart';
 import '../../../../core/config/purchase_config.dart';
 import '../../../../core/device/device_info_service.dart';
 import '../../../../core/errors/auth_failure.dart';
+import '../../../../core/testing/e2e_keys.dart';
 import '../../../access/application/access_providers.dart';
 import '../../../access/domain/access_state.dart';
 import '../../../auth/application/auth_providers.dart';
@@ -325,6 +326,7 @@ class ProfileScreen extends ConsumerWidget {
                           child: Divider(height: 0.5, color: AppTheme.border),
                         ),
                         _ListRow(
+                          key: E2eKeys.settingsRow,
                           icon: Icons.settings_rounded,
                           title: 'Settings',
                           onTap: () => _openSettings(context, ref),
@@ -652,6 +654,7 @@ class _Badge extends StatelessWidget {
 
 class _ListRow extends StatelessWidget {
   const _ListRow({
+    super.key,
     required this.icon,
     required this.title,
     this.value,
@@ -772,6 +775,7 @@ class _SettingsSheetState extends ConsumerState<_SettingsSheet> {
 
                 // ── Logout ──
                 _SheetTile(
+                  key: E2eKeys.logoutButton,
                   icon: Icons.logout,
                   iconColor: AppTheme.clay,
                   title: 'Logout',
@@ -1127,7 +1131,8 @@ class _SheetSectionLabel extends StatelessWidget {
 
 class _SheetTile extends StatelessWidget {
   const _SheetTile(
-      {required this.icon,
+      {super.key,
+      required this.icon,
       required this.iconColor,
       required this.title,
       required this.onTap});

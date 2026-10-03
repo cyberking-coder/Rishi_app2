@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import '../../../../app/theme/app_theme.dart';
 import '../../../../app/widgets/remote_image.dart';
 import '../../../../core/config/purchase_config.dart';
+import '../../../../core/testing/e2e_keys.dart';
 import '../../application/lms_providers.dart';
 import '../../domain/entities/course_summary.dart';
 
@@ -115,7 +116,10 @@ class _CoursesScreenState extends ConsumerState<CoursesScreen> {
                     padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
                     itemCount: visible.length,
                     separatorBuilder: (_, __) => const SizedBox(height: 14),
-                    itemBuilder: (_, i) => CourseCard(course: visible[i]),
+                    itemBuilder: (_, i) => CourseCard(
+                      key: E2eKeys.courseCard(visible[i].id),
+                      course: visible[i],
+                    ),
                   ),
                 );
               },
