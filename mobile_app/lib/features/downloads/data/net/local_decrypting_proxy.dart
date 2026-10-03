@@ -63,25 +63,41 @@ class LocalDecryptingProxy {
     String mimeType,
   ) async {
     await start();
-    _entries[id] = _ProxyEntry(file, key, mimeType);
+    final entry = _ProxyEntry(file, key, mimeType);
+    _entries[id] = entry;
     final port = _server!.port;
-    return Uri.parse('http://127.0.0.1:$port/${_sessionToken!}/$id');
+    // Resolve the real type now (sniffs + caches) and put a matching file
+    // extension on the URL. iOS AVPlayer decides an asset's type from the
+    // URL extension as well as the Content-Type; an extension-less URL for
+    // an M4A was enough to make it refuse the file with -11800 even once
+    // the Content-Type was right. Ids contain no dots, so the extension is
+    // recovered unambiguously on the way back in.
+    final contentType = await _resolveContentType(entry);
+    final ext = _extensionForMime(contentType);
+    final suffix = ext != null ? '.$ext' : '';
+    return Uri.parse('http://127.0.0.1:$port/${_sessionToken!}/$id$suffix');
   }
 
   void unregister(String id) => _entries.remove(id);
 
   Future<void> _handle(HttpRequest request) async {
     final segments = request.uri.pathSegments;
+    // The last path segment is "<id>" or "<id>.<ext>"; ids carry no dots,
+    // so strip a trailing extension to recover the entry key.
+    final rawId = segments.length == 2 ? segments[1] : '';
+    final dot = rawId.lastIndexOf('.');
+    final entryId = dot > 0 ? rawId.substring(0, dot) : rawId;
+
     // Reject anything without the session token or a known entry.
     if (segments.length != 2 ||
         segments[0] != _sessionToken ||
-        !_entries.containsKey(segments[1])) {
+        !_entries.containsKey(entryId)) {
       request.response.statusCode = HttpStatus.notFound;
       await request.response.close();
       return;
     }
 
-    final entry = _entries[segments[1]]!;
+    final entry = _entries[entryId]!;
     final totalLength = await entry.file.length();
 
     // Resolve the real Content-Type from the decrypted header rather than
@@ -175,6 +191,19 @@ class LocalDecryptingProxy {
     entry.resolvedMimeType = resolved;
     return resolved;
   }
+
+  /// The file extension AVPlayer expects for a given Content-Type, or null
+  /// when there is no helpful one (the URL then carries no extension).
+  String? _extensionForMime(String mime) => switch (mime) {
+        'audio/mp4' => 'm4a',
+        'audio/mpeg' => 'mp3',
+        'audio/wav' => 'wav',
+        'audio/flac' => 'flac',
+        'audio/ogg' => 'ogg',
+        'audio/aac' => 'aac',
+        'video/mp4' => 'mp4',
+        _ => null,
+      };
 
   /// Identifies an audio container from its leading bytes, or null when it
   /// matches nothing known (so the caller keeps the declared type).

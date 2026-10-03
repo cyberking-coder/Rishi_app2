@@ -290,7 +290,7 @@ publish_to: "none"
 # after its files were purged (re-check cancel after the write await, A6); and
 # an unguarded `state.extra as Lesson` cast that would crash the router on a
 # lesson deep link with no extra (now redirects to the catalogue, A7).
-version: 2.2.6+58
+version: 2.2.7+59
 
 environment:
   sdk: ">=3.3.0 <4.0.0"
