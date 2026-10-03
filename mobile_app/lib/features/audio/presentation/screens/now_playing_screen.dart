@@ -553,6 +553,7 @@ class _DownloadTool extends ConsumerWidget {
         SizedBox(
           height: 26,
           child: DownloadButton(
+            key: E2eKeys.downloadButton,
             contentId: contentId,
             contentType: DownloadContentType.audio,
             title: title,

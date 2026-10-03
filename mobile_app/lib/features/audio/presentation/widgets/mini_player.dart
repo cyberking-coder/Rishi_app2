@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../../../app/theme/app_theme.dart';
 import '../../../../app/widgets/remote_image.dart';
+import '../../../../core/testing/e2e_keys.dart';
 import '../../application/audio_providers.dart';
 import '../utils/audio_navigation.dart';
 
@@ -134,6 +135,7 @@ class MiniPlayer extends ConsumerWidget {
                                       ),
                                     ),
                                   IconButton(
+                                    key: E2eKeys.miniPlayPause,
                                     icon: Icon(
                                         playing
                                             ? Icons.pause

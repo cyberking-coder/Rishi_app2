@@ -51,6 +51,25 @@ Without `E2E_EMAIL`/`E2E_PASSWORD` the test **skips** (it cannot log in).
 > its backend from `--dart-define` and so can target staging without a special
 > build.)
 
+### `e2e_offline_download_test.dart` — offline download → offline playback
+login → Home → play an audio → **tap Download** → wait for it to finish →
+Downloads tab → **play the downloaded item** → the encrypted **offline
+player** starts. End-to-end proof of enqueue → encrypted download → manifest →
+decrypt-on-the-fly playback (the area that had the "downloaded audio won't
+play" bugs). Needs an account that can download the first Home audio (free or
+owned). Degrades gracefully: if nothing is downloadable or the download does
+not finish within the window it records a skip, not a false failure — the firm
+assertion is that offline playback works *when a download completes*.
+
+### `e2e_streaming_audio_test.dart` — stream + mini-player
+login → Home → tap an audio → Now Playing → play/pause → back → the
+persistent **mini-player** shows and its control works. Covers the most-used
+streaming path (where the "audio gets stuck" auto-recovery fix lives).
+
+### `e2e_helpers.dart`
+Shared helpers (`bootAndLogin`, `pumpUntil`, `audioCardFinder`) used by the
+journey tests. Not a test itself.
+
 ### `smoke_test.dart`
 Confirms the `integration_test` binding runs on the device (sanity check).
 

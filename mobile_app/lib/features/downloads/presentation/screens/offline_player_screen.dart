@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:just_audio/just_audio.dart';
 
 import '../../../../app/widgets/remote_image.dart';
+import '../../../../core/testing/e2e_keys.dart';
 import '../../../audio/application/audio_providers.dart';
 import '../../application/download_providers.dart';
 
@@ -300,6 +301,7 @@ class _AudioControlsState extends State<_AudioControls> {
                   ),
                   const SizedBox(width: 20),
                   IconButton(
+                    key: E2eKeys.offlinePlayPause,
                     iconSize: 72,
                     color: Colors.white,
                     icon: Icon(playing

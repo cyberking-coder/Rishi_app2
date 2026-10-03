@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import '../../../../app/theme/app_theme.dart';
 import '../../../../app/widgets/remote_image.dart';
 import '../../../../core/config/purchase_config.dart';
+import '../../../../core/testing/e2e_keys.dart';
 import '../../../access/application/access_providers.dart';
 import '../../../access/data/popup_seen_store.dart';
 import '../../../access/domain/access_state.dart';
@@ -1299,6 +1300,7 @@ class _FeaturedRow extends ConsumerWidget {
               // is what lets two of them sit side by side without the
               // row turning into a wall of boxes.
               return GestureDetector(
+                key: E2eKeys.audioCard(audio.id),
                 onTap: () => onPlay(audio),
                 child: SizedBox(
                   width: 168,

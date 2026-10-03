@@ -106,6 +106,7 @@ class _BottomNav extends StatelessWidget {
                 onTap: () => _go(context, AppTab.courses),
               ),
               _NavItem(
+                key: E2eKeys.navDownloads,
                 icon: Icons.download_outlined,
                 activeIcon: Icons.download_rounded,
                 label: 'Downloads',

@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../../../app/theme/app_theme.dart';
 import '../../../../core/config/purchase_config.dart';
+import '../../../../core/testing/e2e_keys.dart';
 import '../../application/download_providers.dart';
 import '../../domain/entities/download_status.dart';
 import '../widgets/download_tile.dart';
@@ -66,6 +67,7 @@ class _DownloadsScreenState extends ConsumerState<DownloadsScreen> {
                     itemBuilder: (context, index) {
                       final task = tasks[index];
                       return DownloadTile(
+                        key: E2eKeys.downloadTile(task.contentId),
                         task: task,
                         onDelete: () async {
                           try {
