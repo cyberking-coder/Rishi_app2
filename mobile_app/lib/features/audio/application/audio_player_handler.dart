@@ -6,6 +6,8 @@ import 'package:just_audio/just_audio.dart';
 
 import '../domain/entities/audio_track.dart';
 import '../domain/repositories/audio_repository.dart';
+import '../../sync/data/pending_sync_store.dart';
+import '../../sync/domain/pending_sync.dart';
 
 const List<double> kAvailableAudioSpeeds = [0.75, 1.0, 1.25, 1.5, 1.75, 2.0];
 
@@ -16,6 +18,12 @@ const List<double> kAvailableAudioSpeeds = [0.75, 1.0, 1.25, 1.5, 1.75, 2.0];
 class AudioPlayerHandler extends BaseAudioHandler
     with QueueHandler, SeekHandler {
   final AudioRepository _repository;
+
+  /// Shared offline queue. When a progress save fails (offline), the latest
+  /// position is parked here and replayed when the app next comes online, so
+  /// an offline meditation's progress is not lost. Null in tests.
+  final PendingSyncStore? _syncStore;
+
   final AudioPlayer _player = AudioPlayer();
 
   List<AudioTrack> _tracks = [];
@@ -26,7 +34,8 @@ class AudioPlayerHandler extends BaseAudioHandler
   /// Null when no sleep timer is set; counts down while one is active.
   final ValueNotifier<Duration?> sleepTimerRemaining = ValueNotifier(null);
 
-  AudioPlayerHandler(this._repository) {
+  AudioPlayerHandler(this._repository, {PendingSyncStore? syncStore})
+      : _syncStore = syncStore {
     _player.playbackEventStream.listen(
       _broadcastState,
       onError: (Object e, StackTrace st) {
@@ -390,17 +399,28 @@ class AudioPlayerHandler extends BaseAudioHandler
     final track = currentTrack;
     if (track == null || !_player.duration.isPresent) return;
 
+    final progress = _player.position.inSeconds;
+    final duration = _player.duration?.inSeconds ?? 0;
     try {
       await _repository.updateListenProgress(
         audioId: track.id,
-        progressSeconds: _player.position.inSeconds,
-        durationSeconds: _player.duration?.inSeconds ?? 0,
+        progressSeconds: progress,
+        durationSeconds: duration,
         completed: completed,
       );
     } catch (e) {
-      // Network may be unavailable (offline playback). Progress save is
-      // best-effort — never block or crash playback over it.
-      debugPrint('_flushProgress: $e');
+      // Network unavailable (offline playback). Queue the latest position so
+      // it is replayed when the app comes back online, instead of being lost.
+      // The queue keeps only the newest position per track, so this is safe
+      // to call every tick. Never blocks or crashes playback.
+      debugPrint('_flushProgress (queued for sync): $e');
+      unawaited(_syncStore?.enqueueWatchProgress(WatchProgressEvent(
+            audioId: track.id,
+            progressSeconds: progress,
+            durationSeconds: duration,
+            completed: completed,
+          )) ??
+          Future<void>.value());
     }
   }
 

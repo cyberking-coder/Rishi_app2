@@ -25,6 +25,8 @@ import 'features/downloads/data/repositories/download_repository_impl.dart';
 import 'features/downloads/data/sources/download_source_resolver.dart';
 import 'features/downloads/data/storage/download_metadata_store.dart';
 import 'features/downloads/data/storage/secure_download_storage.dart';
+import 'features/sync/application/sync_providers.dart';
+import 'features/sync/data/pending_sync_store.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -107,13 +109,18 @@ Future<void> main() async {
   final audioRepository =
       AudioRepositoryImpl(AudioRemoteDataSource(Supabase.instance.client));
 
+  // One shared offline-action queue, used by the audio handler (to park
+  // progress saved offline) and by SyncService (to replay it when online).
+  final pendingSyncStore = PendingSyncStore();
+
   // Audio + downloads are optional at boot. If either fails to initialise
   // (e.g. missing native channel, storage permission), the app must still
   // reach the login screen rather than dying to a black screen.
   AudioPlayerHandler? audioHandler;
   try {
     audioHandler = await AudioService.init(
-      builder: () => AudioPlayerHandler(audioRepository),
+      builder: () =>
+          AudioPlayerHandler(audioRepository, syncStore: pendingSyncStore),
       config: const AudioServiceConfig(
         androidNotificationChannelId: AppConfig.audioChannelId,
         androidNotificationChannelName: AppConfig.audioChannelName,
@@ -124,7 +131,7 @@ Future<void> main() async {
     debugPrint('AudioService.init failed: $e\n$st');
     // Provide a plain handler so the app can still reach the login screen.
     // Background audio notification won't work but the UI will load.
-    audioHandler = AudioPlayerHandler(audioRepository);
+    audioHandler = AudioPlayerHandler(audioRepository, syncStore: pendingSyncStore);
   }
 
   final downloadRepository = DownloadRepositoryImpl(
@@ -150,6 +157,7 @@ Future<void> main() async {
       overrides: [
         audioHandlerProvider.overrideWithValue(audioHandler),
         downloadRepositoryProvider.overrideWithValue(downloadRepository),
+        pendingSyncStoreProvider.overrideWithValue(pendingSyncStore),
       ],
       child: const MeditationApp(),
     ),

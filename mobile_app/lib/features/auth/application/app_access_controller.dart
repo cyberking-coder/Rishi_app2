@@ -6,6 +6,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../../core/network/supabase_client_provider.dart';
 import '../../downloads/application/download_providers.dart';
+import '../../sync/application/sync_providers.dart';
 import '../data/offline_session_store.dart';
 import '../domain/entities/app_access_mode.dart';
 
@@ -115,9 +116,13 @@ class AppAccessController extends Notifier<AppAccessMode> {
     }
   }
 
-  /// Best-effort server reconciliation once online: drop downloads whose
-  /// license expired or was revoked server-side. Never throws into the UI.
+  /// Best-effort server reconciliation once online: flush offline progress to
+  /// the server, then drop downloads whose license expired or was revoked
+  /// server-side. Never throws into the UI.
   Future<void> _reconcileDownloads() async {
+    try {
+      await ref.read(syncServiceProvider).flush();
+    } catch (_) {/* retried on next online resolve */}
     try {
       await ref.read(downloadRepositoryProvider).purgeRevokedAndExpired();
     } catch (_) {

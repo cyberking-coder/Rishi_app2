@@ -10,6 +10,7 @@ import '../../audio/domain/entities/audio_track.dart';
 import '../application/lms_providers.dart';
 import '../domain/entities/lesson.dart';
 import '../../audio/presentation/utils/audio_navigation.dart';
+import '../../sync/application/sync_providers.dart';
 
 /// Opens a lesson — the single place that knows how each type is played.
 ///
@@ -56,9 +57,12 @@ Future<void> launchLesson(
       ref.invalidate(continueCourseProvider);
       onProgressChanged?.call();
     } catch (e) {
-      // A progress write failing is not worth an error over content that
-      // opened perfectly well.
-      debugPrint('markLessonCompleted: $e');
+      // The write failed (most often: offline). Queue it so the completion is
+      // replayed when connectivity returns, instead of being lost.
+      debugPrint('markLessonCompleted (queued for sync): $e');
+      unawaited(
+        ref.read(pendingSyncStoreProvider).enqueueLessonCompleted(lesson.id),
+      );
     }
   }
 
