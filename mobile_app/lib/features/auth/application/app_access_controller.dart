@@ -59,11 +59,12 @@ class AppAccessController extends Notifier<AppAccessMode> {
       state = AppAccessMode.signedOut;
       return;
     }
-    final session = data.session ?? _client.auth.currentSession;
-    if (session != null) {
-      await _store.markVerified(userId: session.user.id);
-      state = AppAccessMode.authenticatedOnline;
-    }
+    // Any other event (initialSession on cold start, signedIn, tokenRefreshed,
+    // userUpdated): re-resolve rather than force online. supabase_flutter
+    // fires initialSession with the CACHED session even in airplane mode, and
+    // blindly going online there is exactly what stopped the Offline Hub from
+    // showing. resolve() weighs connectivity and picks online/offline/signed-out.
+    await resolve();
   }
 
   /// Resolves the mode at startup (and can be re-run on connectivity return).
