@@ -7,6 +7,7 @@ import '../../../../core/testing/e2e_keys.dart';
 import '../../../downloads/domain/entities/download_content_type.dart';
 import '../../../downloads/presentation/widgets/download_button.dart';
 import '../../application/audio_providers.dart';
+import '../../../favorites/application/favorites_providers.dart';
 import '../widgets/sleep_timer_sheet.dart';
 import '../widgets/speed_selector_sheet.dart';
 import '../../../../app/widgets/remote_image.dart';
@@ -459,6 +460,8 @@ class _ToolRowState extends State<_ToolRow> {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceAround,
         children: [
+          // Favourite — hearts this audio so it joins the Favourites playlist.
+          _FavoriteTool(audioId: widget.media.id),
           // Download — reuses existing DownloadButton widget, wrapped to match style
           _DownloadTool(
             contentId: widget.media.id,
@@ -526,6 +529,25 @@ class _ToolButton extends StatelessWidget {
           if (trailing != null) trailing!,
         ],
       ),
+    );
+  }
+}
+
+/// Heart toggle. Adds/removes this audio from the user's Favourites, with the
+/// filled state driven by [favoriteIdsProvider] so it reflects reality
+/// everywhere (and flips instantly on tap).
+class _FavoriteTool extends ConsumerWidget {
+  final String audioId;
+  const _FavoriteTool({required this.audioId});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final isFav =
+        ref.watch(favoriteIdsProvider).valueOrNull?.contains(audioId) ?? false;
+    return _ToolButton(
+      icon: isFav ? Icons.favorite : Icons.favorite_border,
+      label: 'Favourite',
+      onTap: () => ref.read(favoriteIdsProvider.notifier).toggle(audioId),
     );
   }
 }

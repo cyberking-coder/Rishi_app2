@@ -11,12 +11,13 @@ import '../../core/push/push_registration.dart';
 /// One of the app's four top-level destinations. Courses is a peer of
 /// Home rather than a row buried inside it — learning is its own mode of
 /// using the app, not a shelf on the listening screen.
-enum AppTab { home, courses, downloads, profile }
+enum AppTab { home, courses, downloads, favorites, profile }
 
 const _tabRoutes = {
   AppTab.home: '/home',
   AppTab.courses: '/courses',
   AppTab.downloads: '/downloads',
+  AppTab.favorites: '/favourites',
   AppTab.profile: '/profile',
 };
 
@@ -112,6 +113,13 @@ class _BottomNav extends StatelessWidget {
                 label: 'Downloads',
                 selected: current == AppTab.downloads,
                 onTap: () => _go(context, AppTab.downloads),
+              ),
+              _NavItem(
+                icon: Icons.favorite_border_rounded,
+                activeIcon: Icons.favorite_rounded,
+                label: 'Favourites',
+                selected: current == AppTab.favorites,
+                onTap: () => _go(context, AppTab.favorites),
               ),
               _NavItem(
                 key: E2eKeys.navProfile,

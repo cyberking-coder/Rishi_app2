@@ -13,6 +13,7 @@ import '../../core/config/purchase_config.dart';
 import '../../features/chat/presentation/screens/chat_screen.dart';
 import '../../features/downloads/presentation/screens/downloads_screen.dart';
 import '../../features/downloads/presentation/screens/offline_hub_screen.dart';
+import '../../features/favorites/presentation/screens/favorites_screen.dart';
 import '../../features/home/presentation/screens/home_screen.dart';
 import '../../features/home/presentation/screens/browse_screen.dart';
 import '../../features/lms/domain/entities/lesson.dart';
@@ -131,6 +132,12 @@ final goRouterProvider = Provider<GoRouter>((ref) {
       ),
       // Landing screen while in authenticatedOffline mode (see the redirect).
       GoRoute(path: '/offline', builder: (_, __) => const OfflineHubScreen()),
+      GoRoute(
+        path: '/favourites',
+        pageBuilder: (_, __) => const NoTransitionPage(
+          child: AppShell(tab: AppTab.favorites, child: FavoritesScreen()),
+        ),
+      ),
       GoRoute(
         path: '/profile',
         pageBuilder: (_, __) => const NoTransitionPage(

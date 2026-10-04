@@ -213,12 +213,21 @@ class AudioPlayerHandler extends BaseAudioHandler
           ? _tracks[_currentIndex]
           : null;
 
+  /// When true, the queue wraps: finishing the last track starts the first
+  /// again, so a playlist plays forever until the user stops it. Used by the
+  /// Favourites "Play all".
+  bool _loopAll = false;
+
   /// Loads a queue of tracks (a playlist, or a single track for "play
   /// now" / continue-listening) and starts playback at [startIndex].
+  ///
+  /// [loopAll] makes the WHOLE queue repeat (one track after another, then
+  /// back to the first) rather than stopping at the end.
   Future<void> loadPlaylist(
     List<AudioTrack> tracks, {
     int startIndex = 0,
     Duration? resumeAt,
+    bool loopAll = false,
   }) async {
     if (_loading) return; // ignore re-entrant taps while a load is in flight
 
@@ -233,6 +242,10 @@ class AudioPlayerHandler extends BaseAudioHandler
 
     _loading = true;
     try {
+      _loopAll = loopAll;
+      // Per-track loop (LoopMode.one) is a separate user toggle; queue looping
+      // is handled by _playIndex wrapping, so keep the player's own loop off.
+      await _player.setLoopMode(LoopMode.off);
       // Flush the OUTGOING track's progress BEFORE swapping _tracks — otherwise
       // _flushProgress would save the old player position under the NEW track's
       // id, causing the new track to wrongly resume at that point.
@@ -251,8 +264,14 @@ class AudioPlayerHandler extends BaseAudioHandler
     bool flush = true,
   }) async {
     if (index < 0 || index >= _tracks.length) {
-      await stop();
-      return;
+      // Wrap the whole queue when looping a playlist (last -> first, and a
+      // "previous" from the first -> last); otherwise the queue is over.
+      if (_loopAll && _tracks.isNotEmpty) {
+        index = index < 0 ? _tracks.length - 1 : 0;
+      } else {
+        await stop();
+        return;
+      }
     }
 
     if (flush) await _flushProgress();
@@ -394,6 +413,7 @@ class AudioPlayerHandler extends BaseAudioHandler
   Future<void> stop() async {
     _stopped = true;
     _resumeAfterInterruption = false;
+    _loopAll = false;
     _progressTimer?.cancel();
     _sleepTimer?.cancel();
     await _flushProgress();
@@ -418,6 +438,7 @@ class AudioPlayerHandler extends BaseAudioHandler
       _loading = false;
       _recovering = false;
       _resumeAfterInterruption = false;
+      _loopAll = false;
       await _player.stop();
       await _player.setLoopMode(LoopMode.off);
       mediaItem.add(null);
