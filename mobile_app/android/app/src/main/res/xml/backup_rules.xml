@@ -10,11 +10,18 @@
 <full-backup-content>
     <exclude domain="sharedpref" path="FlutterSecureStorage.xml"/>
     <!--
-      The app-owned login flag (LoginFlagStore, a plain file in the app
-      support dir). It must NOT be restored to a fresh install: the session it
-      stands for lives in FlutterSecureStorage, which is excluded above and
-      cannot be restored, so a restored flag made the app think it was logged
-      in with no session (no login screen, nothing plays, Profile empty).
+      The Supabase auth session lives in plain SharedPreferences
+      (FlutterSharedPreferences.xml), NOT in flutter_secure_storage. If Auto
+      Backup restores it to a fresh install, the app comes back "logged in"
+      with a stale session and no registered device — no login screen, Profile
+      says "Not logged in", and playback fails. A reinstall must restore NO
+      identity, so the whole prefs file is excluded (other prefs like theme
+      simply re-default, which is harmless).
+    -->
+    <exclude domain="sharedpref" path="FlutterSharedPreferences.xml"/>
+    <!--
+      The app-owned login flag (legacy LoginFlagStore, a plain file). Same
+      reasoning — must not be restored to a fresh install.
     -->
     <exclude domain="file" path="login_flag"/>
 </full-backup-content>
