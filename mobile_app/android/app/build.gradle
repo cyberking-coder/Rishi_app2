@@ -79,7 +79,11 @@ android {
         minSdkVersion = flutter.minSdkVersion
         targetSdk = 36
         versionCode = flutterVersionCode.toInteger()
-        versionName = flutterVersionName
+        // Play Store version name is pinned to 3.0.0 here, independent of the
+        // Flutter/pubspec version (2.2.9) that iOS uses — the two stores carry
+        // different marketing versions. versionCode still comes from the build
+        // number (Codemagic's counter), so uploads keep incrementing.
+        versionName = "3.0.0"
         multiDexEnabled true
     }
 
