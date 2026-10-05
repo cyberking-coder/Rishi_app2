@@ -1,3 +1,5 @@
+import 'dart:io' show Platform;
+
 /// App-wide configuration.
 ///
 /// Replace the two placeholder values below with your Supabase project
@@ -18,19 +20,18 @@ class AppConfig {
   /// The version a support ticket reports.
   ///
   /// ───────────────────────────────────────────────────────────────────
-  ///  KEEP IN SYNC WITH the `version:` line in pubspec.yaml
+  ///  KEEP IN SYNC WITH the store version for each platform.
   /// ───────────────────────────────────────────────────────────────────
-  ///  A constant rather than package_info_plus, which would be a new
-  /// dependency, a plugin channel and an async call on a screen that has
-  /// no other reason to be async — all to read a number that is already
-  /// written down in this repository.
+  ///  The two stores carry DIFFERENT marketing versions: Play Store is
+  /// 3.0.0 (pinned in android/app/build.gradle), the App Store is 2.2.9
+  /// (the pubspec version iOS uses). So this is per-platform rather than a
+  /// single const, so a support ticket reports the version the user
+  /// actually sees in their store.
   ///
-  /// It is the marketing version only, not the build number: Codemagic
+  ///  Still the marketing version only, not the build number: Codemagic
   /// overrides the build number with its own counter, so a build number
-  /// compiled in here would be wrong on every CI build. If a ticket needs
-  /// to be pinned to an exact build, the OS version and device in the
-  /// same payload plus the ticket's timestamp will narrow it.
-  static const appVersion = '2.2.9';
+  /// compiled in here would be wrong on every CI build.
+  static String get appVersion => Platform.isAndroid ? '3.0.0' : '2.2.9';
 
   static const audioChannelId = 'com.knowthyself.app.audio.channel';
   static const audioChannelName = 'Meditation Audio';
