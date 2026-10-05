@@ -7,7 +7,6 @@ import 'package:firebase_crashlytics/firebase_crashlytics.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_cache_manager/flutter_cache_manager.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'app/router/app_router.dart';
@@ -16,7 +15,6 @@ import 'features/profile/application/profile_providers.dart';
 import 'core/config/app_config.dart';
 import 'core/push/push_service.dart';
 import 'features/auth/application/app_access_controller.dart';
-import 'features/auth/data/offline_session_store.dart';
 import 'features/audio/application/audio_player_handler.dart';
 import 'features/audio/application/audio_providers.dart';
 import 'features/audio/data/datasources/audio_remote_datasource.dart';
@@ -88,34 +86,14 @@ Future<void> main() async {
     anonKey: AppConfig.supabaseAnonKey,
   );
 
-  // ── Fresh-install guard ────────────────────────────────────────────────
-  // Supabase keeps its session in plain SharedPreferences, which Android Auto
-  // Backup can restore to a brand-new install — bringing back a stale session
-  // with no registered device, so the app opened "logged in" but broken (no
-  // login screen, Profile "Not logged in", playback failing). Backup rules now
-  // exclude that file, but an OLDER cloud backup may still carry it.
-  //
-  // This marker is the reliable signal: it lives in flutter_secure_storage,
-  // which is NOT backed up, so it never survives a reinstall. If it is absent,
-  // this is a fresh install — wipe any restored session/identity so the user
-  // logs in cleanly (which registers the device). Best-effort; a keystore
-  // hiccup just falls back to the backup-rule behaviour.
-  try {
-    const marker = FlutterSecureStorage(
-      aOptions: AndroidOptions(encryptedSharedPreferences: true),
-    );
-    const markerKey = 'install_initialized_v1';
-    final seen = await marker.read(key: markerKey);
-    if (seen == null) {
-      await Supabase.instance.client.auth
-          .signOut(scope: SignOutScope.local)
-          .catchError((_) {});
-      await OfflineSessionStore().clear();
-      await marker.write(key: markerKey, value: '1');
-    }
-  } catch (e) {
-    debugPrint('Fresh-install guard skipped: $e');
-  }
+  // NOTE on reinstall vs update: a reinstall/new install must show login; an
+  // update must keep the user signed in. That split is handled by
+  // android:allowBackup="false" (a reinstall restores NO data, so there is no
+  // session to resume -> login), while an update preserves the session on
+  // device as normal. There is deliberately NO "wipe on first run" step here:
+  // it could not tell a genuine fresh install from an update off an older
+  // build (both lack any new marker), so it logged updating users out and
+  // tripped the one-device "reset device" lock.
 
   // Push is optional at boot for the same reason audio and downloads are:
   // it can fail (no google-services.json, no Play Services) and the app
