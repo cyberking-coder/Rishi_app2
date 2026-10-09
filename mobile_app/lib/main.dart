@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:io' show HandshakeException, HttpException, SocketException;
 
 import 'package:audio_service/audio_service.dart';
 import 'package:firebase_core/firebase_core.dart';
@@ -13,6 +12,7 @@ import 'app/router/app_router.dart';
 import 'app/theme/app_theme.dart';
 import 'features/profile/application/profile_providers.dart';
 import 'core/config/app_config.dart';
+import 'core/errors/error_classification.dart';
 import 'core/push/push_service.dart';
 import 'features/auth/application/app_access_controller.dart';
 import 'features/audio/application/audio_player_handler.dart';
@@ -47,12 +47,8 @@ Future<void> main() async {
       // errorBuilder already handled it and the app kept running. Recording
       // those as FATAL inflates the crash rate and buries real crashes. Log
       // image/network errors as NON-fatal; everything else stays fatal.
-      final e = details.exception;
       final nonFatal = details.library == 'image resource service' ||
-          e is SocketException ||
-          e is HttpException ||
-          e is HandshakeException ||
-          e is TimeoutException;
+          isNonFatalError(details.exception);
       if (nonFatal) {
         FirebaseCrashlytics.instance.recordFlutterError(details);
       } else {
@@ -60,15 +56,13 @@ Future<void> main() async {
       }
     };
     // Uncaught async (non-Flutter) errors — e.g. a failed Future during
-    // startup — which FlutterError.onError does not see.
+    // startup, or Supabase's background token-refresh timer failing a DNS
+    // lookup while offline — which FlutterError.onError does not see.
     WidgetsBinding.instance.platformDispatcher.onError = (error, stack) {
-      // Same reasoning: a bare network/IO failure that bubbles up here is not
-      // an app crash. Record it, but not as fatal.
-      final fatal = !(error is SocketException ||
-          error is HttpException ||
-          error is HandshakeException ||
-          error is TimeoutException);
-      FirebaseCrashlytics.instance.recordError(error, stack, fatal: fatal);
+      // Same reasoning: a network/IO failure that bubbles up here is not an
+      // app crash. Record it, but not as fatal.
+      FirebaseCrashlytics.instance
+          .recordError(error, stack, fatal: !isNonFatalError(error));
       return true;
     };
   } catch (e) {
