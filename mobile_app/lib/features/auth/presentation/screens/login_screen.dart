@@ -99,18 +99,15 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
               ),
             ),
             const SizedBox(height: 18),
-            // Above the form on purpose, so the one-device-per-account lock is
-            // read as a rule up front rather than discovered as a failure at
-            // login. It used to sit below the sign-up link, off the bottom of
-            // the screen, where it had to be scrolled to.
-            const AuthInfoCard(
-              icon: Icons.phonelink_lock_outlined,
-              title: 'One account. One device.',
-              body: 'One account can be used on one device only. Logging in '
-                  'on a new device will not work until the previous one is '
-                  'released.',
-            ),
-            const SizedBox(height: 22),
+            // Social sign-in first, above the email/password form.
+            GoogleSignInButton(enabled: !isLoading),
+            if (AppleSignInButton.isSupported) ...[
+              const SizedBox(height: 12),
+              AppleSignInButton(enabled: !isLoading),
+            ],
+            const SizedBox(height: 20),
+            const AuthDivider(),
+            const SizedBox(height: 20),
             AuthTextField(
               fieldKey: E2eKeys.loginEmail,
               controller: _emailController,
@@ -150,13 +147,16 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
               onPressed: isLoading ? null : _submit,
             ),
             const SizedBox(height: 20),
-            const AuthDivider(),
-            const SizedBox(height: 20),
-            GoogleSignInButton(enabled: !isLoading),
-            if (AppleSignInButton.isSupported) ...[
-              const SizedBox(height: 12),
-              AppleSignInButton(enabled: !isLoading),
-            ],
+            // One-device lock note, moved below the form now that social
+            // sign-in leads — still a rule the user reads before the sign-up
+            // link, just further down the screen.
+            const AuthInfoCard(
+              icon: Icons.phonelink_lock_outlined,
+              title: 'One account. One device.',
+              body: 'One account can be used on one device only. Logging in '
+                  'on a new device will not work until the previous one is '
+                  'released.',
+            ),
             const SizedBox(height: 18),
             Center(
               child: TextButton(
