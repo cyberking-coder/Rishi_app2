@@ -755,3 +755,166 @@ export async function grantCourseAccess(
   revalidatePath(`/courses/${courseId}`);
   return { ok: true };
 }
+
+/** Outcome of a bulk grant: how many were newly granted, how many already
+ *  had access, and the addresses with no account (so the admin can see who
+ *  still needs to sign up). */
+export interface BulkGrantResult {
+  ok: true;
+  total: number;
+  granted: number;
+  alreadyHad: number;
+  notFound: string[];
+}
+
+/**
+ * Grants course access to many accounts at once from a pasted/uploaded CSV
+ * of email addresses.
+ *
+ * Same semantics as [grantCourseAccess] applied in bulk: each email is
+ * resolved to an existing account, and that account gets a paid, ₹0
+ * `course_purchases` row (a revoked row is promoted rather than duplicated,
+ * so the unique-paid index is never violated). Addresses with no account are
+ * skipped and reported back — access is granted to an account, not to an
+ * address.
+ *
+ * Built for throughput: the user list is fetched once (not per email) and
+ * the purchase rows are read/written in chunks, so a few hundred emails is a
+ * handful of round trips rather than one per row.
+ */
+export async function grantCourseAccessBulk(
+  csvText: string,
+  courseId: string,
+): Promise<BulkGrantResult | { ok: false; error: string }> {
+  await requireAdmin();
+  const db = createAdminClient();
+
+  if (!courseId) return { ok: false, error: "No course selected." };
+
+  // Pull every email-shaped token out of the file, regardless of how the CSV
+  // is laid out (header row, extra columns, quotes, commas or newlines).
+  // Lower-cased and de-duplicated.
+  const emails = Array.from(
+    new Set(
+      (csvText.match(/[^\s,;"']+@[^\s,;"']+\.[^\s,;"']+/g) ?? []).map((e) =>
+        e.trim().toLowerCase(),
+      ),
+    ),
+  );
+  if (emails.length === 0) {
+    return { ok: false, error: "No email addresses found in the file." };
+  }
+  if (emails.length > 5000) {
+    return {
+      ok: false,
+      error: "Too many emails in one upload (limit 5000). Split the file.",
+    };
+  }
+
+  // Build a lower-cased email -> user id map by paging through all accounts
+  // once. auth.users is not reachable via PostgREST and there is no
+  // lookup-by-email admin endpoint, so this mirrors grantCourseAccess.
+  const emailToId = new Map<string, string>();
+  for (let page = 1; page <= 50; page++) {
+    const { data: list, error } = await db.auth.admin.listUsers({
+      page,
+      perPage: 1000,
+    });
+    if (error) return { ok: false, error: error.message };
+    const users = list?.users ?? [];
+    for (const u of users) {
+      if (u.email) emailToId.set(u.email.toLowerCase(), u.id);
+    }
+    if (users.length < 1000) break; // last page
+  }
+
+  const notFound: string[] = [];
+  const targetIds: string[] = [];
+  for (const email of emails) {
+    const id = emailToId.get(email);
+    if (id) {
+      targetIds.push(id);
+    } else {
+      notFound.push(email);
+    }
+  }
+
+  // Read the existing purchase rows for just these users, in chunks (the
+  // `in` filter and later writes are bounded so a big list can't build one
+  // oversized request).
+  const chunk = <T>(arr: T[], n: number): T[][] => {
+    const out: T[][] = [];
+    for (let i = 0; i < arr.length; i += n) out.push(arr.slice(i, i + n));
+    return out;
+  };
+
+  const paid = new Set<string>(); // user ids already enrolled
+  const revokedRowByUser = new Map<string, string>(); // user id -> row id to promote
+
+  for (const ids of chunk(targetIds, 300)) {
+    const { data, error } = await db
+      .from("course_purchases")
+      .select("id, user_id, status")
+      .eq("course_id", courseId)
+      .in("status", ["paid", "revoked"])
+      .in("user_id", ids)
+      .returns<{ id: string; user_id: string; status: string }[]>();
+    if (error) return { ok: false, error: error.message };
+    for (const row of data ?? []) {
+      if (row.status === "paid") {
+        paid.add(row.user_id);
+      } else if (!revokedRowByUser.has(row.user_id)) {
+        revokedRowByUser.set(row.user_id, row.id);
+      }
+    }
+  }
+
+  const toPromote: string[] = []; // revoked row ids -> set to paid
+  const toInsert: string[] = []; // user ids -> new paid row
+  let alreadyHad = 0;
+  // targetIds is already unique (emails were de-duplicated and map 1:1 to an
+  // account), so a plain array walk is safe and avoids Set iteration.
+  for (const id of targetIds) {
+    if (paid.has(id)) {
+      alreadyHad++;
+    } else if (revokedRowByUser.has(id)) {
+      toPromote.push(revokedRowByUser.get(id)!);
+    } else {
+      toInsert.push(id);
+    }
+  }
+
+  // Promote revoked rows back to paid.
+  const now = new Date().toISOString();
+  for (const rowIds of chunk(toPromote, 300)) {
+    const { error } = await db
+      .from("course_purchases")
+      .update({ status: "paid", updated_at: now })
+      .in("id", rowIds);
+    if (error) return { ok: false, error: error.message };
+  }
+
+  // Insert new ₹0 paid rows for accounts that never had one.
+  for (const ids of chunk(toInsert, 300)) {
+    const { error } = await db.from("course_purchases").insert(
+      ids.map((user_id) => ({
+        user_id,
+        course_id: courseId,
+        amount: 0,
+        currency: "INR",
+        status: "paid",
+      })),
+    );
+    if (error) return { ok: false, error: error.message };
+  }
+
+  revalidatePath(`/courses/${courseId}`);
+  revalidatePath("/courses");
+  return {
+    ok: true,
+    total: emails.length,
+    granted: toPromote.length + toInsert.length,
+    alreadyHad,
+    notFound,
+  };
+}

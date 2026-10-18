@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -14,10 +14,11 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { grantCourseAccess } from "@/app/actions/courses";
+import { grantCourseAccess, grantCourseAccessBulk } from "@/app/actions/courses";
 
 /**
- * Lets somebody into this course without a payment.
+ * Lets people into this course without a payment — one at a time by email,
+ * or many at once by uploading a CSV of email addresses.
  *
  * Asks for an email rather than offering a list of users: the roster is
  * per-course and the whole user table is not, so a picker here would be
@@ -29,6 +30,11 @@ export function GrantAccessDialog({ courseId }: { courseId: string }) {
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const [email, setEmail] = useState("");
+
+  // Bulk CSV
+  const fileRef = useRef<HTMLInputElement>(null);
+  const [bulkBusy, setBulkBusy] = useState(false);
+  const [notFound, setNotFound] = useState<string[]>([]);
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -42,6 +48,28 @@ export function GrantAccessDialog({ courseId }: { courseId: string }) {
       router.refresh();
     } finally {
       setBusy(false);
+    }
+  }
+
+  async function submitBulk() {
+    const file = fileRef.current?.files?.[0];
+    if (!file) return toast.error("Choose a CSV file first.");
+    setBulkBusy(true);
+    setNotFound([]);
+    try {
+      const text = await file.text();
+      const result = await grantCourseAccessBulk(text, courseId);
+      if (!result.ok) return toast.error(result.error);
+
+      const parts = [`${result.granted} granted`];
+      if (result.alreadyHad > 0) parts.push(`${result.alreadyHad} already had access`);
+      if (result.notFound.length > 0) parts.push(`${result.notFound.length} without an account`);
+      toast.success(`${result.total} emails: ${parts.join(", ")}.`);
+      setNotFound(result.notFound);
+      if (fileRef.current) fileRef.current.value = "";
+      router.refresh();
+    } finally {
+      setBulkBusy(false);
     }
   }
 
@@ -63,7 +91,6 @@ export function GrantAccessDialog({ courseId }: { courseId: string }) {
             <Input
               id="grant-email"
               type="email"
-              required
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               placeholder="person@example.com"
@@ -82,15 +109,54 @@ export function GrantAccessDialog({ courseId }: { courseId: string }) {
               type="button"
               variant="ghost"
               onClick={() => setOpen(false)}
-              disabled={busy}
+              disabled={busy || bulkBusy}
             >
               Cancel
             </Button>
-            <Button type="submit" disabled={busy}>
+            <Button type="submit" disabled={busy || bulkBusy || !email.trim()}>
               {busy ? "Granting…" : "Grant access"}
             </Button>
           </DialogFooter>
         </form>
+
+        {/* ── Bulk upload ─────────────────────────────────────────────── */}
+        <div className="mt-2 border-t pt-4 space-y-2">
+          <Label htmlFor="grant-csv">Grant to many (CSV)</Label>
+          <p className="text-xs text-muted-foreground">
+            Upload a CSV containing the users&apos; email addresses (a plain
+            list, or a column of emails — other columns and a header row are
+            ignored). Everyone with an account is enrolled at once; addresses
+            with no account are skipped and listed below.
+          </p>
+          <div className="flex items-center gap-2">
+            <Input
+              id="grant-csv"
+              ref={fileRef}
+              type="file"
+              accept=".csv,text/csv,text/plain"
+              disabled={bulkBusy || busy}
+              className="text-sm"
+            />
+            <Button
+              type="button"
+              variant="secondary"
+              onClick={submitBulk}
+              disabled={bulkBusy || busy}
+            >
+              {bulkBusy ? "Granting…" : "Grant to all"}
+            </Button>
+          </div>
+
+          {notFound.length > 0 && (
+            <div className="rounded-md border border-amber-300 bg-amber-50 p-2 text-xs text-amber-900">
+              <p className="font-medium">
+                {notFound.length} address{notFound.length === 1 ? "" : "es"} had
+                no account and were skipped:
+              </p>
+              <p className="mt-1 break-words">{notFound.join(", ")}</p>
+            </div>
+          )}
+        </div>
       </DialogContent>
     </Dialog>
   );
