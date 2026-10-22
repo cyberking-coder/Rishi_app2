@@ -145,7 +145,21 @@ class _CourseDetailScreenState extends ConsumerState<CourseDetailScreen>
           // Lessons are numbered 1..n across the whole course rather than
           // restarting inside each module, matching how a learner counts
           // their way through a programme.
-          var lessonNumber = 0;
+          //
+          // Computed up front into a map keyed by lesson id, NOT with a
+          // counter incremented inside the lazy sliver itemBuilder below.
+          // That builder runs on demand and more than once as the list
+          // scrolls and rebuilds, so a `++` there handed out numbers that
+          // jumped around (…4, 9, 5, 10…) instead of a clean 1..n.
+          final lessonNumbers = <String, int>{};
+          {
+            var n = 0;
+            for (final module in detail.modules) {
+              for (final lesson in module.lessons) {
+                lessonNumbers[lesson.id] = ++n;
+              }
+            }
+          }
 
           return CustomScrollView(
             slivers: [
@@ -229,12 +243,11 @@ class _CourseDetailScreenState extends ConsumerState<CourseDetailScreen>
                   separatorBuilder: (_, __) => const SizedBox(height: 10),
                   itemBuilder: (_, i) {
                     final lesson = module.lessons[i];
-                    lessonNumber++;
                     return Padding(
                         padding: const EdgeInsets.symmetric(horizontal: 20),
                         child: _LessonTile(
                           key: E2eKeys.lessonTile(lesson.id),
-                          number: lessonNumber,
+                          number: lessonNumbers[lesson.id] ?? (i + 1),
                           lesson: lesson,
                           locked: locked,
                           onTap: () => _openLesson(lesson, locked),
@@ -522,6 +535,19 @@ class _LessonTile extends StatelessWidget {
     }
   }
 
+  /// The title without any number an author typed at the front. The app
+  /// supplies the lesson number itself, so a title like "2. Visualization"
+  /// would otherwise read "5. 2. Visualization". Strips a leading "2.",
+  /// "2)", "2-" or "2:" only; a trailing number that is part of the name
+  /// ("Awaken Day 2", "Visualization 2") is left alone. Falls back to the
+  /// original if stripping would leave nothing.
+  String get _displayTitle {
+    final stripped = lesson.title
+        .replaceFirst(RegExp(r'^\s*\d+\s*[.):\-]\s*'), '')
+        .trim();
+    return stripped.isEmpty ? lesson.title : stripped;
+  }
+
   /// "Not started · 14 min" — state first, then the fact about it.
   ///
   /// The state used to live only in the leading badge, as one of three
@@ -587,7 +613,7 @@ class _LessonTile extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      '$number. ${lesson.title}',
+                      '$number. $_displayTitle',
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                       style: TextStyle(
