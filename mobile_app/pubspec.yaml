@@ -323,6 +323,7 @@ dependencies:
   url_launcher: ^6.3.0
   video_player: ^2.9.1
   chewie: ^1.8.5
+  wakelock_plus: ^1.2.8
   open_filex: ^4.5.0
   share_plus: ^10.0.2
   firebase_core: ^3.6.0

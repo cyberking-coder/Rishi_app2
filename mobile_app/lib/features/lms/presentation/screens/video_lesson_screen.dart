@@ -4,6 +4,7 @@ import 'package:flutter/services.dart' show PlatformException;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart' show FunctionException;
 import 'package:video_player/video_player.dart';
+import 'package:wakelock_plus/wakelock_plus.dart';
 
 import '../../../../app/theme/app_theme.dart';
 import '../../application/lms_providers.dart';
@@ -52,6 +53,8 @@ class _VideoLessonScreenState extends ConsumerState<VideoLessonScreen> {
         controller.dispose();
         return;
       }
+
+      controller.addListener(_syncWakelock);
 
       setState(() {
         _played = true;
@@ -106,6 +109,20 @@ class _VideoLessonScreenState extends ConsumerState<VideoLessonScreen> {
     return null;
   }
 
+  /// Keeps the screen awake while the lesson is actually playing, and
+  /// lets it sleep the moment it pauses or ends.
+  ///
+  /// Without this the phone's display timeout (often 15–30s) blacks the
+  /// screen out mid-lesson because nothing is touching it — the video
+  /// keeps running underneath, so a tap only wakes the display and makes
+  /// it look like playback had stopped. Driven off the controller's own
+  /// play/pause state rather than held for the whole screen so a paused
+  /// lesson left open doesn't burn battery.
+  void _syncWakelock() {
+    final playing = _controller?.value.isPlaying ?? false;
+    WakelockPlus.toggle(enable: playing);
+  }
+
   ChewieController _buildChewie(
     VideoPlayerController controller, {
     required bool autoPlay,
@@ -153,6 +170,8 @@ class _VideoLessonScreenState extends ConsumerState<VideoLessonScreen> {
         return;
       }
 
+      controller.addListener(_syncWakelock);
+
       setState(() {
         _quality = quality;
         _controller = controller;
@@ -160,6 +179,7 @@ class _VideoLessonScreenState extends ConsumerState<VideoLessonScreen> {
         _switchingQuality = false;
       });
 
+      previous?.removeListener(_syncWakelock);
       previousChewie?.dispose();
       previous?.dispose();
     } catch (e) {
@@ -223,6 +243,10 @@ class _VideoLessonScreenState extends ConsumerState<VideoLessonScreen> {
 
   @override
   void dispose() {
+    // Release the screen-awake lock when leaving — the lesson is no
+    // longer on screen, so the phone's display timeout should resume.
+    _controller?.removeListener(_syncWakelock);
+    WakelockPlus.disable();
     // Chewie must go first: it holds a reference to the video controller
     // and will touch it during its own teardown.
     _chewie?.dispose();
