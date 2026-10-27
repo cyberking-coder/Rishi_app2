@@ -142,22 +142,22 @@ class _CourseDetailScreenState extends ConsumerState<CourseDetailScreen>
           final locked = detail.course.isLocked;
           final next = detail.nextLesson;
 
-          // Lessons are numbered 1..n across the whole course rather than
-          // restarting inside each module, matching how a learner counts
-          // their way through a programme.
+          // Lessons are numbered <module>.<lesson> — 1.1, 1.2, 1.3, then
+          // 2.1, 2.2 and so on — so the number says which module a lesson
+          // belongs to and where it sits inside it. Both parts are 1-based.
           //
           // Computed up front into a map keyed by lesson id, NOT with a
           // counter incremented inside the lazy sliver itemBuilder below.
           // That builder runs on demand and more than once as the list
-          // scrolls and rebuilds, so a `++` there handed out numbers that
-          // jumped around (…4, 9, 5, 10…) instead of a clean 1..n.
-          final lessonNumbers = <String, int>{};
-          {
-            var n = 0;
-            for (final module in detail.modules) {
-              for (final lesson in module.lessons) {
-                lessonNumbers[lesson.id] = ++n;
-              }
+          // scrolls and rebuilds, so mutating a counter there handed out
+          // unstable numbers that jumped around. Deriving each label from
+          // the module/lesson position means a newly added lesson always
+          // slots into the scheme automatically.
+          final lessonLabels = <String, String>{};
+          for (var m = 0; m < detail.modules.length; m++) {
+            final lessons = detail.modules[m].lessons;
+            for (var l = 0; l < lessons.length; l++) {
+              lessonLabels[lessons[l].id] = '${m + 1}.${l + 1}';
             }
           }
 
@@ -247,7 +247,7 @@ class _CourseDetailScreenState extends ConsumerState<CourseDetailScreen>
                         padding: const EdgeInsets.symmetric(horizontal: 20),
                         child: _LessonTile(
                           key: E2eKeys.lessonTile(lesson.id),
-                          number: lessonNumbers[lesson.id] ?? (i + 1),
+                          label: lessonLabels[lesson.id] ?? '${i + 1}',
                           lesson: lesson,
                           locked: locked,
                           onTap: () => _openLesson(lesson, locked),
@@ -511,14 +511,14 @@ class _MetaCard extends StatelessWidget {
 // ── Lesson row ───────────────────────────────────────────────────────
 
 class _LessonTile extends StatelessWidget {
-  final int number;
+  final String label;
   final Lesson lesson;
   final bool locked;
   final VoidCallback onTap;
 
   const _LessonTile({
     super.key,
-    required this.number,
+    required this.label,
     required this.lesson,
     required this.locked,
     required this.onTap,
@@ -536,14 +536,14 @@ class _LessonTile extends StatelessWidget {
   }
 
   /// The title without any number an author typed at the front. The app
-  /// supplies the lesson number itself, so a title like "2. Visualization"
-  /// would otherwise read "5. 2. Visualization". Strips a leading "2.",
-  /// "2)", "2-" or "2:" only; a trailing number that is part of the name
-  /// ("Awaken Day 2", "Visualization 2") is left alone. Falls back to the
-  /// original if stripping would leave nothing.
+  /// supplies the lesson number itself, so a title like "1. Visualization"
+  /// would otherwise read "1.1  1. Visualization". Strips a leading "1.",
+  /// "1)", "1-", "1:" or "1.1 " only; a trailing number that is part of the
+  /// name ("Awaken Day 2", "Visualization 2") is left alone. Falls back to
+  /// the original if stripping would leave nothing.
   String get _displayTitle {
     final stripped = lesson.title
-        .replaceFirst(RegExp(r'^\s*\d+\s*[.):\-]\s*'), '')
+        .replaceFirst(RegExp(r'^\s*\d+(\.\d+\s+|\s*[.):\-]\s*)'), '')
         .trim();
     return stripped.isEmpty ? lesson.title : stripped;
   }
@@ -613,7 +613,7 @@ class _LessonTile extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      '$number. $_displayTitle',
+                      '$label  $_displayTitle',
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                       style: TextStyle(

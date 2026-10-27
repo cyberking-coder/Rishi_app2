@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import {
   AlertTriangle,
+  Check,
   ChevronDown,
   ChevronUp,
   FileDown,
@@ -12,8 +13,10 @@ import {
   Headphones,
   Image as ImageIcon,
   Link as LinkIcon,
+  Pencil,
   Trash2,
   Video as VideoIcon,
+  X,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -25,6 +28,7 @@ import {
   deleteModule,
   moveLesson,
   moveModule,
+  renameModule,
 } from "@/app/actions/courses";
 import { AddLessonDialog } from "./add-lesson-dialog";
 import { AddResourceDialog } from "./add-resource-dialog";
@@ -71,6 +75,25 @@ export function CourseBuilder({
   const [newModuleTitle, setNewModuleTitle] = useState("");
   const [busy, setBusy] = useState(false);
 
+  // Inline module rename: which module is being edited, and its draft title.
+  const [editingModuleId, setEditingModuleId] = useState<string | null>(null);
+  const [editModuleTitle, setEditModuleTitle] = useState("");
+
+  function startEditModule(id: string, title: string) {
+    setEditingModuleId(id);
+    setEditModuleTitle(title);
+  }
+
+  async function saveModuleName(moduleId: string) {
+    const title = editModuleTitle.trim();
+    if (!title) return;
+    await run(
+      () => renameModule({ moduleId, courseId: course.id, title }),
+      "Module renamed",
+    );
+    setEditingModuleId(null);
+  }
+
   async function run(fn: () => Promise<{ ok: boolean; error?: string }>, ok: string) {
     setBusy(true);
     try {
@@ -107,15 +130,75 @@ export function CourseBuilder({
         <Card key={module.id}>
           <CardContent className="p-4">
             <div className="flex items-start justify-between gap-3">
-              <div>
-                <p className="font-medium">{module.title}</p>
-                <p className="text-xs text-muted-foreground">
-                  {module.lessons.length}{" "}
-                  {module.lessons.length === 1 ? "lesson" : "lessons"}
-                </p>
-              </div>
+              {editingModuleId === module.id ? (
+                <form
+                  className="flex flex-1 items-center gap-2"
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    saveModuleName(module.id);
+                  }}
+                >
+                  <Input
+                    autoFocus
+                    value={editModuleTitle}
+                    onChange={(e) => setEditModuleTitle(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Escape") setEditingModuleId(null);
+                    }}
+                    disabled={busy}
+                    className="h-8"
+                  />
+                  <Button
+                    type="submit"
+                    variant="ghost"
+                    size="icon"
+                    disabled={busy || !editModuleTitle.trim()}
+                    title="Save"
+                  >
+                    <Check className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    disabled={busy}
+                    onClick={() => setEditingModuleId(null)}
+                    title="Cancel"
+                  >
+                    <X className="h-4 w-4" />
+                  </Button>
+                </form>
+              ) : (
+                <div>
+                  <p className="font-medium">
+                    <span className="text-muted-foreground">
+                      {moduleIndex + 1}.
+                    </span>{" "}
+                    {module.title}
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    {module.lessons.length}{" "}
+                    {module.lessons.length === 1 ? "lesson" : "lessons"}
+                  </p>
+                </div>
+              )}
 
-              <div className="flex items-center gap-1">
+              <div
+                className={
+                  editingModuleId === module.id
+                    ? "hidden"
+                    : "flex items-center gap-1"
+                }
+              >
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  disabled={busy}
+                  onClick={() => startEditModule(module.id, module.title)}
+                  title="Rename module"
+                >
+                  <Pencil className="h-4 w-4" />
+                </Button>
                 <Button
                   variant="ghost"
                   size="icon"
@@ -199,7 +282,12 @@ export function CourseBuilder({
                     <Icon className="h-4 w-4 shrink-0 text-muted-foreground" />
 
                     <div className="min-w-0 flex-1">
-                      <p className="truncate text-sm">{lesson.title}</p>
+                      <p className="truncate text-sm">
+                        <span className="text-muted-foreground">
+                          {moduleIndex + 1}.{lessonIndex + 1}
+                        </span>{" "}
+                        {lesson.title}
+                      </p>
                       <p className="truncate text-xs text-muted-foreground">
                         {lesson.lesson_type === "text"
                           ? "Text lesson"

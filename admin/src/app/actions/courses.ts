@@ -243,9 +243,12 @@ export async function renameModule(args: {
   await requireAdmin();
   const db = createAdminClient();
 
+  const title = args.title.trim();
+  if (!title) return { ok: false, error: "A module needs a name." };
+
   const { error } = await db
     .from("course_modules")
-    .update({ title: args.title })
+    .update({ title })
     .eq("id", args.moduleId);
 
   if (error) return { ok: false, error: error.message };
