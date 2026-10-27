@@ -479,6 +479,29 @@ export async function deleteLesson(args: {
   return { ok: true };
 }
 
+/** Renames a lesson. Title only — media, resources and position are
+ *  untouched. */
+export async function renameLesson(args: {
+  lessonId: string;
+  courseId: string;
+  title: string;
+}): Promise<ActionResult> {
+  await requireAdmin();
+  const db = createAdminClient();
+
+  const title = args.title.trim();
+  if (!title) return { ok: false, error: "A lesson needs a name." };
+
+  const { error } = await db
+    .from("lessons")
+    .update({ title })
+    .eq("id", args.lessonId);
+
+  if (error) return { ok: false, error: error.message };
+  revalidatePath(`/courses/${args.courseId}`);
+  return { ok: true };
+}
+
 export async function moveLesson(args: {
   lessonId: string;
   moduleId: string;

@@ -28,6 +28,7 @@ import {
   deleteModule,
   moveLesson,
   moveModule,
+  renameLesson,
   renameModule,
 } from "@/app/actions/courses";
 import { AddLessonDialog } from "./add-lesson-dialog";
@@ -92,6 +93,25 @@ export function CourseBuilder({
       "Module renamed",
     );
     setEditingModuleId(null);
+  }
+
+  // Inline lesson rename: which lesson is being edited, and its draft title.
+  const [editingLessonId, setEditingLessonId] = useState<string | null>(null);
+  const [editLessonTitle, setEditLessonTitle] = useState("");
+
+  function startEditLesson(id: string, title: string) {
+    setEditingLessonId(id);
+    setEditLessonTitle(title);
+  }
+
+  async function saveLessonName(lessonId: string) {
+    const title = editLessonTitle.trim();
+    if (!title) return;
+    await run(
+      () => renameLesson({ lessonId, courseId: course.id, title }),
+      "Lesson renamed",
+    );
+    setEditingLessonId(null);
   }
 
   async function run(fn: () => Promise<{ ok: boolean; error?: string }>, ok: string) {
@@ -282,22 +302,64 @@ export function CourseBuilder({
                     <Icon className="h-4 w-4 shrink-0 text-muted-foreground" />
 
                     <div className="min-w-0 flex-1">
-                      <p className="truncate text-sm">
-                        <span className="text-muted-foreground">
-                          {moduleIndex + 1}.{lessonIndex + 1}
-                        </span>{" "}
-                        {lesson.title}
-                      </p>
-                      <p className="truncate text-xs text-muted-foreground">
-                        {lesson.lesson_type === "text"
-                          ? "Text lesson"
-                          : media
-                            ? media.title
-                            : "Media unavailable — it may have been deleted"}
-                      </p>
+                      {editingLessonId === lesson.id ? (
+                        <form
+                          className="flex items-center gap-2"
+                          onSubmit={(e) => {
+                            e.preventDefault();
+                            saveLessonName(lesson.id);
+                          }}
+                        >
+                          <Input
+                            autoFocus
+                            value={editLessonTitle}
+                            onChange={(e) => setEditLessonTitle(e.target.value)}
+                            onKeyDown={(e) => {
+                              if (e.key === "Escape") setEditingLessonId(null);
+                            }}
+                            disabled={busy}
+                            className="h-8"
+                          />
+                          <Button
+                            type="submit"
+                            variant="ghost"
+                            size="icon"
+                            disabled={busy || !editLessonTitle.trim()}
+                            title="Save"
+                          >
+                            <Check className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            disabled={busy}
+                            onClick={() => setEditingLessonId(null)}
+                            title="Cancel"
+                          >
+                            <X className="h-4 w-4" />
+                          </Button>
+                        </form>
+                      ) : (
+                        <>
+                          <p className="truncate text-sm">
+                            <span className="text-muted-foreground">
+                              {moduleIndex + 1}.{lessonIndex + 1}
+                            </span>{" "}
+                            {lesson.title}
+                          </p>
+                          <p className="truncate text-xs text-muted-foreground">
+                            {lesson.lesson_type === "text"
+                              ? "Text lesson"
+                              : media
+                                ? media.title
+                                : "Media unavailable — it may have been deleted"}
+                          </p>
+                        </>
+                      )}
                     </div>
 
-                    {mismatched && (
+                    {editingLessonId !== lesson.id && mismatched && (
                       <Badge
                         variant="warning"
                         className="shrink-0 gap-1"
@@ -312,7 +374,22 @@ export function CourseBuilder({
                       </Badge>
                     )}
 
-                    <div className="flex shrink-0 items-center gap-1">
+                    <div
+                      className={
+                        editingLessonId === lesson.id
+                          ? "hidden"
+                          : "flex shrink-0 items-center gap-1"
+                      }
+                    >
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        disabled={busy}
+                        onClick={() => startEditLesson(lesson.id, lesson.title)}
+                        title="Rename lesson"
+                      >
+                        <Pencil className="h-4 w-4" />
+                      </Button>
                       <AddResourceDialog
                         lessonId={lesson.id}
                         courseId={course.id}
