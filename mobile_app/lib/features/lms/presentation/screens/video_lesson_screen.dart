@@ -120,7 +120,14 @@ class _VideoLessonScreenState extends ConsumerState<VideoLessonScreen> {
   /// lesson left open doesn't burn battery.
   void _syncWakelock() {
     final playing = _controller?.value.isPlaying ?? false;
-    WakelockPlus.toggle(enable: playing);
+    // Best-effort, and must never throw. The controller fires this listener
+    // on play/pause even while the app is in the background or tearing down,
+    // and wakelock_plus throws PlatformException("wakelock requires a
+    // foreground activity") if it is toggled then. Unhandled, that async
+    // error was surfacing as a fatal crash and killing playback. Swallow it:
+    // when there is no foreground activity the screen is already off, so the
+    // wakelock is moot anyway.
+    WakelockPlus.toggle(enable: playing).catchError((_) {});
   }
 
   ChewieController _buildChewie(
@@ -246,7 +253,9 @@ class _VideoLessonScreenState extends ConsumerState<VideoLessonScreen> {
     // Release the screen-awake lock when leaving — the lesson is no
     // longer on screen, so the phone's display timeout should resume.
     _controller?.removeListener(_syncWakelock);
-    WakelockPlus.disable();
+    // Also best-effort: disabling can throw the same foreground-activity
+    // PlatformException when the screen is torn down while backgrounded.
+    WakelockPlus.disable().catchError((_) {});
     // Chewie must go first: it holds a reference to the video controller
     // and will touch it during its own teardown.
     _chewie?.dispose();
