@@ -1,5 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/device/device_info_service.dart';
 import '../../../core/network/supabase_client_provider.dart';
 import '../data/datasources/audio_remote_datasource.dart';
 import '../data/repositories/audio_repository_impl.dart';
@@ -7,7 +8,10 @@ import '../domain/repositories/audio_repository.dart';
 import 'audio_player_handler.dart';
 
 final audioRemoteDataSourceProvider = Provider<AudioRemoteDataSource>((ref) {
-  return AudioRemoteDataSource(ref.watch(supabaseClientProvider));
+  return AudioRemoteDataSource(
+    ref.watch(supabaseClientProvider),
+    ref.watch(deviceInfoServiceProvider),
+  );
 });
 
 final audioRepositoryProvider = Provider<AudioRepository>((ref) {

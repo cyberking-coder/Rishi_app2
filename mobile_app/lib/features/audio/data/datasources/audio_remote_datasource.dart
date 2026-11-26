@@ -1,11 +1,14 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../../../../core/device/active_device.dart';
+import '../../../../core/device/device_info_service.dart';
 import '../../../../core/errors/auth_failure.dart';
 
 class AudioRemoteDataSource {
   final SupabaseClient _client;
+  final DeviceInfoService _deviceInfo;
 
-  AudioRemoteDataSource(this._client);
+  AudioRemoteDataSource(this._client, this._deviceInfo);
 
   /// Test-mode: returns a direct public URL if the audio row has one set,
   /// otherwise null (caller then falls back to the signed R2 license flow).
@@ -33,7 +36,7 @@ class AudioRemoteDataSource {
   }
 
   Future<Map<String, dynamic>> issueAudioLicense(String audioId) async {
-    final deviceId = await _getActiveDeviceId();
+    final deviceId = await resolveActiveDeviceId(_client, _deviceInfo);
 
     final response = await _client.functions.invoke(
       'issue-audio-license',
@@ -59,25 +62,6 @@ class AudioRemoteDataSource {
     }
 
     return response.data as Map<String, dynamic>;
-  }
-
-  Future<String> _getActiveDeviceId() async {
-    final userId = _client.auth.currentUser?.id;
-    if (userId == null) {
-      throw AuthFailure.unknown('Not logged in');
-    }
-
-    final row = await _client
-        .from('devices')
-        .select('id')
-        .eq('user_id', userId)
-        .eq('is_active', true)
-        .maybeSingle();
-
-    if (row == null) {
-      throw AuthFailure.unknown('No active device registered');
-    }
-    return row['id'] as String;
   }
 
   Future<List<Map<String, dynamic>>> getPlaylistTracks(String playlistId) {

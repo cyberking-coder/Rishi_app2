@@ -1,5 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/device/device_info_service.dart';
 import '../../../core/network/supabase_client_provider.dart';
 import '../data/datasources/lms_remote_datasource.dart';
 import '../data/datasources/certificate_remote_datasource.dart';
@@ -16,7 +17,10 @@ final lmsRemoteDataSourceProvider = Provider<LmsRemoteDataSource>((ref) {
 });
 
 final videoRemoteDataSourceProvider = Provider<VideoRemoteDataSource>((ref) {
-  return VideoRemoteDataSource(ref.watch(supabaseClientProvider));
+  return VideoRemoteDataSource(
+    ref.watch(supabaseClientProvider),
+    ref.watch(deviceInfoServiceProvider),
+  );
 });
 
 final lmsRepositoryProvider = Provider<LmsRepository>((ref) {

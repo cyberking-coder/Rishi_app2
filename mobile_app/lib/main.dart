@@ -12,6 +12,7 @@ import 'app/router/app_router.dart';
 import 'app/theme/app_theme.dart';
 import 'features/profile/application/profile_providers.dart';
 import 'core/config/app_config.dart';
+import 'core/device/device_info_service.dart';
 import 'core/errors/error_classification.dart';
 import 'core/push/push_service.dart';
 import 'features/auth/application/app_access_controller.dart';
@@ -109,8 +110,9 @@ Future<void> main() async {
     debugPrint('Image cache warmup skipped: $e');
   }
 
-  final audioRepository =
-      AudioRepositoryImpl(AudioRemoteDataSource(Supabase.instance.client));
+  final audioRepository = AudioRepositoryImpl(
+    AudioRemoteDataSource(Supabase.instance.client, DeviceInfoService()),
+  );
 
   // One shared offline-action queue, used by the audio handler (to park
   // progress saved offline) and by SyncService (to replay it when online).

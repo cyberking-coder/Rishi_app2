@@ -1,5 +1,7 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../../../../core/device/active_device.dart';
+import '../../../../core/device/device_info_service.dart';
 import '../../../../core/errors/auth_failure.dart';
 import '../../domain/entities/playback_sources.dart';
 
@@ -9,11 +11,12 @@ import '../../domain/entities/playback_sources.dart';
 /// mapping, so both media types surface the same typed failures to the UI.
 class VideoRemoteDataSource {
   final SupabaseClient _client;
+  final DeviceInfoService _deviceInfo;
 
-  VideoRemoteDataSource(this._client);
+  VideoRemoteDataSource(this._client, this._deviceInfo);
 
   Future<PlaybackSources> issuePlaybackUrl(String videoId) async {
-    final deviceId = await _getActiveDeviceId();
+    final deviceId = await resolveActiveDeviceId(_client, _deviceInfo);
 
     final response = await _client.functions.invoke(
       'issue-playback-license',
@@ -66,20 +69,5 @@ class VideoRemoteDataSource {
     }
 
     throw AuthFailure.unknown('No playable version of this video.');
-  }
-
-  Future<String> _getActiveDeviceId() async {
-    final userId = _client.auth.currentUser?.id;
-    if (userId == null) throw AuthFailure.unknown('Not logged in');
-
-    final row = await _client
-        .from('devices')
-        .select('id')
-        .eq('user_id', userId)
-        .eq('is_active', true)
-        .maybeSingle();
-
-    if (row == null) throw AuthFailure.unknown('No active device registered');
-    return row['id'] as String;
   }
 }
