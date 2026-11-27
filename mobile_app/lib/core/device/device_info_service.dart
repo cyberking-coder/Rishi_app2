@@ -27,11 +27,19 @@ class DeviceInfoService {
   Future<DeviceProfile> getDeviceProfile() async {
     final salt = await _getOrCreateInstallationSalt();
 
+    // The fingerprint is the durable per-install salt ALONE — not any OS
+    // build property. It used to mix in Android's Build.ID (info.id) and
+    // serialNumber; Build.ID changes on every OS/security update, so the same
+    // phone silently got a new fingerprint after an update and tripped the
+    // one-device lock, which is why the team kept having to "reset all
+    // devices" after a build. The salt is persisted in secure storage AND a
+    // file (see _getOrCreateInstallationSalt), so it survives OS updates, app
+    // updates and a Keystore wipe — the same phone keeps the same identity and
+    // never needs a reset. Device name/platform are still read for display.
     if (Platform.isAndroid) {
       final info = await _deviceInfoPlugin.androidInfo;
-      final rawId = '${info.id}-${info.serialNumber}-$salt';
       return DeviceProfile(
-        fingerprint: _hash(rawId),
+        fingerprint: _hash(salt),
         name: '${info.manufacturer} ${info.model}',
         platform: 'android',
       );
@@ -39,9 +47,8 @@ class DeviceInfoService {
 
     if (Platform.isIOS) {
       final info = await _deviceInfoPlugin.iosInfo;
-      final rawId = '${info.identifierForVendor}-$salt';
       return DeviceProfile(
-        fingerprint: _hash(rawId),
+        fingerprint: _hash(salt),
         name: info.utsname.machine,
         platform: 'ios',
       );

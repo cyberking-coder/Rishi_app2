@@ -287,6 +287,28 @@ class AuthRemoteDataSource {
   }
 
   Future<void> signOut() async {
+    // Release this device's lock slot BEFORE dropping the session, so a later
+    // sign-in on the same phone re-registers cleanly instead of colliding with
+    // a still-active row (which would read as "active on another device").
+    // Best-effort: a failure here must never block signing out.
+    try {
+      final uid = _client.auth.currentUser?.id;
+      if (uid != null) {
+        final profile = await _deviceInfoService.getDeviceProfile();
+        final row = await _client
+            .from('devices')
+            .select('id')
+            .eq('user_id', uid)
+            .eq('device_fingerprint', profile.fingerprint)
+            .eq('is_active', true)
+            .maybeSingle();
+        if (row != null) {
+          await _client
+              .rpc('release_device', params: {'p_device_id': row['id']});
+        }
+      }
+    } catch (_) {}
+
     await _client.auth.signOut();
     // Also clear the cached Google account, otherwise google_sign_in
     // silently re-signs the user into the same account on the next
